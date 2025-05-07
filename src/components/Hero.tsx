@@ -9,6 +9,7 @@ import {
 import { Calendar as CalendarComponent } from "./ui/calendar";
 import { format } from "date-fns";
 import { Input } from "./ui/input";
+import { useNavigate } from 'react-router-dom';
 
 interface SearchFormData {
   location: string;
@@ -18,6 +19,7 @@ interface SearchFormData {
 }
 
 const Hero = () => {
+  const navigate = useNavigate();
   console.log('Hero component rendering');
   
   const [formData, setFormData] = useState<SearchFormData>({
@@ -58,13 +60,13 @@ const Hero = () => {
                 <button className="w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-full transition-colors">
                   <Users className="w-4 h-4" />
                 </button>
-                <a 
-                  href="#" 
+                <button 
+                  onClick={() => navigate('/chat')}
                   className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-900 transition-colors"
                 >
                   <MessageSquare className="w-4 h-4" />
                   Начать чат
-                </a>
+                </button>
               </div>
             </div>
           </div>
