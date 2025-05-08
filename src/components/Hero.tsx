@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Search, Calendar, Users, Heart, MessageSquare } from 'lucide-react';
+import { Search, Calendar, Users, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 import { 
   Popover,

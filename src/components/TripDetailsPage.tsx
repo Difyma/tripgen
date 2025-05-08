@@ -1,6 +1,4 @@
-import { MapPin, Calendar, DollarSign, Users, Plane, Hotel, Car, Clock, CalendarDays, Utensils, CircleDollarSign, ArrowLeft, Edit2, Check, X, Plus, Trash } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { MapPin, Calendar, DollarSign, Users, Plane, Hotel, Car, Clock, CalendarDays, Utensils, CircleDollarSign, ArrowLeft } from 'lucide-react';
 
 interface Trip {
   id: string;
@@ -29,8 +27,8 @@ interface Trip {
 
 interface TripDetailsPageProps {
   trip: Trip;
-  onUpdateTrip?: (updatedTrip: Trip) => void;
   onBack: () => void;
+  onUpdateTrip: (updatedTrip: Trip) => void;
 }
 
 const formatDate = (dateString: string) => {
@@ -57,15 +55,7 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-export function TripDetailsPage({ trip, onUpdateTrip, onBack }: TripDetailsPageProps) {
-  const navigate = useNavigate();
-  const [isEditingRoute, setIsEditingRoute] = useState(false);
-  const [isEditingActivities, setIsEditingActivities] = useState(false);
-  const [editedRoute, setEditedRoute] = useState(trip.route);
-  const [editedTransportation, setEditedTransportation] = useState(trip.details?.transportation || []);
-  const [editedAccommodation, setEditedAccommodation] = useState(trip.details?.accommodation || []);
-  const [editedActivities, setEditedActivities] = useState(trip.details?.activities || []);
-
+export function TripDetailsPage({ trip, onBack, onUpdateTrip }: TripDetailsPageProps) {
   const totalDays = getDaysBetweenDates(trip.startDate, trip.endDate);
   const daysArray = Array.from({ length: totalDays }, (_, i) => {
     const date = new Date(trip.startDate);
@@ -75,54 +65,6 @@ export function TripDetailsPage({ trip, onUpdateTrip, onBack }: TripDetailsPageP
 
   const totalCost = trip.details?.costs ? 
     Object.values(trip.details.costs).reduce((acc, curr) => acc + curr, 0) : 0;
-
-  const handleSaveRoute = () => {
-    if (onUpdateTrip) {
-      onUpdateTrip({
-        ...trip,
-        route: editedRoute,
-        details: {
-          ...trip.details!,
-          transportation: editedTransportation,
-          accommodation: editedAccommodation,
-        }
-      });
-    }
-    setIsEditingRoute(false);
-  };
-
-  const handleSaveActivities = () => {
-    if (onUpdateTrip) {
-      onUpdateTrip({
-        ...trip,
-        details: {
-          ...trip.details!,
-          activities: editedActivities,
-        }
-      });
-    }
-    setIsEditingActivities(false);
-  };
-
-  const handleAddRouteStop = () => {
-    setEditedRoute([...editedRoute, '']);
-    setEditedTransportation([...editedTransportation, '']);
-    setEditedAccommodation([...editedAccommodation, '']);
-  };
-
-  const handleRemoveRouteStop = (index: number) => {
-    setEditedRoute(editedRoute.filter((_, i) => i !== index));
-    setEditedTransportation(editedTransportation.filter((_, i) => i !== index));
-    setEditedAccommodation(editedAccommodation.filter((_, i) => i !== index));
-  };
-
-  const handleAddActivity = () => {
-    setEditedActivities([...editedActivities, '']);
-  };
-
-  const handleRemoveActivity = (index: number) => {
-    setEditedActivities(editedActivities.filter((_, i) => i !== index));
-  };
 
   return (
     <div className="min-h-screen bg-white">
