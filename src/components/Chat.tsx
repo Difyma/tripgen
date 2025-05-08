@@ -15,7 +15,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { CreateTripModal } from './CreateTripModal';
-import AILogo from '../images/TRIPGEN_logo_2.png';
+// import AILogo from '../images/TRIPGEN_logo_2.png';
+const AILogo = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
 
 interface Message {
@@ -42,11 +43,6 @@ interface FilterState {
     min: number;
     max: number;
   };
-}
-
-interface Place {
-  type: 'airport' | 'hotel' | 'restaurant' | 'location' | 'attraction';
-  name: string;
 }
 
 interface DateFilter {
@@ -910,7 +906,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
               onClick={handleTripGenClick}
               className="flex-1 min-w-[160px] h-10 flex items-center justify-center gap-2 px-4 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
             >
-              <img src="/src/images/TRIPGEN_logo_white.png" alt="TripGen" className="w-6 h-6" />
+              <img src={AILogo} alt="TripGen" className="w-6 h-6" />
               TripGen Builder
             </button>
           </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MapPin, Plus, MessageSquare, Compass, Heart, Bell, Settings, ChevronRight, ChevronLeft, Users } from 'lucide-react';
+import { Plus, MessageSquare, Compass, Heart, Bell, Settings, ChevronRight, ChevronLeft, Users } from 'lucide-react';
 import { CreateTripModal } from './CreateTripModal';
 
 interface SidebarProps {
@@ -28,7 +28,7 @@ export function Sidebar({ className }: SidebarProps) {
       <div className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ${className}`}>
         <div className="p-4 relative">
           <Link to="/" className={`flex items-center gap-2 mb-6 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
-            <img src="src/images/TRIPGEN_logo_2.png" alt="Logo" className="w-8 h-8" />
+            <img src="/images/TRIPGEN_logo_2.png" alt="Logo" className="w-8 h-8" />
             {!isSidebarCollapsed && <span className="font-semibold">TRIPGEN</span>}
           </Link>
           <div className="space-y-2">
