@@ -1,22 +1,4 @@
 import { motion } from 'framer-motion';
-import { Hotel, Car, Coffee, Ticket } from 'lucide-react';
-
-const expenses = [
-  { icon: Hotel, label: 'Отели', amount: '45000 ₽' },
-  { icon: Car, label: 'Транспорт', amount: '25000 ₽' },
-  { icon: Coffee, label: 'Питание', amount: '15000 ₽' },
-  { icon: Ticket, label: 'Развлечения', amount: '20000 ₽' },
-];
-
-const schedule = [
-  'День 1: Прибытие в Горно-Алтайск, заселение в отель',
-  'День 2: Экскурсия на Телецкое озеро',
-  'День 3: Поездка на Чемальскую ГЭС',
-  'День 4: Треккинг по Алтайскому заповеднику',
-  'День 5: Рафтинг по реке Катунь',
-  'День 6: Посещение села Чемал',
-  'День 7: Возвращение домой',
-];
 
 const ExampleTrip = () => {
   return (

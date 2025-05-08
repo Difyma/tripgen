@@ -1,6 +1,5 @@
 import { Dialog, DialogContent } from './ui/dialog';
-import { MapPin, Calendar, DollarSign, ChevronRight, X, Users, Plane, Hotel, Car, Clock } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { MapPin, Calendar, X, Users, Plane, Hotel, Car, Clock } from 'lucide-react';
 
 interface Trip {
   id: string;

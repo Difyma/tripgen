@@ -46,7 +46,7 @@ const Hero = () => {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-0.5">
               <img 
-                src="/src/images/TRIPGEN_logo_2.png" 
+                src="/images/TRIPGEN_logo_2.png" 
                 alt="TripGen Logo" 
                 className="w-12 h-12"
               />

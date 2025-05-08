@@ -59,7 +59,7 @@ export function CurrentTrip({ trip }: CurrentTripProps) {
         <div className="space-y-2">
           <h4 className="text-sm font-medium">Маршрут:</h4>
           <div className="flex flex-wrap gap-2">
-            {trip.route.map((stop, index) => (
+            {trip.route.map((stop) => (
               <div key={stop} className="px-2 py-1 bg-gray-100 rounded text-sm">
                 {stop}
               </div>

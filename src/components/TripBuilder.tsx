@@ -162,7 +162,7 @@ const TripBuilder = ({ message, duration, travelers, onClose }: TripBuilderProps
       {/* Список дней */}
       <div className="flex-1 overflow-y-auto p-6 pt-2">
         <h2 className="text-lg font-semibold mb-4">Itinerary <span className="text-gray-400 font-normal">{days.length} days</span></h2>
-        {days.map((day, i) => (
+        {days.map((day) => (
           <div key={day.number} className="mb-8">
             {/* Заголовок дня */}
             <button

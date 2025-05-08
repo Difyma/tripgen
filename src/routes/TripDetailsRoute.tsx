@@ -1,15 +1,12 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { TripDetailsPage } from '../components/TripDetailsPage';
 import { trips, Trip } from '../data/trips';
-import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 export function TripDetailsRoute() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [currentTrip, setCurrentTrip] = useState<Trip | undefined>(
-    trips.find((t: Trip) => t.id === id)
-  );
+  const currentTrip = trips.find((t: Trip) => t.id === id);
 
   if (!currentTrip) {
     return (

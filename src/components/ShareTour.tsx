@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Users, MessageSquare, Mail, Link2, MapPin, Camera, Calendar, Map } from 'lucide-react';
+import { Users, MessageSquare, Mail, MapPin, Camera, Calendar, Map } from 'lucide-react';
 
 const ShareTour = () => {
   const handleCopyLink = () => {

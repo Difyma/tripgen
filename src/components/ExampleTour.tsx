@@ -43,7 +43,7 @@ const ExampleTour = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <img src="src/images/TRIPGEN_logo_2.png" alt="AI Assistant" className="w-6 h-6" />
+            <img src="/images/TRIPGEN_logo_2.png" alt="AI Assistant" className="w-6 h-6" />
             <span className="text-sm font-medium">AI TRIPGEN</span>
           </div>
           <motion.h2 
@@ -80,7 +80,7 @@ const ExampleTour = () => {
               </div>
               <div className="bg-gray-50 rounded-2xl p-4 mb-4">
                 <div className="flex items-start gap-3">
-                  <img src="src/images/TRIPGEN_logo_2.png" alt="AI" className="w-5 h-5 mt-1" />
+                  <img src="/images/TRIPGEN_logo_2.png" alt="AI" className="w-5 h-5 mt-1" />
                   <div>
                     <p className="text-sm font-medium">Рекомендация TRIPGEN</p>
                     <p className="text-sm text-gray-600">Маршрут оптимизирован по времени и расстоянию между локациями для максимального комфорта.</p>
@@ -144,7 +144,7 @@ const ExampleTour = () => {
             <div className="p-6 bg-gray-50 flex items-center justify-between mt-auto">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-black flex items-center justify-center">
-                  <img src="src/images/TRIPGEN_logo_white.png" alt="AI Assistant" className="w-6 h-6" />
+                  <img src="/images/TRIPGEN_logo_white.png" alt="AI Assistant" className="w-6 h-6" />
                 </div>
                 <div>
                   <p className="text-sm font-medium">AI TRIPGEN</p>

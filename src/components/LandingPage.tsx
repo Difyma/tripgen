@@ -1,7 +1,5 @@
-import { Link } from 'react-router-dom';
 import Hero from './Hero';
 import HowItWorks from './HowItWorks';
-import ExampleTrip from './ExampleTrip';
 import Services from './Services';
 import CreatorSection from './CreatorSection';
 import Footer from './Footer';

@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
-import { Camera, Globe, DollarSign, Users, Star, TrendingUp, ChevronRight } from 'lucide-react';
+import { Globe, DollarSign, Users, Star, ChevronRight } from 'lucide-react';
 
 const benefits = [
   {

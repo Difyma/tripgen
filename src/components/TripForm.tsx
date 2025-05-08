@@ -1,44 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, ClipboardList, Settings } from 'lucide-react';
 
-interface FormData {
-  departureCity: string;
-  startDate: string;
-  endDate: string;
-  budget: string;
-  interests: string[];
-}
-
-const interests = [
-  { id: 'nature', label: 'Природа' },
-  { id: 'gastro', label: 'Гастрономия' },
-  { id: 'active', label: 'Активный отдых' },
-  { id: 'relax', label: 'Релакс' },
-  { id: 'kids', label: 'С детьми' },
-];
-
 const TripForm = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState<FormData>({
-    departureCity: '',
-    startDate: '',
-    endDate: '',
-    budget: '',
-    interests: [],
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    // Имитация загрузки
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 2000);
-  };
-
   return (
     <section id="trip-form" className="py-20 bg-[#FBFBFD]">
       <div className="max-w-7xl mx-auto px-4">

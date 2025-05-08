@@ -16,7 +16,7 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { CreateTripModal } from './CreateTripModal';
 // import AILogo from '../images/TRIPGEN_logo_2.png';
-const AILogo = '/images/TRIPGEN_logo_2.png';
+const AILogo = '/images/TRIPGEN_logo_white.png';
 import TripBuilder from './TripBuilder';
 
 interface Message {

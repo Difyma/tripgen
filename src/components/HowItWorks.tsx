@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Search, Calendar, MapPin, Plane, Camera } from 'lucide-react';
+import { Search, Calendar, MapPin, Plane } from 'lucide-react';
 
 const HowItWorks = () => {
   return (
