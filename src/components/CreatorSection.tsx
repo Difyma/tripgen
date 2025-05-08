@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const CreatorSection = () => {
   return (
@@ -34,18 +35,22 @@ const CreatorSection = () => {
                     Станьте создателем контента для TripGen и получайте вознаграждение за любимое дело!
                   </p>
                   
-                  <motion.button
+                  <motion.div
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, amount: 0.3 }}
                     transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+                  >
+                    <Link
+                      to="/creator"
                     className="inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-gray-900 transition-colors"
                   >
                     Стать создателем
                     <ArrowRight className="w-5 h-5" />
-                  </motion.button>
+                    </Link>
+                  </motion.div>
 
                   {/* Stats */}
                   <div className="mt-8 grid grid-cols-3 gap-6">

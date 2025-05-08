@@ -1,52 +1,29 @@
-import { useState, useEffect } from 'react';
-import Hero from './components/Hero';
-import HowItWorks from './components/HowItWorks';
-//import TourPackages from './components/TourPackages';
-//import ExperienceStats from './components/ExperienceStats';
-//import TourGuides from './components/TourGuides';
-import CTASection from './components/CTASection';
-import Footer from './components/Footer';
-import TripForm from './components/TripForm';
-import PopularDestinations from './components/PopularDestinations';
-import Services from './components/Services';
-import TravelQuiz from './components/TravelQuiz';
-import CreatorSection from './components/CreatorSection';
-import TravelGallery from './components/TravelGallery';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AppLayout } from './components/AppLayout';
+import { LandingPage } from './components/LandingPage';
+import { TripsRoute } from './routes/TripsRoute';
+import { TripDetailsRoute } from './routes/TripDetailsRoute';
+import Chat from './components/Chat';
+import CreatorPage from './components/CreatorPage';
 
-const App = () => {
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Имитация загрузки ресурсов
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-xl">Loading...</div>
-      </div>
-    );
-  }
-
+export function App() {
   return (
-    <div className="min-h-screen bg-white">
-      <Hero />
-      <HowItWorks />
-      <TripForm />
-      <PopularDestinations />
-      <Services />
-      <TravelQuiz />
-      <CreatorSection />
-      <CTASection />
-      <TravelGallery />
-      <Footer />
-    </div>
-  );
-};
+    <Router>
+      <Routes>
+        {/* Landing Page */}
+        <Route path="/" element={<LandingPage />} />
 
-export default App;
+        {/* Creator Page */}
+        <Route path="/creator" element={<CreatorPage />} />
+
+        {/* App Routes */}
+        <Route element={<AppLayout />}>
+          <Route path="trips" element={<TripsRoute />} />
+          <Route path="trips/:id" element={<TripDetailsRoute />} />
+          <Route path="chat" element={<Chat />} />
+          <Route path="chat/:id" element={<Chat />} />
+        </Route>
+      </Routes>
+    </Router>
+  );
+}

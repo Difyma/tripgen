@@ -15,6 +15,8 @@ interface SearchFormData {
   checkIn: Date | undefined;
   checkOut: Date | undefined;
   guests: number;
+  children: number;
+  pets: number;
 }
 
 const Hero = () => {
@@ -24,7 +26,9 @@ const Hero = () => {
     location: '',
     checkIn: undefined,
     checkOut: undefined,
-    guests: 1
+    guests: 1,
+    children: 0,
+    pets: 0
   });
 
   const [isLocationOpen, setIsLocationOpen] = useState(false);
@@ -42,7 +46,7 @@ const Hero = () => {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-0.5">
               <img 
-                src="src/images/TRIPGEN_logo_2.png" 
+                src="/src/images/TRIPGEN_logo_2.png" 
                 alt="TripGen Logo" 
                 className="w-12 h-12"
               />
@@ -59,7 +63,7 @@ const Hero = () => {
                   <Users className="w-4 h-4" />
                 </button>
                 <a 
-                  href="#" 
+                  href="/chat" 
                   className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-900 transition-colors"
                 >
                   <MessageSquare className="w-4 h-4" />
@@ -197,6 +201,8 @@ const Hero = () => {
                         </div>
                         <div className="text-sm font-medium">
                           {formData.guests} {formData.guests === 1 ? 'guest' : 'guests'}
+                          {formData.children > 0 && `, ${formData.children} ${formData.children === 1 ? 'child' : 'children'}`}
+                          {formData.pets > 0 && `, ${formData.pets} ${formData.pets === 1 ? 'pet' : 'pets'}`}
                         </div>
                       </button>
                     </PopoverTrigger>
@@ -214,6 +220,40 @@ const Hero = () => {
                           <button 
                             className="w-8 h-8 rounded-full border flex items-center justify-center"
                             onClick={() => setFormData({ ...formData, guests: formData.guests + 1 })}
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        <h4 className="font-medium">Children</h4>
+                        <div className="flex items-center gap-4">
+                          <button 
+                            className="w-8 h-8 rounded-full border flex items-center justify-center"
+                            onClick={() => setFormData({ ...formData, children: Math.max(0, formData.children - 1) })}
+                          >
+                            -
+                          </button>
+                          <span>{formData.children}</span>
+                          <button 
+                            className="w-8 h-8 rounded-full border flex items-center justify-center"
+                            onClick={() => setFormData({ ...formData, children: formData.children + 1 })}
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        <h4 className="font-medium">Pets</h4>
+                        <div className="flex items-center gap-4">
+                          <button 
+                            className="w-8 h-8 rounded-full border flex items-center justify-center"
+                            onClick={() => setFormData({ ...formData, pets: Math.max(0, formData.pets - 1) })}
+                          >
+                            -
+                          </button>
+                          <span>{formData.pets}</span>
+                          <button 
+                            className="w-8 h-8 rounded-full border flex items-center justify-center"
+                            onClick={() => setFormData({ ...formData, pets: formData.pets + 1 })}
                           >
                             +
                           </button>
