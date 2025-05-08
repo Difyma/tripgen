@@ -3,12 +3,6 @@ import {
   Send, 
   Plus, 
   MapPin, 
-  Search, 
-  MessageSquare, 
-  Compass, 
-  Heart, 
-  Bell, 
-  Settings, 
   ChevronRight, 
   ChevronLeft, 
   Users,
@@ -16,10 +10,9 @@ import {
   DollarSign
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { CreateTripModal } from './CreateTripModal';
 import AILogo from '../images/TRIPGEN_logo_2.png';
@@ -148,7 +141,6 @@ const Chat = () => {
   });
 
   const [inputText, setInputText] = useState('');
-  const [showChatList, setShowChatList] = useState(false);
   const [isCreateTripModalOpen, setIsCreateTripModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currentMessage, setCurrentMessage] = useState<string>('');
@@ -165,12 +157,7 @@ const Chat = () => {
     }
   };
 
-  const handleDateChange = (date: Date | undefined) => {
-    setFilters(prev => ({ 
-      ...prev, 
-      date: date ? date.toISOString() : '' 
-    }));
-  };
+  
 
   const handleTravelersChange = (increment: boolean) => {
     setFilters(prev => ({
@@ -249,23 +236,7 @@ const Chat = () => {
     }
   ];
 
-  const getPlaceIcon = (type: string): string => {
-    const icons: { [key: string]: string } = {
-      'museum': '🏛️',
-      'palace': '👑',
-      'park': '🌳',
-      'cafe': '☕',
-      'restaurant': '🍽️',
-      'hotel': '🏨',
-      'airport': '✈️',
-      'attraction': '🎯',
-      'monastery': '⛪',
-      'church': '⛪',
-      'city': '🏰',
-      'landmark': '🗿'
-    };
-    return icons[type.toLowerCase()] || '📍';
-  };
+  
 
   // Функция для генерации URL места
   const generatePlaceUrl = (place: string): string => {

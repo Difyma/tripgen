@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, MapPin, Users, Calendar, Undo2, Redo2, Trash2, ExternalLink, Plus, Clock, BedDouble, Utensils } from 'lucide-react';
+import { ChevronDown, ChevronUp, Users, Calendar, Undo2, Redo2, Trash2, ExternalLink, Plus, Clock, BedDouble, Utensils } from 'lucide-react';
 
 interface TripBuilderProps {
   message: string;
@@ -107,7 +107,7 @@ const parseMessage = (text: string): Day[] => {
   return days;
 };
 
-const TripBuilder = ({ message, location, duration, travelers, onClose }: TripBuilderProps) => {
+const TripBuilder = ({ message, duration, travelers, onClose }: TripBuilderProps) => {
   const [expandedDays, setExpandedDays] = useState<number[]>([1]);
   const [showDistances, setShowDistances] = useState(true);
 
