@@ -26,11 +26,6 @@ export function TripDetailsRoute() {
     );
   }
 
-  const handleUpdateTrip = (updatedTrip: Trip) => {
-    setCurrentTrip(updatedTrip);
-    // Here you would typically also update the backend/storage
-  };
-
   return (
     <div className="flex-1 overflow-y-auto">
       <TripDetailsPage 
