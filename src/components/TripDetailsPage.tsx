@@ -28,7 +28,6 @@ interface Trip {
 interface TripDetailsPageProps {
   trip: Trip;
   onBack: () => void;
-  onUpdateTrip: (updatedTrip: Trip) => void;
 }
 
 const formatDate = (dateString: string) => {
@@ -55,7 +54,7 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-export function TripDetailsPage({ trip, onBack, onUpdateTrip }: TripDetailsPageProps) {
+export function TripDetailsPage({ trip, onBack }: TripDetailsPageProps) {
   const totalDays = getDaysBetweenDates(trip.startDate, trip.endDate);
   const daysArray = Array.from({ length: totalDays }, (_, i) => {
     const date = new Date(trip.startDate);

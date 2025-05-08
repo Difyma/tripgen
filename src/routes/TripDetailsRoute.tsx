@@ -33,7 +33,10 @@ export function TripDetailsRoute() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <TripDetailsPage trip={currentTrip} onUpdateTrip={handleUpdateTrip} onBack={() => navigate('/trips')} />
+      <TripDetailsPage 
+        trip={currentTrip} 
+        onBack={() => navigate('/trips')} 
+      />
     </div>
   );
 } 
