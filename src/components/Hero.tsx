@@ -68,10 +68,10 @@ const Hero = () => {
                 </button>
                 <a 
                   href="/chat" 
-                  className="flex items-center gap-1 sm:gap-2 bg-black text-white px-2 py-1 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-900 transition-colors"
+                  className="flex items-center gap-2 bg-black text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-900 transition-colors"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span className="hidden xs:inline">Начать чат</span>
+                  <span>Начать чат</span>
                 </a>
               </div>
             </div>
