@@ -33,10 +33,24 @@ const Hero = () => {
 
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authStep, setAuthStep] = useState<'email' | 'otp'>('email');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authOtp, setAuthOtp] = useState('');
+  const [authError, setAuthError] = useState('');
 
   const handleSearch = () => {
     console.log('Search clicked', formData);
     // Здесь будет обработка поиска
+  };
+
+  const handleSendEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // Implementation of sending email
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // Implementation of verifying OTP
   };
 
   return (
@@ -300,21 +314,33 @@ const Hero = () => {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </button>
             <h2 className="text-xl font-semibold text-center mb-2">Вход / Регистрация</h2>
-            <form className="flex flex-col gap-3">
-              <input
-                type="email"
-                placeholder="Email"
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-black focus:border-transparent transition-shadow text-sm"
-                autoFocus
-              />
-              <input
-                type="password"
-                placeholder="Пароль"
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-black focus:border-transparent transition-shadow text-sm"
-              />
-              <button type="submit" className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors mt-2">Войти</button>
-              <div className="text-center text-xs text-gray-500">или</div>
-              <button type="button" className="w-full border border-gray-200 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors">Зарегистрироваться</button>
+            <form className="flex flex-col gap-3" onSubmit={authStep === 'email' ? handleSendEmail : handleVerifyOtp}>
+              {authStep === 'email' ? (
+                <>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={authEmail}
+                    onChange={e => setAuthEmail(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-black focus:border-transparent transition-shadow text-sm"
+                    autoFocus
+                  />
+                  <button type="submit" className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors mt-2">Получить код</button>
+                </>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Код из письма"
+                    value={authOtp}
+                    onChange={e => setAuthOtp(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-black focus:border-transparent transition-shadow text-sm"
+                  />
+                  <button type="submit" className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors mt-2">Войти</button>
+                  <button type="button" onClick={() => setAuthStep('email')} className="w-full border border-gray-200 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors">Изменить email</button>
+                </>
+              )}
+              {authError && <div className="text-center text-xs text-red-500">{authError}</div>}
             </form>
           </motion.div>
         </div>
