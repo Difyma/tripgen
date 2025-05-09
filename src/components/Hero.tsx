@@ -32,6 +32,7 @@ const Hero = () => {
   });
 
   const [isLocationOpen, setIsLocationOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const handleSearch = () => {
     console.log('Search clicked', formData);
@@ -41,33 +42,36 @@ const Hero = () => {
   return (
     <div className="min-h-screen bg-[#FBFBFD]">
       {/* Navigation */}
-      <nav className="w-full py-4 px-8 bg-white/80 backdrop-blur-xl fixed top-0 left-0 z-50 border-b border-gray-200/50">
+      <nav className="w-full py-2 px-2 sm:py-4 sm:px-8 bg-white/80 backdrop-blur-xl fixed top-0 left-0 z-50 border-b border-gray-200/50">
         <div className="max-w-[1200px] mx-auto">
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-1 sm:gap-0.5">
               <img 
                 src="/images/TRIPGEN_logo_2.png" 
                 alt="TripGen Logo" 
-                className="w-12 h-12"
+                className="w-8 h-8 sm:w-12 sm:h-12"
               />
-              <div className="text-xl font-semibold tracking-wide text-gray-800 font-cal">TRIPGEN</div>
+              <div className="text-base sm:text-xl font-semibold tracking-wide text-gray-800 font-cal">TRIPGEN</div>
             </div>
-            <div className="flex items-center gap-12">
-              <a href="#" className="text-sm text-gray-600 hover:text-black transition-colors">Как это работает</a>
-              <a href="#" className="text-sm text-gray-600 hover:text-black transition-colors">О нас</a>
-              <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-12">
+              <a href="#" className="text-xs sm:text-sm text-gray-600 hover:text-black transition-colors">Как это работает</a>
+              <a href="#" className="text-xs sm:text-sm text-gray-600 hover:text-black transition-colors">О нас</a>
+              <div className="flex items-center gap-1 sm:gap-4">
                 <button className="w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-full transition-colors">
                   <Search className="w-4 h-4" />
                 </button>
-                <button className="w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-full transition-colors">
+                <button className="w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-full transition-colors"
+                  onClick={() => setShowAuthModal(true)}
+                  aria-label="Войти или зарегистрироваться"
+                >
                   <Users className="w-4 h-4" />
                 </button>
                 <a 
                   href="/chat" 
-                  className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-900 transition-colors"
+                  className="flex items-center gap-1 sm:gap-2 bg-black text-white px-2 py-1 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-900 transition-colors"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  Начать чат
+                  <span className="hidden xs:inline">Начать чат</span>
                 </a>
               </div>
             </div>
@@ -77,24 +81,24 @@ const Hero = () => {
 
       {/* Hero Content */}
       <div className="min-h-screen pt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex flex-col items-center justify-center py-12">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 h-full flex flex-col items-center justify-center py-6 sm:py-12">
           {/* Main Heading */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="text-center mb-12 relative z-20"
+            className="text-center mb-6 sm:mb-12 relative z-20"
           >
-            <h1 className="text-[56px] leading-tight font-semibold tracking-[-0.025em] bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 mb-4">
+            <h1 className="text-2xl xs:text-3xl sm:text-5xl md:text-6xl leading-tight font-semibold tracking-[-0.025em] bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 mb-3 sm:mb-4">
             Ваше Путешествие Начинается Здесь
             </h1>
-            <p className="text-xl text-gray-600 max-w-[600px] mx-auto font-light">
+            <p className="text-sm xs:text-base sm:text-xl text-gray-600 max-w-[95vw] sm:max-w-[600px] mx-auto font-light">
             Посетите самые замечательные места мира с помощью наших тщательно отобранных туристических предложений.
             </p>
           </motion.div>
 
           {/* Featured Image Container */}
-          <div className="relative w-full aspect-[21/9]">
+          <div className="relative w-full h-[160px] xs:h-[200px] sm:aspect-[21/9] sm:h-auto rounded-2xl overflow-hidden">
             {/* Featured Image */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -102,7 +106,7 @@ const Hero = () => {
               transition={{ duration: 1, delay: 0.2 }}
               className="absolute inset-0"
             >
-              <div className="w-full h-full rounded-3xl overflow-hidden">
+              <div className="w-full h-full rounded-2xl overflow-hidden">
                 <img
                   src="https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=2400&q=80"
                   alt="Scenic landscape"
@@ -116,10 +120,10 @@ const Hero = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
-              className="absolute inset-x-0 bottom-8 mx-auto max-w-[900px] px-2 z-20"
+              className="absolute inset-x-0 bottom-2 sm:bottom-8 mx-auto w-full max-w-full sm:max-w-[900px] px-0 sm:px-2 z-20"
             >
-              <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg p-4">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-2 px-2">
+              <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg p-2 sm:p-4">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-2 px-0 sm:px-2">
                   {/* Location */}
                   <Popover open={isLocationOpen} onOpenChange={setIsLocationOpen}>
                     <PopoverTrigger asChild>
@@ -276,6 +280,45 @@ const Hero = () => {
           </div>
         </div>
       </div>
+
+      {/* Popover для авторизации/регистрации */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setShowAuthModal(false)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="bg-white rounded-2xl shadow-2xl max-w-xs w-full p-6 relative flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 p-1 rounded-full"
+              onClick={() => setShowAuthModal(false)}
+              aria-label="Закрыть"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            <h2 className="text-xl font-semibold text-center mb-2">Вход / Регистрация</h2>
+            <form className="flex flex-col gap-3">
+              <input
+                type="email"
+                placeholder="Email"
+                className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-black focus:border-transparent transition-shadow text-sm"
+                autoFocus
+              />
+              <input
+                type="password"
+                placeholder="Пароль"
+                className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-black focus:border-transparent transition-shadow text-sm"
+              />
+              <button type="submit" className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors mt-2">Войти</button>
+              <div className="text-center text-xs text-gray-500">или</div>
+              <button type="button" className="w-full border border-gray-200 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors">Зарегистрироваться</button>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
