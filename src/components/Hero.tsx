@@ -36,6 +36,7 @@ const Hero = () => {
   const [authStep, setAuthStep] = useState<'email' | 'otp'>('email');
   const [authEmail, setAuthEmail] = useState('');
   const [authOtp, setAuthOtp] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
 
   const handleSearch = () => {
@@ -45,12 +46,32 @@ const Hero = () => {
 
   const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Implementation of sending email
+    setAuthLoading(true);
+    setAuthError('');
+    // TODO: заменить на реальный запрос
+    setTimeout(() => {
+      setAuthStep('otp');
+      setAuthLoading(false);
+    }, 1000);
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Implementation of verifying OTP
+    setAuthLoading(true);
+    setAuthError('');
+    // TODO: заменить на реальный запрос
+    setTimeout(() => {
+      if (authOtp === '123456') { // для теста
+        setShowAuthModal(false);
+        setAuthStep('email');
+        setAuthEmail('');
+        setAuthOtp('');
+        setAuthError('');
+      } else {
+        setAuthError('Неверный код');
+      }
+      setAuthLoading(false);
+    }, 1000);
   };
 
   return (
@@ -82,7 +103,7 @@ const Hero = () => {
                 </button>
                 <a 
                   href="/chat" 
-                  className="flex items-center gap-2 bg-black text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-900 transition-colors"
+                  className="flex items-center gap-1 sm:gap-2 bg-black text-white px-2 py-1 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-900 transition-colors"
                 >
                   <MessageSquare className="w-4 h-4" />
                   <span>Начать чат</span>
@@ -297,7 +318,7 @@ const Hero = () => {
 
       {/* Popover для авторизации/регистрации */}
       {showAuthModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setShowAuthModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => { setShowAuthModal(false); setAuthStep('email'); setAuthEmail(''); setAuthOtp(''); setAuthError(''); }}>
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -308,7 +329,7 @@ const Hero = () => {
           >
             <button
               className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 p-1 rounded-full"
-              onClick={() => setShowAuthModal(false)}
+              onClick={() => { setShowAuthModal(false); setAuthStep('email'); setAuthEmail(''); setAuthOtp(''); setAuthError(''); }}
               aria-label="Закрыть"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -323,9 +344,12 @@ const Hero = () => {
                     value={authEmail}
                     onChange={e => setAuthEmail(e.target.value)}
                     className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-black focus:border-transparent transition-shadow text-sm"
+                    required
                     autoFocus
                   />
-                  <button type="submit" className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors mt-2">Получить код</button>
+                  <button type="submit" className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors mt-2" disabled={authLoading}>
+                    {authLoading ? 'Отправка...' : 'Получить код'}
+                  </button>
                 </>
               ) : (
                 <>
@@ -335,12 +359,18 @@ const Hero = () => {
                     value={authOtp}
                     onChange={e => setAuthOtp(e.target.value)}
                     className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-black focus:border-transparent transition-shadow text-sm"
+                    required
+                    autoFocus
                   />
-                  <button type="submit" className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors mt-2">Войти</button>
-                  <button type="button" onClick={() => setAuthStep('email')} className="w-full border border-gray-200 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors">Изменить email</button>
+                  <button type="submit" className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors mt-2" disabled={authLoading}>
+                    {authLoading ? 'Проверка...' : 'Войти'}
+                  </button>
+                  <button type="button" className="text-xs text-gray-500 mt-2" onClick={() => { setAuthStep('email'); setAuthOtp(''); setAuthError(''); }}>
+                    Изменить email
+                  </button>
                 </>
               )}
-              {authError && <div className="text-center text-xs text-red-500">{authError}</div>}
+              {authError && <div className="text-red-500 text-xs text-center">{authError}</div>}
             </form>
           </motion.div>
         </div>
