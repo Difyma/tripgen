@@ -828,59 +828,94 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
               </PopoverContent>
             </Popover>
 
-            {/* Travelers, Children and Pets Counter */}
-            <div className="flex items-center gap-4 min-w-[320px]">
-              <div className="flex items-center gap-2">
-                <Users size={20} className="text-gray-400" />
-                <button
-                  onClick={() => handleTravelersChange(false)}
-                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-50"
-                >
-                  -
+            {/* Travelers Filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="flex-1 min-w-[160px] h-10 pl-8 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 text-left relative">
+                  <Users className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2" />
+                  <span className="block truncate mt-[7px]">
+                    {filters.travelers} взр • {filters.children} реб • {filters.pets} пит
+                  </span>
                 </button>
-                <span className="w-8 text-center">{filters.travelers}</span>
-                <button
-                  onClick={() => handleTravelersChange(true)}
-                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-50"
-                >
-                  +
-                </button>
-              </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-4 bg-white shadow-lg rounded-lg border border-gray-200" align="start">
+                <div className="space-y-4">
+                  <h4 className="font-medium text-gray-900">Путешественники</h4>
+                  
+                  {/* Adults */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-gray-900">Взрослые</div>
+                      <div className="text-sm text-gray-500">От 13 лет</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleTravelersChange(false)}
+                        className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                        disabled={filters.travelers <= 1}
+                      >
+                        -
+                      </button>
+                      <span className="w-4 text-center">{filters.travelers}</span>
+                      <button
+                        onClick={() => handleTravelersChange(true)}
+                        className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-2">
-                <span role="img" aria-label="children" className="text-gray-400">👶</span>
-                <button
-                  onClick={() => handleChildrenChange(false)}
-                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-50"
-                >
-                  -
-                </button>
-                <span className="w-8 text-center">{filters.children}</span>
-                <button
-                  onClick={() => handleChildrenChange(true)}
-                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-50"
-                >
-                  +
-                </button>
-              </div>
+                  {/* Children */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-gray-900">Дети</div>
+                      <div className="text-sm text-gray-500">До 12 лет</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleChildrenChange(false)}
+                        className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                        disabled={filters.children <= 0}
+                      >
+                        -
+                      </button>
+                      <span className="w-4 text-center">{filters.children}</span>
+                      <button
+                        onClick={() => handleChildrenChange(true)}
+                        className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-2">
-                <span role="img" aria-label="pets" className="text-gray-400">🐾</span>
-                <button
-                  onClick={() => handlePetsChange(false)}
-                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-50"
-                >
-                  -
-                </button>
-                <span className="w-8 text-center">{filters.pets}</span>
-                <button
-                  onClick={() => handlePetsChange(true)}
-                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-50"
-                >
-                  +
-                </button>
-              </div>
-            </div>
+                  {/* Pets */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-gray-900">Питомцы</div>
+                      <div className="text-sm text-gray-500">Домашние животные</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handlePetsChange(false)}
+                        className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                        disabled={filters.pets <= 0}
+                      >
+                        -
+                      </button>
+                      <span className="w-4 text-center">{filters.pets}</span>
+                      <button
+                        onClick={() => handlePetsChange(true)}
+                        className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
 
             {/* Budget Filter */}
             <Popover>
