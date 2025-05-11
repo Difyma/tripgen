@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Search, Calendar, MapPin, Plane } from 'lucide-react';
+import { Search, Calendar, MapPin, Plane, MessageSquare } from 'lucide-react';
 
 const HowItWorks = () => {
   return (
@@ -26,6 +26,15 @@ const HowItWorks = () => {
               <p>
                 Выберите из ряда доступных направлений и активностей, подходящих вашим предпочтениям.
               </p>
+            </div>
+            <div className="mt-8 flex">
+              <a
+                href="/chat"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-base font-medium shadow-lg hover:bg-gray-900 transition-colors"
+              >
+                <MessageSquare className="w-5 h-5" />
+                Написать в чат
+              </a>
             </div>
           </motion.div>
 
@@ -123,6 +132,16 @@ const HowItWorks = () => {
             {/* Decorative Elements */}
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[450px] h-[450px] rounded-full border-2 border-gray-100/30 -z-10"></div>
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] rounded-full border-2 border-gray-100/50 -z-10"></div>
+
+            {/* Chat Screenshot (реальный скриншот) */}
+            <div className="absolute left-1/2 bottom-4 -translate-x-1/2 w-[90%] sm:w-[70%] max-w-md shadow-xl rounded-2xl overflow-hidden border border-gray-100 bg-white">
+              <img
+                src="/images/chat-screenshot.png"
+                alt="Chat Screenshot"
+                className="w-full h-auto object-cover"
+                style={{ minHeight: 80 }}
+              />
+            </div>
           </div>
         </div>
       </div>

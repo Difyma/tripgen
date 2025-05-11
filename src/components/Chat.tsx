@@ -17,7 +17,10 @@ import { ru } from 'date-fns/locale';
 import { CreateTripModal } from './CreateTripModal';
 // import AILogo from '../images/TRIPGEN_logo_2.png';
 const AILogo = '/images/TRIPGEN_logo_white.png';
+const AILogo2 = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
+import { useFlightInfo } from '../hooks/useFlightInfo';
+import { useHotelInfo } from '../hooks/useHotelInfo';
 
 interface Message {
   id: number;
@@ -53,50 +56,43 @@ interface DateFilter {
   month?: { month: number; year: number };
 }
 
-const SYSTEM_PROMPT = `Ты — профессиональный турагент по путешествиям по России. Твоя задача — давать краткие, структурированные рекомендации.
+const SYSTEM_PROMPT = `Ты — профессиональный турагент по путешествиям по России и travel-блогер. Помоги пользователю спланировать незабываемую поездку. На основе входных данных создай яркий маршрут, полный эмоций, впечатлений и неожиданных находок.
 
-Формат ответа:
-# ⏱️ Оптимальная продолжительность
-• Рекомендуемое количество дней: [число] дней
-• Минимум для осмотра основных мест: [число] дней
-• Комфортный темп осмотра: [число] дней
-• Для полного погружения: [число] дней
+Структура ответа:
 
-# 🎯 Рекомендации
-✈️ [Место](airport) — краткое описание
-🏨 [Отель](hotel) — краткое описание
-🍽️ [Ресторан](restaurant) — краткое описание
-🎯 [Достопримечательность](attraction) — краткое описание
+# ✨ Введение
+[Атмосферное описание поездки, чем она будет особенной]
 
-# 🌟 Главные достопримечательности
-• 🏛️ [Музей](museum) — что особенного
-• 👑 [Дворец](palace) — что особенного
-• 🌳 [Парк](park) — что особенного
-• 🎯 [Достопримечательность](attraction) — что особенного
+# 📅 Маршрут путешествия
+
+### День 1: [Название] 🌅
+• 🌞 **Утро:** [Место](attraction) — описание
+• 🏃 **День:** [Место](attraction) — описание
+• 🌙 **Вечер:** [Место](restaurant) — описание
+
+[Повторить блок для каждого дня]
+
+# 🛏️ Где остановиться
+• 🏨 [Отель](hotel) — описание и особенности
+• 🏰 [Отель](hotel) — описание и особенности
 
 # 🍽️ Где поесть
-• 🍽️ [Ресторан](restaurant) — кухня, ценовой диапазон
-• ☕ [Кафе](cafe) — особенности, атмосфера
+• 🍽️ [Ресторан](restaurant) — кухня, атмосфера
+• ☕ [Кафе](cafe) — особенности, вайб
+• 🍷 [Бар](restaurant) — стиль, коктейли
 
-# 🏨 Где остановиться
-• 🏨 [Отель](hotel) — уровень, особенности
-• 🏨 [Отель](hotel) — уровень, особенности
+# 🚗 Логистика и советы
+• ✈️ Как добраться
+• 🚇 Как передвигаться
+• 🎫 Билеты и бронирование
+• 🌦️ Сезонные особенности
 
-# ❓ Уточняющие вопросы
-1. На сколько дней планируете поездку?
-2. Какой бюджет на человека?
-3. Что больше интересует: история, природа, активный отдых?
-4. В каком темпе предпочитаете осматривать достопримечательности?
+# 🕵️‍♀️ Скрытые жемчужины
+• 📍 [Секретное место](attraction) — почему стоит посетить
+• 🎯 [Необычное место](attraction) — чем интересно
 
-Правила для рекомендации продолжительности:
-1. Учитывай размер города/региона
-2. Учитывай количество достопримечательностей
-3. Учитывай расстояния между местами
-4. Учитывай сезон и погоду
-5. Предлагай варианты для разных темпов осмотра
-6. Если место большое (например, Москва) - предлагай больше дней
-7. Если место компактное - предлагай меньше дней
-8. Учитывай время на дорогу и акклиматизацию
+# 🔁 Итог
+[Вдохновляющая фраза-заключение]
 
 Доступные типы мест:
 - museum (музей) 🏛️
@@ -109,11 +105,14 @@ const SYSTEM_PROMPT = `Ты — профессиональный тураген�
 - attraction (достопримечательность) 🎯
 
 Правила:
-1. Используй Markdown разметку (#, •, 1.)
-2. Отмечай места с эмодзи и типом: ✈️ [Место](тип)
-3. Давай краткие, но информативные описания
-4. Добавляй эмодзи к заголовкам
-5. Задавай уточняющие вопросы при необходимости`;
+1. Используй эмодзи для атмосферы
+2. Форматируй места как [Название](тип)
+3. Добавляй краткие, но яркие описания
+4. Пиши с душой, как человек
+5. Учитывай сезон и погоду
+6. Добавляй неочевидные места
+7. Адаптируй под бюджет
+8. Учитывай интересы путешественника`;
 
 const Chat = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -142,6 +141,8 @@ const Chat = () => {
   const [currentMessage, setCurrentMessage] = useState<string>('');
   const [showTripBuilder, setShowTripBuilder] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilter>({ type: 'specific' });
+  const { getFlightInfoForGPT } = useFlightInfo();
+  const { getHotelInfoForGPT } = useHotelInfo();
 
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newLocation = e.target.value;
@@ -309,236 +310,191 @@ const Chat = () => {
     return `<div class="space-y-1">${formattedText}${createRouteButton}</div>`;
   };
 
-  const handleSendMessage = async () => {
-    if (inputText.trim() && !isLoading) {
-      try {
-        setIsLoading(true);
-        
-        // Check if message contains duration
-        const durationMatch = inputText.match(/на (\d+) д[еня]/i);
-        if (durationMatch && filters.location) {
-          const duration = parseInt(durationMatch[1]);
-          setDateFilter({
-            type: 'duration',
-            duration: duration
-          });
-          generateItinerary(filters.location, duration);
-        }
+  // Функция для извлечения информации о перелете из сообщения GPT
+  const extractFlightInfo = (message: string) => {
+    const originMatch = message.match(/из\s+([A-Za-zА-Яа-я\s-]+)\s+в/i);
+    const destinationMatch = message.match(/в\s+([A-Za-zА-Яа-я\s-]+)\s+на/i);
+    const dateMatch = message.match(/на\s+(\d{1,2}\s+[А-Яа-я]+)/i);
 
-        // Add user's message
-        const userMessage: Message = {
-          id: Date.now(),
-          text: inputText,
-          isUser: true,
-          role: 'user'
-        };
-        setMessages(prev => [...prev, userMessage]);
+    return {
+      origin: originMatch?.[1]?.trim(),
+      destination: destinationMatch?.[1]?.trim(),
+      date: dateMatch?.[1]?.trim()
+    };
+  };
 
-        // Get last 5 messages for context
-        const recentMessages = messages
-          .slice(-5)
-          .map(msg => ({
-            role: msg.isUser ? 'user' : 'assistant',
-            text: msg.text
-          }));
-        
-        const areFiltersEmpty = () => {
-          return !filters.location && 
-                 !filters.date && 
-                 filters.travelers <= 1 && 
-                 filters.budget.min === 0 && 
-                 filters.budget.max === 10000;
-        };
+  // Функция для преобразования русской даты в формат YYYY-MM-DD
+  const parseRussianDate = (dateStr: string) => {
+    const months: { [key: string]: string } = {
+      'января': '01', 'февраля': '02', 'марта': '03', 'апреля': '04',
+      'мая': '05', 'июня': '06', 'июля': '07', 'августа': '08',
+      'сентября': '09', 'октября': '10', 'ноября': '11', 'декабря': '12'
+    };
 
-        const messageWithContext = {
-          modelUri: `gpt://yandexgpt/latest`,
-          completionOptions: {
-            stream: true,
-            temperature: 0.7,
-            maxTokens: 1000,
-            partialResults: true,
-          },
-          messages: [
-            {
-              role: 'system',
-              text: SYSTEM_PROMPT
-            },
-            ...recentMessages,
-            {
-              role: 'user',
-              text: `Контекст запроса:
+    const [day, month] = dateStr.toLowerCase().split(' ');
+    const year = new Date().getFullYear();
+    const monthNum = months[month];
+    
+    return `${year}-${monthNum}-${day.padStart(2, '0')}`;
+  };
+
+  // Вспомогательные функции
+  const shouldGenerateItinerary = (text: string): boolean => {
+    return text.toLowerCase().includes('маршрут') || 
+           text.toLowerCase().includes('план поездки') ||
+           text.toLowerCase().includes('день') ||
+           text.toLowerCase().includes('дней');
+  };
+
+  const extractDuration = (text: string): number => {
+    const match = text.match(/на (\d+) д[еня]/i);
+    return match ? parseInt(match[1]) : 7; // По умолчанию 7 дней
+  };
+
+  const processMessage = async (text: string): Promise<string> => {
+    // Get last 5 messages for context
+    const recentMessages = messages
+      .slice(-5)
+      .map(msg => ({
+        role: msg.isUser ? 'user' : 'assistant',
+        text: msg.text
+      }));
+    
+    const messageWithContext = {
+      modelUri: 'gpt://yandexgpt/latest',
+      completionOptions: {
+        stream: true,
+        temperature: 0.7,
+        maxTokens: 1000,
+        partialResults: true,
+      },
+      messages: [
+        {
+          role: 'system',
+          text: SYSTEM_PROMPT
+        },
+        ...recentMessages,
+        {
+          role: 'user',
+          text: `Контекст запроса:
 ${filters.location ? `🌍 Место: ${filters.location}` : ''}
 ${filters.date ? `📅 Даты: ${format(new Date(filters.date), 'dd.MM.yyyy')}` : ''}
 ${filters.travelers ? `👥 Количество путешественников: ${filters.travelers}` : ''}
 ${filters.budget.min > 0 || filters.budget.max < 10000 ? `💰 Бюджет: ${filters.budget.min}₽ - ${filters.budget.max}₽` : ''}
 
-Параметры для учета в рекомендациях:
-${filters.location ? `- Все места и активности в локации: ${filters.location}` : ''}
-${filters.date ? `- Рекомендации актуальны для даты ${format(new Date(filters.date), 'dd.MM.yyyy')} (учитывай сезон и погоду)` : ''}
-${filters.travelers > 1 ? `- Подбор активностей для группы из ${filters.travelers} человек` : ''}
-${filters.budget.min > 0 || filters.budget.max < 10000 ? `- Все рекомендации в диапазоне ${filters.budget.min}₽ - ${filters.budget.max}₽` : ''}
-
-Вопрос пользователя: ${inputText}
-
-${areFiltersEmpty() ? 'Если нужно что-то уточнить - задай вопросы.' : 'Основные параметры указаны, дай конкретные рекомендации по существу без уточняющих вопросов.'}`
-            }
-          ]
-        };
-
-        let accumulatedText = '';
-        let lastReceivedText = '';
-        let questionMessageId: number | null = null;
-
-        const extractQuestions = (text: string) => {
-          // Ищем секцию с вопросами (после эмодзи ❓ или слова "Уточняющие вопросы")
-          const questionsMatch = text.match(/(?:# ❓|# Уточняющие вопросы:?)([^]*?)(?=$)/i);
-          if (questionsMatch && areFiltersEmpty()) {
-            // Если фильтры пустые, показываем вопросы
-            const mainText = text.replace(questionsMatch[0], '');
-            const questions = `# ❓ Уточняющие вопросы${questionsMatch[1]}`.trim();
-            return { mainText, questions };
-          }
-          // Если фильтры заполнены, не показываем секцию с вопросами
-          return null;
-        };
-
-        // Add initial AI message
-        const aiMessageId = Date.now() + 1;
-        const aiMessage: Message = {
-          id: aiMessageId,
-          text: '',
-          isUser: false,
-          role: 'assistant'
-        };
-        setMessages(prev => [...prev, aiMessage]);
-
-        try {
-          // Call Yandex GPT API with streaming
-          const response = await fetch('http://localhost:3001/yandex-gpt', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(messageWithContext)
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to get response from API');
-          }
-
-          const reader = response.body?.getReader();
-          const decoder = new TextDecoder();
-
-          if (!reader) {
-            throw new Error('Failed to get response reader');
-          }
-
-          while (true) {
-            const { done, value } = await reader.read();
-            
-            if (done) break;
-            
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  console.log('Received SSE data:', data);
-                  
-                  if (data.type === 'chunk' && data.text && data.text !== lastReceivedText) {
-                    lastReceivedText = data.text;
-                    
-                    // Проверяем наличие уточняющих вопросов
-                    const extracted = extractQuestions(data.text);
-                    if (extracted) {
-                      // Обновляем основной текст
-                      accumulatedText = extracted.mainText;
-                      setMessages(prev => prev.map(msg => 
-                        msg.id === aiMessageId 
-                          ? { ...msg, text: accumulatedText }
-                          : msg
-                      ));
-                      
-                      // Обновляем или создаем сообщение с вопросами
-                      if (questionMessageId) {
-                        // Если сообщение с вопросами уже существует, обновляем его
-                        setMessages(prev => prev.map(msg =>
-                          msg.id === questionMessageId
-                            ? { ...msg, text: extracted.questions }
-                            : msg
-                        ));
-                      } else {
-                        // Создаем новое сообщение с вопросами
-                        const newQuestionId = Date.now();
-                        questionMessageId = newQuestionId;
-                        const questionMessage: Message = {
-                          id: newQuestionId,
-                          text: extracted.questions,
-                          isUser: false,
-                          role: 'assistant'
-                        };
-                        setMessages(prev => [...prev, questionMessage]);
-                      }
-                    } else {
-                      accumulatedText = data.text;
-                      setMessages(prev => prev.map(msg => 
-                        msg.id === aiMessageId 
-                          ? { ...msg, text: accumulatedText }
-                          : msg
-                      ));
-                    }
-
-                    // Show TripBuilder if the message contains day-by-day itinerary
-                    if (data.text.includes('Day 1:') || data.text.includes('День 1:')) {
-                      setShowTripBuilder(true);
-                      setCurrentMessage(data.text);
-                    }
-                  } else if (data.type === 'error') {
-                    throw new Error(data.error);
-                  }
-                } catch (e) {
-                  console.error('Error parsing SSE data:', e);
-                  throw e;
-                }
-              }
-            }
-          }
-
-          setInputText('');
-        } catch (error) {
-          const err = error as Error;
-          console.error('Error details:', {
-            name: err.name,
-            message: err.message,
-            stack: err.stack
-          });
-          // Add error message
-          setMessages(prev => prev.map(msg => 
-            msg.id === aiMessageId 
-              ? { ...msg, text: `Ошибка: ${err.message}` }
-              : msg
-          ));
-        } finally {
-          setIsLoading(false);
+Вопрос пользователя: ${text}`
         }
-      } catch (error) {
-        const err = error as Error;
-        console.error('Error details:', {
-          name: err.name,
-          message: err.message,
-          stack: err.stack
-        });
-        // Add error message
-        setMessages(prev => [...prev, {
-          id: Date.now() + 1,
-          text: "Извините, возникла проблема с получением ответа. Пожалуйста, попробуйте позже.",
-          isUser: false
-        }]);
+      ]
+    };
+
+    try {
+      const response = await fetch('http://localhost:3001/yandex-gpt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(messageWithContext)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from API');
       }
+
+      const data = await response.json();
+      return data.text || 'Извините, не удалось получить ответ';
+    } catch (error) {
+      console.error('Error processing message:', error);
+      throw error;
     }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim()) return;
+
+    try {
+      setIsLoading(true);
+
+      // Add user's message
+      const userMessage: Message = {
+        id: Date.now(),
+        text: inputText,
+        isUser: true
+      };
+      setMessages(prev => [...prev, userMessage]);
+      setInputText('');
+
+      // Process the message with GPT first
+      const gptResponse = await processMessage(inputText);
+      
+      let finalResponse = gptResponse;
+
+      // Check if the message is about flights
+      if (inputText.toLowerCase().includes('рейс') || 
+          inputText.toLowerCase().includes('перелет') || 
+          inputText.toLowerCase().includes('самолет') ||
+          inputText.toLowerCase().includes('авиа')) {
+        
+        const flightInfo = extractFlightInfo(inputText);
+        
+        if (flightInfo.origin && flightInfo.destination && flightInfo.date) {
+          const formattedDate = parseRussianDate(flightInfo.date);
+          const flightData = await getFlightInfoForGPT(
+            flightInfo.origin,
+            flightInfo.destination,
+            formattedDate
+          );
+          
+          finalResponse = `${gptResponse}\n\n${flightData}`;
+        }
+      }
+
+      // Check if the message is about hotels
+      if (inputText.toLowerCase().includes('отел') || 
+          inputText.toLowerCase().includes('где остановиться') ||
+          inputText.toLowerCase().includes('проживани')) {
+        
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const checkIn = today.toISOString().split('T')[0];
+        const checkOut = tomorrow.toISOString().split('T')[0];
+
+        const hotelData = await getHotelInfoForGPT(
+          filters.location || extractLocationFromText(inputText),
+          checkIn,
+          checkOut,
+          filters.travelers
+        );
+        
+        finalResponse = `${gptResponse}\n\n${hotelData}`;
+      }
+
+      // Add final response
+      const assistantMessage: Message = {
+        id: Date.now(),
+        text: finalResponse,
+        isUser: false
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+
+    } catch (error) {
+      console.error('Error processing message:', error);
+      const errorMessage: Message = {
+        id: Date.now(),
+        text: 'Произошла ошибка при обработке сообщения. Пожалуйста, попробуйте еще раз.',
+        isUser: false
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Добавляем функцию для извлечения локации из текста
+  const extractLocationFromText = (text: string): string => {
+    const locationMatch = text.match(/(?:в|во|для|про)\s+([А-Яа-я\-]+(?:\s+[А-Яа-я\-]+)*)/i);
+    return locationMatch ? locationMatch[1] : 'Москва'; // По умолчанию используем Москву
   };
 
   const handleCreateTrip = (data: any) => {
@@ -929,7 +885,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                     <div className="flex-shrink-0">
                       <div className="w-8 h-8 flex items-center justify-center">
                         <img 
-                          src={AILogo} 
+                          src={AILogo2} 
                           alt="TRIPGEN Assistant" 
                           className="w-full h-full object-contain"
                         />
@@ -939,7 +895,8 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                   <div 
                     className={`
                       ${message.isUser ? 'items-end' : 'items-start'}
-                      ${message.isUser ? 'max-w-[320px]' : 'max-w-[75%]'}
+                      ${message.isUser ? 'max-w-[320px]' : 'max-w-[85%]'}
+                      w-full overflow-hidden
                     `}
                   >
                     <div 
@@ -957,6 +914,8 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                           ${message.isUser ? 'text-white' : 'text-gray-900'}
                           text-[14px] leading-tight tracking-[-0.2px]
                           font-normal
+                          break-words
+                          overflow-hidden
                           [&>div]:last:mb-0
                           [&_h3]:text-[16px]
                           [&_h3]:font-semibold
@@ -981,6 +940,10 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                           [&_ul]:mb-1
                           [&_li]:mb-0.5
                           [&_li]:leading-snug
+                          [&_a]:inline-block
+                          [&_a]:max-w-full
+                          [&_a]:overflow-hidden
+                          [&_a]:text-ellipsis
                           whitespace-pre-wrap
                         `}
                         dangerouslySetInnerHTML={

@@ -5,6 +5,7 @@ import { TripsRoute } from './routes/TripsRoute';
 import { TripDetailsRoute } from './routes/TripDetailsRoute';
 import Chat from './components/Chat';
 import CreatorPage from './components/CreatorPage';
+import FlightsPage from './pages/FlightsPage';
 
 export function App() {
   return (
@@ -23,6 +24,8 @@ export function App() {
           <Route path="chat" element={<Chat />} />
           <Route path="chat/:id" element={<Chat />} />
         </Route>
+
+        <Route path="/flights" element={<FlightsPage />} />
       </Routes>
     </Router>
   );

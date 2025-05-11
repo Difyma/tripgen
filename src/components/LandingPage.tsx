@@ -7,6 +7,7 @@ import ExampleTour from './ExampleTour';
 import CollectiveTour from './CollectiveTour';
 import TravelGallery from './TravelGallery';
 import CTASection from './CTASection';
+import TravelQuiz from './TravelQuiz';
 
 export function LandingPage() {
   return (
@@ -19,6 +20,7 @@ export function LandingPage() {
         <HowItWorks />
         <ExampleTour />
         <Services />
+        <TravelQuiz />
         <CollectiveTour />
         <CreatorSection />
         <TravelGallery />

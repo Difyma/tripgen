@@ -200,7 +200,7 @@ const ExampleTour = () => {
               {/* AI Analysis Overlay */}
               <div className="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-sm rounded-xl p-4 z-20">
                 <div className="flex items-start gap-3">
-                  <img src="src/images/TRIPGEN_logo_2.png" alt="AI" className="w-5 h-5 mt-1" />
+                  <img src="/images/TRIPGEN_logo_2.png" alt="AI" className="w-5 h-5 mt-1" />
                   <div>
                     <p className="text-sm font-medium mb-1">Оптимальный маршрут</p>
                     <p className="text-xs text-gray-600">Маршрут построен с учетом пробок, времени работы и загруженности мест. Расстояние между точками оптимизировано для комфортной прогулки.</p>
