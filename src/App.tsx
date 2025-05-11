@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, ScrollRestoration } from 'react-router-dom';
 import { AppLayout } from './components/AppLayout';
 import { LandingPage } from './components/LandingPage';
 import { TripsRoute } from './routes/TripsRoute';
@@ -10,6 +10,7 @@ import FlightsPage from './pages/FlightsPage';
 export function App() {
   return (
     <Router>
+      <ScrollRestoration />
       <Routes>
         {/* Landing Page */}
         <Route path="/" element={<LandingPage />} />

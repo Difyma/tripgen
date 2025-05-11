@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { Globe, DollarSign, Users, Star, ChevronRight, ArrowRight, Coins, Gift, Share2, Trophy } from 'lucide-react';
 import CreatorNavbar from './CreatorNavbar';
-import { useEffect } from 'react';
 
 const benefits = [
   {
@@ -80,10 +79,6 @@ const inspirationSteps = [
 ];
 
 const CreatorPage = () => {
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-
   return (
     <>
       <CreatorNavbar />
