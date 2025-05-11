@@ -42,6 +42,8 @@ interface FilterState {
   location: string;
   date: string;
   travelers: number;
+  children: number;
+  pets: number;
   budget: {
     min: number;
     max: number;
@@ -129,6 +131,8 @@ const Chat = () => {
     location: '',
     date: '',
     travelers: 2,
+    children: 0,
+    pets: 0,
     budget: {
       min: 0,
       max: 10000
@@ -160,6 +164,20 @@ const Chat = () => {
     setFilters(prev => ({
       ...prev,
       travelers: increment ? prev.travelers + 1 : Math.max(1, prev.travelers - 1)
+    }));
+  };
+
+  const handleChildrenChange = (increment: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      children: increment ? prev.children + 1 : Math.max(0, prev.children - 1)
+    }));
+  };
+
+  const handlePetsChange = (increment: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      pets: increment ? prev.pets + 1 : Math.max(0, prev.pets - 1)
     }));
   };
 
@@ -352,59 +370,80 @@ const Chat = () => {
   };
 
   const processMessage = async (text: string): Promise<string> => {
-    // Get last 5 messages for context
-    const recentMessages = messages
-      .slice(-5)
-      .map(msg => ({
-        role: msg.isUser ? 'user' : 'assistant',
-        text: msg.text
-      }));
+    let systemMessage = SYSTEM_PROMPT;
     
-    const messageWithContext = {
-      modelUri: 'gpt://yandexgpt/latest',
-      completionOptions: {
-        stream: true,
-        temperature: 0.7,
-        maxTokens: 1000,
-        partialResults: true,
-      },
-      messages: [
-        {
-          role: 'system',
-          text: SYSTEM_PROMPT
-        },
-        ...recentMessages,
-        {
-          role: 'user',
-          text: `Контекст запроса:
-${filters.location ? `🌍 Место: ${filters.location}` : ''}
-${filters.date ? `📅 Даты: ${format(new Date(filters.date), 'dd.MM.yyyy')}` : ''}
-${filters.travelers ? `👥 Количество путешественников: ${filters.travelers}` : ''}
-${filters.budget.min > 0 || filters.budget.max < 10000 ? `💰 Бюджет: ${filters.budget.min}₽ - ${filters.budget.max}₽` : ''}
+    // Add travel group information
+    const travelGroupInfo = `\nГруппа путешественников:\n- ${filters.travelers} взрослых\n- ${filters.children} детей\n- ${filters.pets} животных`;
+    systemMessage += travelGroupInfo;
 
-Вопрос пользователя: ${text}`
-        }
-      ]
-    };
+    // Add budget information if available
+    if (filters.budget.min > 0 || filters.budget.max < 10000) {
+      systemMessage += `\nБюджет: от ${filters.budget.min} до ${filters.budget.max} рублей`;
+    }
+
+    // Add date information if available
+    if (dateFilter.startDate) {
+      systemMessage += `\nДата поездки: ${format(dateFilter.startDate, 'dd.MM.yyyy', { locale: ru })}`;
+    } else if (dateFilter.type === 'duration' && dateFilter.duration) {
+      systemMessage += `\nДлительность поездки: ${dateFilter.duration} дней`;
+    }
+
+    // Add location if available
+    if (filters.location) {
+      systemMessage += `\nМесто назначения: ${filters.location}`;
+    }
+
+    // Add special requirements for children and pets
+    if (filters.children > 0) {
+      systemMessage += `\n\nТребования для детей:\n- Учесть детские активности и развлечения\n- Выбрать семейные рестораны\n- Обеспечить безопасность и комфорт для детей`;
+    }
+
+    if (filters.pets > 0) {
+      systemMessage += `\n\nТребования для животных:\n- Проверить pet-friendly отели\n- Найти места, где разрешены животные\n- Учесть наличие ветклиник поблизости`;
+    }
 
     try {
-      const response = await fetch('http://localhost:3001/yandex-gpt', {
+      // Get flight information
+      const flightInfo = await getFlightInfoForGPT(text);
+      if (flightInfo) {
+        systemMessage += `\n\nИнформация о перелете:\n${flightInfo}`;
+      }
+
+      // Get hotel information
+      const hotelInfo = await getHotelInfoForGPT(text);
+      if (hotelInfo) {
+        systemMessage += `\n\nИнформация об отелях:\n${hotelInfo}`;
+      }
+
+      // Process the message with the AI
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(messageWithContext)
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: systemMessage },
+            ...messages
+              .filter(m => m.role)
+              .map(m => ({
+                role: m.role,
+                content: m.text
+              })),
+            { role: 'user', content: text }
+          ]
+        })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get response from API');
+        throw new Error('Failed to get response from AI');
       }
 
       const data = await response.json();
-      return data.text || 'Извините, не удалось получить ответ';
+      return data.message;
     } catch (error) {
       console.error('Error processing message:', error);
-      throw error;
+      return 'Извините, произошла ошибка при обработке сообщения. Пожалуйста, попробуйте еще раз.';
     }
   };
 
@@ -789,26 +828,57 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
               </PopoverContent>
             </Popover>
 
-            {/* Travelers Filter */}
-            <div className="relative flex-1 min-w-[160px]">
-              <div className="w-full h-10 pl-8 pr-3 border border-gray-200 rounded-lg text-sm bg-gray-50/50 flex items-center justify-between">
-                <Users className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2" />
-                <span className="text-gray-600">{filters.travelers} человек</span>
-                <div className="flex items-center gap-1">
-                  <button 
-                    onClick={() => handleTravelersChange(false)}
-                    className="p-1 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
-                    disabled={filters.travelers <= 1}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => handleTravelersChange(true)}
-                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
+            {/* Travelers, Children and Pets Counter */}
+            <div className="flex items-center gap-4 min-w-[320px]">
+              <div className="flex items-center gap-2">
+                <Users size={20} className="text-gray-400" />
+                <button
+                  onClick={() => handleTravelersChange(false)}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-50"
+                >
+                  -
+                </button>
+                <span className="w-8 text-center">{filters.travelers}</span>
+                <button
+                  onClick={() => handleTravelersChange(true)}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-50"
+                >
+                  +
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span role="img" aria-label="children" className="text-gray-400">👶</span>
+                <button
+                  onClick={() => handleChildrenChange(false)}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-50"
+                >
+                  -
+                </button>
+                <span className="w-8 text-center">{filters.children}</span>
+                <button
+                  onClick={() => handleChildrenChange(true)}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-50"
+                >
+                  +
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span role="img" aria-label="pets" className="text-gray-400">🐾</span>
+                <button
+                  onClick={() => handlePetsChange(false)}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-50"
+                >
+                  -
+                </button>
+                <span className="w-8 text-center">{filters.pets}</span>
+                <button
+                  onClick={() => handlePetsChange(true)}
+                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-50"
+                >
+                  +
+                </button>
               </div>
             </div>
 
