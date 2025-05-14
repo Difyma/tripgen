@@ -370,77 +370,75 @@ const Chat = () => {
   };
 
   const processMessage = async (text: string): Promise<string> => {
-    let systemMessage = SYSTEM_PROMPT;
-    
-    // Add travel group information
-    const travelGroupInfo = `\nГруппа путешественников:\n- ${filters.travelers} взрослых\n- ${filters.children} детей\n- ${filters.pets} животных`;
-    systemMessage += travelGroupInfo;
-
-    // Add budget information if available
-    if (filters.budget.min > 0 || filters.budget.max < 10000) {
-      systemMessage += `\nБюджет: от ${filters.budget.min} до ${filters.budget.max} рублей`;
-    }
-
-    // Add date information if available
-    if (dateFilter.startDate) {
-      systemMessage += `\nДата поездки: ${format(dateFilter.startDate, 'dd.MM.yyyy', { locale: ru })}`;
-    } else if (dateFilter.type === 'duration' && dateFilter.duration) {
-      systemMessage += `\nДлительность поездки: ${dateFilter.duration} дней`;
-    }
-
-    // Add location if available
-    if (filters.location) {
-      systemMessage += `\nМесто назначения: ${filters.location}`;
-    }
-
-    // Add special requirements for children and pets
-    if (filters.children > 0) {
-      systemMessage += `\n\nТребования для детей:\n- Учесть детские активности и развлечения\n- Выбрать семейные рестораны\n- Обеспечить безопасность и комфорт для детей`;
-    }
-
-    if (filters.pets > 0) {
-      systemMessage += `\n\nТребования для животных:\n- Проверить pet-friendly отели\n- Найти места, где разрешены животные\n- Учесть наличие ветклиник поблизости`;
-    }
-
     try {
-      // Get flight information
-      const flightInfo = await getFlightInfoForGPT(text);
-      if (flightInfo) {
-        systemMessage += `\n\nИнформация о перелете:\n${flightInfo}`;
+      let systemMessage = SYSTEM_PROMPT;
+    
+      // Add travel group information
+      const travelGroupInfo = `\nГруппа путешественников:\n- ${filters.travelers} взрослых\n- ${filters.children} детей\n- ${filters.pets} животных`;
+      systemMessage += travelGroupInfo;
+
+      // Add budget information if available
+      if (filters.budget.min > 0 || filters.budget.max < 10000) {
+        systemMessage += `\nБюджет: от ${filters.budget.min} до ${filters.budget.max} рублей`;
       }
 
-      // Get hotel information
-      const hotelInfo = await getHotelInfoForGPT(text);
-      if (hotelInfo) {
-        systemMessage += `\n\nИнформация об отелях:\n${hotelInfo}`;
+      // Add date information if available
+      if (dateFilter.startDate) {
+        systemMessage += `\nДата поездки: ${format(dateFilter.startDate, 'dd.MM.yyyy', { locale: ru })}`;
+      } else if (dateFilter.type === 'duration' && dateFilter.duration) {
+        systemMessage += `\nДлительность поездки: ${dateFilter.duration} дней`;
+      }
+
+      // Add location if available
+      if (filters.location) {
+        systemMessage += `\nМесто назначения: ${filters.location}`;
+      }
+
+      // Add special requirements for children and pets
+      if (filters.children > 0) {
+        systemMessage += `\n\nТребования для детей:\n- Учесть детские активности и развлечения\n- Выбрать семейные рестораны\n- Обеспечить безопасность и комфорт для детей`;
+      }
+
+      if (filters.pets > 0) {
+        systemMessage += `\n\nТребования для животных:\n- Проверить pet-friendly отели\n- Найти места, где разрешены животные\n- Учесть наличие ветклиник поблизости`;
       }
 
       // Process the message with the AI
-      const response = await fetch('/api/chat', {
+      console.log('Sending request to server...');
+      const response = await fetch('http://localhost:3000/yandex-gpt', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
           messages: [
-            { role: 'system', content: systemMessage },
+            { role: 'system', text: systemMessage },
             ...messages
               .filter(m => m.role)
               .map(m => ({
                 role: m.role,
-                content: m.text
+                text: m.text
               })),
-            { role: 'user', content: text }
+            { role: 'user', text: text }
           ]
         })
+      }).catch(error => {
+        console.error('Fetch error:', error);
+        throw new Error(`Network error: ${error.message}`);
       });
 
+      console.log('Response received:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Failed to get response from AI');
+        const errorText = await response.text();
+        console.error('Server error:', errorText);
+        throw new Error(`Server error: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
-      return data.message;
+      console.log('Response data:', data);
+      return data.text;
     } catch (error) {
       console.error('Error processing message:', error);
       return 'Извините, произошла ошибка при обработке сообщения. Пожалуйста, попробуйте еще раз.';
