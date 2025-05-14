@@ -1,9 +1,36 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
+import TravelQuizModal from './TravelQuizModal';
+
+interface QuizResults {
+  travelStyle: string;
+  preferences: string[];
+  budget: string;
+}
 
 const TravelQuiz = () => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleOpenModal = () => {
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleQuizComplete = (results: QuizResults) => {
+    console.log('Quiz results:', results);
+    // Here you can handle the quiz results, for example:
+    // - Send them to an API
+    // - Update user preferences
+    // - Show personalized recommendations
+    setIsModalOpen(false);
+  };
+
   return (
     <section className="py-20 bg-[#FBFBFD]">
       <div className="max-w-7xl mx-auto">
@@ -45,6 +72,7 @@ const TravelQuiz = () => {
             </p>
             
             <motion.button
+              onClick={handleOpenModal}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className="inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-gray-900 transition-colors"
@@ -77,6 +105,13 @@ const TravelQuiz = () => {
           </motion.div>
         </div>
       </div>
+
+      {/* Travel Quiz Modal */}
+      <TravelQuizModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onComplete={handleQuizComplete}
+      />
     </section>
   );
 };
