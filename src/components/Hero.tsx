@@ -100,18 +100,18 @@ const Hero = () => {
                       <button className="flex flex-col items-center p-4 hover:bg-black/5 rounded-xl transition-colors text-center group">
                         <div className="flex items-center gap-2 text-gray-500 mb-1">
                           <Search className="w-4 h-4" />
-                          <span className="text-xs">Location</span>
+                          <span className="text-xs">Место</span>
                         </div>
                         <div className="text-sm font-medium">
-                          {formData.location || "Where to?"}
+                          {formData.location || "Куда поедем?"}
                         </div>
                       </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80">
                       <div className="space-y-4">
-                        <h4 className="font-medium">Enter destination</h4>
+                        <h4 className="font-medium">Введите место назначения</h4>
                         <Input
-                          placeholder="Enter location..."
+                          placeholder="Введите место..."
                           value={formData.location}
                           onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                         />
@@ -125,10 +125,10 @@ const Hero = () => {
                       <button className="flex flex-col items-center p-4 hover:bg-black/5 rounded-xl transition-colors text-center group">
                         <div className="flex items-center gap-2 text-gray-500 mb-1">
                           <Calendar className="w-4 h-4" />
-                          <span className="text-xs">Check In</span>
+                          <span className="text-xs">Заезд</span>
                         </div>
                         <div className="text-sm font-medium">
-                          {formData.checkIn ? format(formData.checkIn, 'PP') : 'Add date'}
+                          {formData.checkIn ? format(formData.checkIn, 'PP') : 'Выберите дату'}
                         </div>
                       </button>
                     </PopoverTrigger>
@@ -148,10 +148,10 @@ const Hero = () => {
                       <button className="flex flex-col items-center p-4 hover:bg-black/5 rounded-xl transition-colors text-center group">
                         <div className="flex items-center gap-2 text-gray-500 mb-1">
                           <Calendar className="w-4 h-4" />
-                          <span className="text-xs">Check Out</span>
+                          <span className="text-xs">Выезд</span>
                         </div>
                         <div className="text-sm font-medium">
-                          {formData.checkOut ? format(formData.checkOut, 'PP') : 'Add date'}
+                          {formData.checkOut ? format(formData.checkOut, 'PP') : 'Выберите дату'}
                         </div>
                       </button>
                     </PopoverTrigger>
@@ -171,21 +171,21 @@ const Hero = () => {
                       <button className="flex flex-col items-center p-4 hover:bg-black/5 rounded-xl transition-colors text-center group">
                         <div className="flex items-center gap-2 text-gray-500 mb-1">
                           <Users className="w-4 h-4" />
-                          <span className="text-xs">Guests</span>
+                          <span className="text-xs">Гости</span>
                         </div>
                         <div className="text-sm font-medium">
-                          {formData.guests} {formData.guests === 1 ? 'guest' : 'guests'}
-                          {formData.children > 0 && `, ${formData.children} ${formData.children === 1 ? 'child' : 'children'}`}
-                          {formData.pets > 0 && `, ${formData.pets} ${formData.pets === 1 ? 'pet' : 'pets'}`}
+                          {formData.guests} {formData.guests === 1 ? 'гость' : 'гостей'}
+                          {formData.children > 0 && `, ${formData.children} ${formData.children === 1 ? 'ребенок' : formData.children < 5 ? 'ребенка' : 'детей'}`}
+                          {formData.pets > 0 && `, ${formData.pets} ${formData.pets === 1 ? 'питомец' : formData.pets < 5 ? 'питомца' : 'питомцев'}`}
                         </div>
                       </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80">
                       <div className="space-y-4">
-                        <h4 className="font-medium">Number of guests</h4>
+                        <h4 className="font-medium">Количество гостей</h4>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <span>Adults</span>
+                            <span>Взрослые</span>
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => setFormData(prev => ({ ...prev, guests: Math.max(1, prev.guests - 1) }))}
@@ -203,7 +203,7 @@ const Hero = () => {
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span>Children</span>
+                            <span>Дети</span>
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => setFormData(prev => ({ ...prev, children: Math.max(0, prev.children - 1) }))}
@@ -221,7 +221,7 @@ const Hero = () => {
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span>Pets</span>
+                            <span>Питомцы</span>
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => setFormData(prev => ({ ...prev, pets: Math.max(0, prev.pets - 1) }))}
@@ -249,7 +249,7 @@ const Hero = () => {
                     className="flex items-center justify-center gap-2 bg-black text-white p-4 rounded-xl hover:bg-gray-900 transition-colors"
                   >
                     <Search className="w-4 h-4" />
-                    <span>Search</span>
+                    <span>Поиск</span>
                   </button>
                 </div>
               </div>
