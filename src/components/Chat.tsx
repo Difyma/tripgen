@@ -1,13 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
   Send, 
-  Plus, 
   MapPin, 
-  ChevronRight, 
-  ChevronLeft, 
   Users,
   Calendar as CalendarIcon,
-  DollarSign
+  DollarSign,
+  UserPlus
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -15,12 +13,14 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { CreateTripModal } from './CreateTripModal';
-// import AILogo from '../images/TRIPGEN_logo_2.png';
+import { AuthModal } from './AuthModal';
+import { useLocation } from 'react-router-dom';
 const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
 import { useFlightInfo } from '../hooks/useFlightInfo';
 import { useHotelInfo } from '../hooks/useHotelInfo';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Message {
   id: number;
@@ -58,65 +58,46 @@ interface DateFilter {
   month?: { month: number; year: number };
 }
 
-const SYSTEM_PROMPT = `Ты — профессиональный турагент по путешествиям по России и travel-блогер. Помоги пользователю спланировать незабываемую поездку. На основе входных данных создай яркий маршрут, полный эмоций, впечатлений и неожиданных находок.
+const SYSTEM_PROMPT = `Ты — профессиональный турагент и travel-блогер с обширным опытом путешествий по всему миру. 
+Помоги пользователю спланировать незабываемую поездку в любую точку мира. 
 
-Структура ответа:
+ВАЖНО: Когда я предоставляю информацию о рейсах в формате "# ✈️ Информация о рейсах", используй ТОЛЬКО эту информацию для рекомендаций по перелетам.
+Не говори, что у тебя нет доступа к данным. Вся необходимая информация будет в сообщении.
 
-# ✨ Введение
-[Атмосферное описание поездки, чем она будет особенной]
+Когда пользователь спрашивает о перелетах:
+1. Анализируй предоставленные варианты и давай рекомендации:
+   - Сравни самый выгодный и самый быстрый варианты
+   - Объясни преимущества и недостатки каждого варианта
+   - Порекомендуй оптимальный выбор с учетом соотношения цена/время
+   - Если есть обратные рейсы, проанализируй их тоже
 
-# 📅 Маршрут путешествия
+2. Дополняй свой ответ полезной информацией:
+   - Особенности выбранных авиакомпаний
+   - Правила провоза багажа и ручной клади
+   - Дополнительные услуги на борту
+   - Советы по выбору места в самолете
+   - Рекомендации по времени прибытия в аэропорт
+   - Информация о терминалах и трансфере между ними
 
-### День 1: [Название] 🌅
-• 🌞 **Утро:** [Место](attraction) — описание
-• 🏃 **День:** [Место](attraction) — описание
-• 🌙 **Вечер:** [Место](restaurant) — описание
+3. Учитывай контекст запроса:
+   - Если это деловая поездка, обрати внимание на удобство времени вылета/прилета
+   - Для отпуска важнее цена и комфорт
+   - При путешествии с детьми рекомендуй прямые рейсы
+   - Для длительных перелетов обращай внимание на качество сервиса
 
-[Повторить блок для каждого дня]
+4. Давай дополнительные советы:
+   - Лучшее время для покупки билетов
+   - Возможности накопления миль
+   - Особенности регистрации на рейс
+   - Правила безопасности и требования авиакомпаний
 
-# 🛏️ Где остановиться
-• 🏨 [Отель](hotel) — описание и особенности
-• 🏰 [Отель](hotel) — описание и особенности
+При ответе ОБЯЗАТЕЛЬНО используй предоставленную информацию о конкретных рейсах и дополняй её своими экспертными рекомендациями.
+Если информация о рейсах предоставлена, НИКОГДА не говори, что у тебя нет доступа к данным.
 
-# 🍽️ Где поесть
-• 🍽️ [Ресторан](restaurant) — кухня, атмосфера
-• ☕ [Кафе](cafe) — особенности, вайб
-• 🍷 [Бар](restaurant) — стиль, коктейли
-
-# 🚗 Логистика и советы
-• ✈️ Как добраться
-• 🚇 Как передвигаться
-• 🎫 Билеты и бронирование
-• 🌦️ Сезонные особенности
-
-# 🕵️‍♀️ Скрытые жемчужины
-• 📍 [Секретное место](attraction) — почему стоит посетить
-• 🎯 [Необычное место](attraction) — чем интересно
-
-# 🔁 Итог
-[Вдохновляющая фраза-заключение]
-
-Доступные типы мест:
-- museum (музей) 🏛️
-- palace (дворец) 👑
-- park (парк) 🌳
-- cafe (кафе) ☕
-- restaurant (ресторан) 🍽️
-- hotel (отель) 🏨
-- airport (аэропорт) ✈️
-- attraction (достопримечательность) 🎯
-
-Правила:
-1. Используй эмодзи для атмосферы
-2. Форматируй места как [Название](тип)
-3. Добавляй краткие, но яркие описания
-4. Пиши с душой, как человек
-5. Учитывай сезон и погоду
-6. Добавляй неочевидные места
-7. Адаптируй под бюджет
-8. Учитывай интересы путешественника`;
+Форматируй свои ответы, используя эмодзи и markdown для лучшей читаемости.`;
 
 const Chat = () => {
+  const location = useLocation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -147,6 +128,32 @@ const Chat = () => {
   const [dateFilter, setDateFilter] = useState<DateFilter>({ type: 'specific' });
   const { getFlightInfoForGPT } = useFlightInfo();
   const { getHotelInfoForGPT } = useHotelInfo();
+  const { user } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // Reset chat state when URL changes
+  useEffect(() => {
+    setMessages([{
+      id: 1,
+      text: "Привет, где бы ты хотел побывать? Я помогу тебе спланировать твое путешествие. Спрашивай меня о чем угодно, что связано с поездкой.",
+      isUser: false,
+      role: 'assistant'
+    }]);
+    setInputText('');
+    setShowTripBuilder(false);
+    setFilters({
+      location: '',
+      date: '',
+      travelers: 2,
+      children: 0,
+      pets: 0,
+      budget: {
+        min: 0,
+        max: 10000
+      }
+    });
+    setDateFilter({ type: 'specific' });
+  }, [location.search]);
 
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newLocation = e.target.value;
@@ -157,8 +164,6 @@ const Chat = () => {
       generateItinerary(newLocation, dateFilter.duration);
     }
   };
-
-  
 
   const handleTravelersChange = (increment: boolean) => {
     setFilters(prev => ({
@@ -189,6 +194,34 @@ const Chat = () => {
         [type]: value
       }
     }));
+  };
+
+  const validateRequiredFields = () => {
+    const errors = [];
+    
+    if (!filters.location) {
+      errors.push("Пожалуйста, укажите место назначения");
+    }
+
+    // Проверка даты/длительности/месяца
+    const hasDateInfo = (
+      (dateFilter.type === 'specific' && dateFilter.startDate) ||
+      (dateFilter.type === 'duration' && dateFilter.duration) ||
+      (dateFilter.type === 'month' && dateFilter.month)
+    );
+    if (!hasDateInfo) {
+      errors.push("Пожалуйста, укажите даты поездки или длительность");
+    }
+
+    if (filters.travelers < 1) {
+      errors.push("Укажите количество путешественников");
+    }
+
+    if (filters.budget.min === 0 && filters.budget.max === 10000) {
+      errors.push("Пожалуйста, укажите предполагаемый бюджет");
+    }
+
+    return errors;
   };
 
   const recommendations: Recommendation[] = [
@@ -251,276 +284,276 @@ const Chat = () => {
     }
   ];
 
-  
-
   // Функция для генерации URL места
   const generatePlaceUrl = (place: string): string => {
     const encodedPlace = encodeURIComponent(place.trim());
     return `https://www.google.com/maps/search/?api=1&query=${encodedPlace}`;
   };
 
-  const formatAIMessage = (text: string) => {
-    // Check if the message contains recommendations that can be turned into an itinerary
-    const hasRecommendations = text.includes('# 🎯 Рекомендации') || 
-                              text.includes('# 🌟 Главные достопримечательности') ||
-                              text.includes('# 🍽️ Где поесть');
+  const formatMessage = (text: string): string => {
+    if (!text) return '';
 
-    // Форматируем заголовки с эмодзи
     let formattedText = text
-      .replace(
-        /^(?:# |##\s*)([🎯🌟🍽️🏨❓📍⏱️][^\n]*)/gm,
-        '<h3 class="flex items-center gap-2 text-[15px] font-semibold text-gray-900 mt-4 mb-2.5">$1</h3>'
-      )
-      .replace(
-        /^(?:# |##\s*)([^\n]*)/gm,
-        '<h3 class="text-[15px] font-semibold text-gray-900 mt-4 mb-2.5">$1</h3>'
-      );
+      // Format headers with emojis
+      .replace(/^(Day \d+:.*)/gm, '<h3 class="text-xl font-bold mt-6 mb-3">$1</h3>')
+      
+      // Format location names with icons and verification badges
+      .replace(/(?:✈️|🛫)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">✈️</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
+      .replace(/(?:🏨|🏰)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🏨</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
+      .replace(/(?:🍽️|🍴)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🍽️</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
+      .replace(/(?:🏛️|⛪)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🏛️</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
+      .replace(/(?:📍)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">📍</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
+      
+      // Format section headers
+      .replace(/^#\s+([^\n]+)/gm, '<h2 class="text-2xl font-bold mt-8 mb-4">$1</h2>')
+      
+      // Format bullet points
+      .replace(/^\*\s+([^\n]+)/gm, '<div class="flex items-start gap-2 my-2"><span class="text-gray-400 mt-1">•</span><span class="flex-1">$1</span></div>')
+      
+      // Format time indicators
+      .replace(/(?:🌞|🌅)\s+\*\*([^*]+)\*\*:/g, '<div class="flex items-center gap-2 mt-4 mb-2"><span class="text-xl">$1</span><span class="font-semibold text-gray-700">$2:</span></div>')
+      
+      // Format bold text
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      
+      // Format paragraphs
+      .replace(/([^\n]+)(?:\n|$)/g, '<p class="my-2">$1</p>');
 
-    // Форматируем места с иконками и верификацией
-    formattedText = formattedText.replace(
-      /(?:✈️|🏨|🍽️|🏰|🏛️|⛪|🎯|📍|[☕])\s+([^—\n]+?)(?:\s+(?:✓|✔️|☑️|✅|\(verified\)))?\s*(?:—|-)\s*([^\n]+)/g,
-      (match, name, description) => {
-        const placeUrl = generatePlaceUrl(name);
-        const icon = match.charAt(0);
-        return `<div class="flex items-start gap-2.5 mb-2">
-          <a href="${placeUrl}" target="_blank" rel="noopener noreferrer" class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/50 border border-gray-100 hover:bg-white hover:border-gray-200 rounded-lg transition-all group">
-            <span class="text-base group-hover:scale-110 transition-transform">${icon}</span>
-            <span class="font-medium text-[14px] text-gray-900">${name}</span>
-            <span class="inline-flex items-center justify-center w-3.5 h-3.5 bg-blue-500 rounded-full group-hover:bg-blue-600 transition-colors">
-              <svg class="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-              </svg>
-            </span>
-          </a>
-          <span class="text-[14px] leading-[1.4] text-gray-600">${description}</span>
-        </div>`;
-      }
-    );
-
-    // Форматируем списки
-    formattedText = formattedText
-      .replace(
-        /^[•*-]\s+([^\n]+)/gm,
-        '<div class="flex items-start gap-2 mb-1.5"><span class="text-gray-400 mt-0.5 text-sm">•</span><span class="flex-1 text-[14px] leading-[1.4] text-gray-600">$1</span></div>'
-      )
-      .replace(
-        /^(\d+)\.\s+([^\n]+)/gm,
-        '<div class="flex items-start gap-2 mb-1.5"><span class="text-gray-400 shrink-0 text-[14px]">$1.</span><span class="flex-1 text-[14px] leading-[1.4] text-gray-600">$2</span></div>'
-      );
-
-    // Форматируем оставшиеся параграфы
-    formattedText = formattedText
-      .replace(/\n{2,}/g, '\n\n')
-      .replace(/([^>])\n\n/g, '$1</p><p class="text-[14px] leading-[1.4] text-gray-600 mb-2">')
-      .replace(/^([^<\n][^\n]*(?:\n(?!<)[^\n]+)*)/gm, '<p class="text-[14px] leading-[1.4] text-gray-600 mb-2">$1</p>');
-
-    const createRouteButton = hasRecommendations ? `
-      <div class="mt-4">
-        <button onclick="window.createRoute()" class="inline-flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L15 8L21 9L17 14L18 20L12 17L6 20L7 14L3 9L9 8L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Создать маршрут
-        </button>
-      </div>
-    ` : '';
-
-    return `<div class="space-y-1">${formattedText}${createRouteButton}</div>`;
+    return formattedText;
   };
 
-  // Функция для извлечения информации о перелете из сообщения GPT
+  // Update the message rendering in the Chat component
+  const renderMessage = (message: Message) => {
+    if (message.isUser) {
+      return (
+        <div className="bg-black text-white rounded-[20px] rounded-br-[4px] px-4 py-3">
+          <p className="text-[15px] font-medium leading-snug">{message.text}</p>
+      </div>
+      );
+    }
+
+    return (
+      <div className="bg-gray-50 rounded-2xl rounded-bl-[4px] p-4">
+        <div
+          className="prose prose-sm max-w-none text-gray-900"
+          dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
+        />
+      </div>
+    );
+  };
+
+  // Улучшенная функция извлечения информации о перелете
   const extractFlightInfo = (message: string) => {
-    const originMatch = message.match(/из\s+([A-Za-zА-Яа-я\s-]+)\s+в/i);
-    const destinationMatch = message.match(/в\s+([A-Za-zА-Яа-я\s-]+)\s+на/i);
-    const dateMatch = message.match(/на\s+(\d{1,2}\s+[А-Яа-я]+)/i);
+    // Поиск города отправления
+    const originPatterns = [
+      /(?:из|от)\s+([A-Za-zА-Яа-я\s-]+)(?:\s+в|\s+до|\s+на|$)/i,
+      /(?:вылет|отправление)\s+из\s+([A-Za-zА-Яа-я\s-]+)/i,
+      /найди.*?(?:из|от)\s+([A-Za-zА-Яа-я\s-]+)/i
+    ];
+    
+    // Поиск города назначения
+    const destinationPatterns = [
+      /(?:в|во|до)\s+([A-Za-zА-Яа-я\s-]+)(?:\s+на|$)/i,
+      /прилет\s+в\s+([A-Za-zА-Яа-я\s-]+)/i,
+      /найди.*?(?:в|до)\s+([A-Za-zА-Яа-я\s-]+)/i
+    ];
+
+    // Поиск даты
+    const datePatterns = [
+      /(?:на|)\s+(\d{1,2}(?:\s+|\.)\s*(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)(?:\s+\d{4})?)/i,
+      /(\d{1,2}\.\d{1,2}(?:\.\d{4})?)/,
+      /(\d{4}-\d{2}-\d{2})/
+    ];
+
+    // Поиск обратной даты
+    const returnDatePatterns = [
+      /обратно\s+(\d{1,2}(?:\s+|\.)\s*(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)(?:\s+\d{4})?)/i,
+      /назад\s+(\d{1,2}\.\d{1,2}(?:\.\d{4})?)/i,
+      /вернуться\s+(\d{1,2}\.\d{1,2}(?:\.\d{4})?)/i
+    ];
+
+    // Поиск количества пассажиров
+    const passengersPattern = /(\d+)\s*(?:взрослых|пассажиров?|человек|чел)?/i;
+    const childrenPattern = /(\d+)\s*(?:реб[её]нка|детей|дет)/i;
+    const infantsPattern = /(\d+)\s*(?:младенц[а-я]{1,2}|груднич[к-я]{2,3})/i;
+
+    // Поиск класса обслуживания
+    const businessClassPatterns = [
+      /бизнес[-\s]класс/i,
+      /business[-\s]class/i
+    ];
+
+    // Извлечение данных
+    const origin = originPatterns.map(pattern => message.match(pattern)?.[1]?.trim()).find(Boolean);
+    const destination = destinationPatterns.map(pattern => message.match(pattern)?.[1]?.trim()).find(Boolean);
+    const dateMatch = datePatterns.map(pattern => message.match(pattern)?.[1]).find(Boolean);
+    const returnDateMatch = returnDatePatterns.map(pattern => message.match(pattern)?.[1]).find(Boolean);
+    
+    const passengers = {
+      adults: parseInt(message.match(passengersPattern)?.[1] || '1'),
+      children: parseInt(message.match(childrenPattern)?.[1] || '0'),
+      infants: parseInt(message.match(infantsPattern)?.[1] || '0')
+    };
+
+    const hasBusiness = businessClassPatterns.some(pattern => pattern.test(message));
+    const tripClass = hasBusiness ? 'C' : 'Y';
+
+    // Проверка на наличие обратного билета
+    const isRoundTrip = message.toLowerCase().includes('обратно') || 
+                       message.toLowerCase().includes('туда и обратно') ||
+                       !!returnDateMatch;
 
     return {
-      origin: originMatch?.[1]?.trim(),
-      destination: destinationMatch?.[1]?.trim(),
-      date: dateMatch?.[1]?.trim()
+      origin,
+      destination,
+      date: dateMatch,
+      returnDate: returnDateMatch,
+      passengers,
+      tripClass,
+      isRoundTrip
     };
   };
 
-  // Функция для преобразования русской даты в формат YYYY-MM-DD
+  // Улучшенная функция парсинга русской даты
   const parseRussianDate = (dateStr: string) => {
+    if (!dateStr) return '';
+
+    // Если дата уже в формате YYYY-MM-DD
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return dateStr;
+    }
+
+    // Если дата в формате DD.MM.YYYY
+    if (dateStr.match(/^\d{1,2}\.\d{1,2}(?:\.\d{4})?$/)) {
+      const [day, month, year = new Date().getFullYear()] = dateStr.split('.');
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
     const months: { [key: string]: string } = {
       'января': '01', 'февраля': '02', 'марта': '03', 'апреля': '04',
       'мая': '05', 'июня': '06', 'июля': '07', 'августа': '08',
-      'сентября': '09', 'октября': '10', 'ноября': '11', 'декабря': '12'
+      'сентября': '09', 'октября': '10', 'ноября': '11', 'декабря': '12',
+      'янв': '01', 'фев': '02', 'мар': '03', 'апр': '04',
+      'май': '05', 'июн': '06', 'июл': '07', 'авг': '08',
+      'сен': '09', 'окт': '10', 'ноя': '11', 'дек': '12'
     };
 
-    const [day, month] = dateStr.toLowerCase().split(' ');
-    const year = new Date().getFullYear();
-    const monthNum = months[month];
-    
-    return `${year}-${monthNum}-${day.padStart(2, '0')}`;
-  };
-
-  // Вспомогательные функции
-  const shouldGenerateItinerary = (text: string): boolean => {
-    return text.toLowerCase().includes('маршрут') || 
-           text.toLowerCase().includes('план поездки') ||
-           text.toLowerCase().includes('день') ||
-           text.toLowerCase().includes('дней');
-  };
-
-  const extractDuration = (text: string): number => {
-    const match = text.match(/на (\d+) д[еня]/i);
-    return match ? parseInt(match[1]) : 7; // По умолчанию 7 дней
-  };
-
-  const processMessage = async (text: string): Promise<string> => {
-    try {
-      let systemMessage = SYSTEM_PROMPT;
-    
-      // Add travel group information
-      const travelGroupInfo = `\nГруппа путешественников:\n- ${filters.travelers} взрослых\n- ${filters.children} детей\n- ${filters.pets} животных`;
-      systemMessage += travelGroupInfo;
-
-      // Add budget information if available
-      if (filters.budget.min > 0 || filters.budget.max < 10000) {
-        systemMessage += `\nБюджет: от ${filters.budget.min} до ${filters.budget.max} рублей`;
+    // Парсинг даты в формате "DD месяц YYYY" или "DD месяц"
+    const match = dateStr.toLowerCase().match(/(\d{1,2})\s+([а-я]+)(?:\s+(\d{4}))?/);
+    if (match) {
+      const [_, day, monthStr, year = new Date().getFullYear()] = match;
+      const month = months[monthStr];
+      if (!month) {
+        console.error('Неверный формат месяца:', monthStr);
+        return '';
       }
-
-      // Add date information if available
-      if (dateFilter.startDate) {
-        systemMessage += `\nДата поездки: ${format(dateFilter.startDate, 'dd.MM.yyyy', { locale: ru })}`;
-      } else if (dateFilter.type === 'duration' && dateFilter.duration) {
-        systemMessage += `\nДлительность поездки: ${dateFilter.duration} дней`;
-      }
-
-      // Add location if available
-      if (filters.location) {
-        systemMessage += `\nМесто назначения: ${filters.location}`;
-      }
-
-      // Add special requirements for children and pets
-      if (filters.children > 0) {
-        systemMessage += `\n\nТребования для детей:\n- Учесть детские активности и развлечения\n- Выбрать семейные рестораны\n- Обеспечить безопасность и комфорт для детей`;
-      }
-
-      if (filters.pets > 0) {
-        systemMessage += `\n\nТребования для животных:\n- Проверить pet-friendly отели\n- Найти места, где разрешены животные\n- Учесть наличие ветклиник поблизости`;
-      }
-
-      // Process the message with the AI
-      console.log('Sending request to server...');
-      const response = await fetch('http://localhost:3000/yandex-gpt', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            { role: 'system', text: systemMessage },
-            ...messages
-              .filter(m => m.role)
-              .map(m => ({
-                role: m.role,
-                text: m.text
-              })),
-            { role: 'user', text: text }
-          ]
-        })
-      }).catch(error => {
-        console.error('Fetch error:', error);
-        throw new Error(`Network error: ${error.message}`);
-      });
-
-      console.log('Response received:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Server error:', errorText);
-        throw new Error(`Server error: ${response.status} ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('Response data:', data);
-      return data.text;
-    } catch (error) {
-      console.error('Error processing message:', error);
-      return 'Извините, произошла ошибка при обработке сообщения. Пожалуйста, попробуйте еще раз.';
+      return `${year}-${month}-${day.padStart(2, '0')}`;
     }
+
+    return '';
   };
 
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
 
+    const newMessage: Message = {
+      id: messages.length + 1,
+      text: inputText,
+      isUser: true,
+      role: 'user'
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+    setInputText('');
+    setIsLoading(true);
+
     try {
-      setIsLoading(true);
-
-      // Add user's message
-      const userMessage: Message = {
-        id: Date.now(),
-        text: inputText,
-        isUser: true
-      };
-      setMessages(prev => [...prev, userMessage]);
-      setInputText('');
-
-      // Process the message with GPT first
-      const gptResponse = await processMessage(inputText);
+      // Извлекаем информацию о перелете из сообщения пользователя
+      const flightInfo = extractFlightInfo(inputText);
+      let flightData = '';
       
-      let finalResponse = gptResponse;
-
-      // Check if the message is about flights
-      if (inputText.toLowerCase().includes('рейс') || 
-          inputText.toLowerCase().includes('перелет') || 
-          inputText.toLowerCase().includes('самолет') ||
-          inputText.toLowerCase().includes('авиа')) {
-        
-        const flightInfo = extractFlightInfo(inputText);
-        
-        if (flightInfo.origin && flightInfo.destination && flightInfo.date) {
+      // Если найдена информация о перелете, получаем данные о рейсах через API
+      if (flightInfo.origin && flightInfo.destination && flightInfo.date) {
+        try {
           const formattedDate = parseRussianDate(flightInfo.date);
-          const flightData = await getFlightInfoForGPT(
+          const formattedReturnDate = flightInfo.returnDate ? parseRussianDate(flightInfo.returnDate) : undefined;
+          
+          // Получаем информацию о рейсах через хук useFlightInfo
+          flightData = await getFlightInfoForGPT(
             flightInfo.origin,
             flightInfo.destination,
-            formattedDate
+            formattedDate,
+            formattedReturnDate,
+            flightInfo.passengers.adults,
+            flightInfo.passengers.children,
+            flightInfo.passengers.infants,
+            flightInfo.tripClass as 'Y' | 'C' // Явное приведение типа
           );
-          
-          finalResponse = `${gptResponse}\n\n${flightData}`;
+
+          // Добавляем дополнительный контекст для GPT
+          flightData = `\n\n# ✈️ Информация о рейсах\n\n` +
+                      `🔍 **Параметры поиска:**\n` +
+                      `- Маршрут: ${flightInfo.origin} → ${flightInfo.destination}\n` +
+                      `- Дата вылета: ${formattedDate}\n` +
+                      (formattedReturnDate ? `- Дата возврата: ${formattedReturnDate}\n` : '') +
+                      `- Пассажиры: ${flightInfo.passengers.adults} взр., ` +
+                      `${flightInfo.passengers.children} дет., ` +
+                      `${flightInfo.passengers.infants} мл.\n` +
+                      `- Класс: ${flightInfo.tripClass === 'C' ? 'Бизнес' : 'Эконом'}\n\n` +
+                      flightData;
+        } catch (error) {
+          console.error('Error fetching flight data:', error);
+          flightData = '\n\nК сожалению, не удалось получить информацию о рейсах. ' +
+                      'Пожалуйста, уточните параметры поиска или попробуйте позже.';
         }
       }
 
-      // Check if the message is about hotels
-      if (inputText.toLowerCase().includes('отел') || 
-          inputText.toLowerCase().includes('где остановиться') ||
-          inputText.toLowerCase().includes('проживани')) {
-        
-        const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+      // Формируем сообщения для GPT с контекстом о рейсах
+      const messagesToSend = [
+        {
+          role: 'system',
+          text: SYSTEM_PROMPT
+        },
+        ...messages.map(msg => ({
+          role: msg.role,
+          text: msg.text
+        })),
+        {
+          role: 'user',
+          text: inputText + flightData
+        }
+      ];
 
-        const checkIn = today.toISOString().split('T')[0];
-        const checkOut = tomorrow.toISOString().split('T')[0];
+      const response = await fetch('/api/yandex-gpt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: messagesToSend }),
+      });
 
-        const hotelData = await getHotelInfoForGPT(
-          filters.location || extractLocationFromText(inputText),
-          checkIn,
-          checkOut,
-          filters.travelers
-        );
-        
-        finalResponse = `${gptResponse}\n\n${hotelData}`;
+      if (!response.ok) {
+        throw new Error('Failed to get response from GPT');
       }
 
-      // Add final response
+      const data = await response.json();
+      
+      // Добавляем ответ от GPT
       const assistantMessage: Message = {
-        id: Date.now(),
-        text: finalResponse,
-        isUser: false
+        id: messages.length + 2,
+        text: data.text,
+        isUser: false,
+        role: 'assistant'
       };
-      setMessages(prev => [...prev, assistantMessage]);
 
+      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Error processing message:', error);
+      console.error('Error in chat:', error);
       const errorMessage: Message = {
-        id: Date.now(),
-        text: 'Произошла ошибка при обработке сообщения. Пожалуйста, попробуйте еще раз.',
-        isUser: false
+        id: messages.length + 2,
+        text: 'Извините, произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз.',
+        isUser: false,
+        role: 'assistant'
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -694,6 +727,15 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
       delete (window as any).createRoute;
     };
   }, [messages, filters.location]);
+
+  const handleInviteFriends = () => {
+    if (!user) {
+      setShowAuthModal(true);
+    } else {
+      // Handle inviting friends when user is authenticated
+      console.log('Implement invite friends functionality');
+    }
+  };
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -961,6 +1003,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
             </Popover>
 
             {/* TripGen Generate Button */}
+            <div className="flex items-center gap-2">
             <button
               onClick={handleTripGenClick}
               className="flex-1 min-w-[160px] h-10 flex items-center justify-center gap-2 px-4 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
@@ -968,6 +1011,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
               <img src={AILogo} alt="TripGen" className="w-6 h-6" />
               TripGen Builder
             </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1002,186 +1046,66 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                       w-full overflow-hidden
                     `}
                   >
-                    <div 
-                      className={`
-                        relative
-                        w-full
-                        ${message.isUser 
-                          ? 'bg-black text-white rounded-[20px] rounded-br-[4px] px-4 py-3' 
-                          : 'bg-gray-50 rounded-2xl rounded-bl-[4px] p-3'
-                        }
-                      `}
-                    >
-                      <div 
-                        className={`
-                          ${message.isUser ? 'text-white' : 'text-gray-900'}
-                          text-[14px] leading-tight tracking-[-0.2px]
-                          font-normal
-                          break-words
-                          overflow-hidden
-                          [&>div]:last:mb-0
-                          [&_h3]:text-[16px]
-                          [&_h3]:font-semibold
-                          [&_h3]:tracking-[-0.4px]
-                          [&_h3]:mb-1
-                          [&>div]:mb-1.5
-                          [&_button]:transition-all
-                          [&_button]:duration-200
-                          [&_button]:ease-in-out
-                          [&_button.inline-flex]:items-center
-                          [&_button.inline-flex]:gap-1
-                          [&_button]:bg-white
-                          [&_button]:border
-                          [&_button]:border-gray-100
-                          [&_button]:shadow-sm
-                          [&_button:hover]:bg-white
-                          [&_button:hover]:border-gray-200
-                          [&_p]:mb-1
-                          [&_p]:last:mb-0
-                          [&_p]:leading-snug
-                          [&_ul]:mt-0.5
-                          [&_ul]:mb-1
-                          [&_li]:mb-0.5
-                          [&_li]:leading-snug
-                          [&_a]:inline-block
-                          [&_a]:max-w-full
-                          [&_a]:overflow-hidden
-                          [&_a]:text-ellipsis
-                          whitespace-pre-wrap
-                        `}
-                        dangerouslySetInnerHTML={
-                          message.isUser 
-                            ? { __html: `<p class="text-[15px] font-medium leading-snug">${message.text}</p>` }
-                            : { __html: formatAIMessage(message.text) }
-                        }
-                      />
+                    {renderMessage(message)}
                     </div>
-                  </div>
-                  {message.isUser && (
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
-                        <Users className="w-5 h-5 text-gray-500" />
-                      </div>
-                    </div>
-                  )}
                 </motion.div>
               ))}
               <div ref={messagesEndRef} />
             </div>
           </div>
-          <div className="border-t border-gray-100 p-4 bg-white">
-            <div className="max-w-6xl mx-auto flex items-center gap-4">
-              <div className="flex-1 relative">
+          
+          {/* Chat Input */}
+          <div className="p-4 border-t border-gray-200">
+            <div className="max-w-6xl mx-auto">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
                 <input
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleSendMessage()}
-                  placeholder="Ask anything..."
-                  className="w-full pl-12 pr-4 py-3 bg-gray-50 hover:bg-gray-100 focus:bg-white rounded-xl border border-gray-100 focus:border-gray-200 transition-colors duration-200 focus:outline-none text-[15px] tracking-[-0.2px]"
-                  disabled={isLoading}
-                />
-                <Plus className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2" />
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder="Напишите ваш вопрос..."
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/5 text-sm"
+                  />
+                  {isLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="w-5 h-5 border-2 border-black/10 border-t-black/40 rounded-full animate-spin"></div>
+                    </div>
+                  )}
               </div>
               <button 
                 onClick={handleSendMessage} 
-                className={`
-                  p-3 rounded-xl transition-colors duration-200
-                  ${isLoading 
-                    ? 'bg-gray-50 cursor-not-allowed' 
-                    : 'hover:bg-gray-100 active:bg-gray-200'
-                  }
-                `}
-                disabled={isLoading}
-              >
-                <Send className={`w-5 h-5 ${isLoading ? 'text-gray-300' : 'text-gray-500'}`} />
+                  disabled={isLoading || !inputText.trim()}
+                  className="shrink-0 w-11 h-11 flex items-center justify-center bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 disabled:hover:bg-black transition-colors"
+                >
+                  <Send className="w-5 h-5" />
               </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right Sidebar / TripBuilder */}
-        {showTripBuilder ? (
+        {showTripBuilder && (
           <TripBuilder
             message={currentMessage}
-            location={filters.location || 'Your Destination'}
-            duration={filters.date ? format(new Date(filters.date), 'dd.MM.yyyy') : '7 days'}
+            duration={dateFilter.type === 'duration' ? `${dateFilter.duration} days` : 'Custom dates'}
             travelers={filters.travelers}
             onClose={() => setShowTripBuilder(false)}
           />
-        ) : (
-          <div className="w-96 border-l border-gray-200 overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold">For you in Innenstadt</h2>
-                <button className="flex items-center gap-1 text-sm text-gray-600">
-                  Map
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                <div className="grid grid-cols-3 gap-2">
-                  {recommendations.map((rec) => (
-                    <div key={rec.id} className="group cursor-pointer">
-                      <div className="aspect-square rounded-xl overflow-hidden mb-2">
-                        <img 
-                          src={rec.image} 
-                          alt={rec.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                      <h3 className="font-medium text-xs truncate">{rec.title}</h3>
-                      <p className="text-xs text-gray-500">{rec.type}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <h2 className="text-lg font-semibold pt-4">Jump back in</h2>
-                <div className="grid grid-cols-3 gap-2">
-                  {jumpBackItems.map((item) => (
-                    <div key={item.id} className="group cursor-pointer">
-                      <div className="aspect-square rounded-xl overflow-hidden mb-2">
-                        <img 
-                          src={item.image} 
-                          alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                      <h3 className="text-xs font-medium truncate">{item.title}</h3>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-between pt-4">
-                  <h2 className="text-lg font-semibold">Get inspired</h2>
-                  <button className="text-sm text-gray-600">See all</button>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {inspiredItems.map((item) => (
-                    <div key={item.id} className="group cursor-pointer">
-                      <div className="aspect-square rounded-xl overflow-hidden mb-2">
-                        <img 
-                          src={item.image} 
-                          alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                      <h3 className="text-xs font-medium truncate">{item.title}</h3>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
         )}
-      </div>
+              </div>
 
-      <CreateTripModal
-        isOpen={isCreateTripModalOpen}
-        onClose={() => setIsCreateTripModalOpen(false)}
-        onSubmit={handleCreateTrip}
-      />
+      {showAuthModal && (
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+        />
+      )}
     </div>
   );
 };
