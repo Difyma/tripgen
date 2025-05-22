@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Calendar, Loader2, Plane } from 'lucide-react';
+import { MapPin, Calendar, Users, DollarSign } from 'lucide-react';
 
 interface FlightSearchParams {
   origin: string;
@@ -104,7 +104,7 @@ const FlightTestPage: React.FC = () => {
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">From</label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
                   value={searchParams.origin}
@@ -119,7 +119,7 @@ const FlightTestPage: React.FC = () => {
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">To</label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
                   value={searchParams.destination}

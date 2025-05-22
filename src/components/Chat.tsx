@@ -556,7 +556,6 @@ const Chat = () => {
 
   const handleCreateTrip = (data: any) => {
     console.log('Creating trip with data:', data);
-    setIsCreateTripModalOpen(false);
   };
 
   const scrollToBottom = () => {

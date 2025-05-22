@@ -9,16 +9,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export interface SupabaseResponse<T> {
-  data: T | null;
-  error: Error | null;
-}
-
 export interface User {
   id: string;
   email: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface SupabaseResponse<T> {
+  data: T | null;
+  error: Error | null;
 }
 
 interface AuthUser {
