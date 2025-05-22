@@ -14,7 +14,8 @@ interface ValidationErrors {
 const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch }) => {
   const [searchParams, setSearchParams] = useState({
     origin: '',
-    destination: ''
+    destination: '',
+    date_from: new Date().toISOString().split('T')[0] // Default to today's date
   });
 
   const [loading, setLoading] = useState(false);
@@ -61,16 +62,13 @@ const FlightSearch: React.FC<FlightSearchProps> = ({ onSearch }) => {
     setError(null);
 
     try {
-      const results = await aviasalesApi.searchFlights({
+      const response = await aviasalesApi.searchFlights({
         origin: searchParams.origin,
-        destination: searchParams.destination
+        destination: searchParams.destination,
+        date_from: searchParams.date_from
       });
 
-      if (results.startsWith('Ошибка')) {
-        setError(results);
-      } else {
-        onSearch(results);
-      }
+      onSearch(aviasalesApi.formatFlightsForGPT(response));
     } catch (err) {
       console.error('Search error:', err);
       setError(
