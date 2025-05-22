@@ -3,11 +3,11 @@ import FlightSearch from '../components/FlightSearch';
 import FlightResults from '../components/FlightResults';
 
 const FlightsPage: React.FC = () => {
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  const handleSearch = (results: any) => {
-    setSearchResults(results.data || []);
+  const handleSearch = (results: string) => {
+    setSearchResults(results);
   };
 
   return (
@@ -24,7 +24,7 @@ const FlightsPage: React.FC = () => {
             <h2 className="text-xl font-semibold mb-4">
               Результаты поиска
             </h2>
-            <FlightResults flights={searchResults} loading={loading} />
+            <FlightResults results={searchResults} loading={loading} />
           </div>
         </div>
       </div>

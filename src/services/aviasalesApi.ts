@@ -1,41 +1,34 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://api.travelpayouts.com/v2';
+const API_BASE_URL = 'https://api.travelpayouts.com';
 const API_TOKEN = import.meta.env.VITE_AVIASALES_API_TOKEN;
-const PARTNER_ID = import.meta.env.VITE_AVIASALES_PARTNER_ID || 'your_partner_id';
 
-interface FlightInfo {
-  origin: string;
-  destination: string;
-  price: number;
-  airline: string;
-  flight_number: string;
-  departure_at: string;
-  arrival_at: string;
-  transfers: number;
-  duration: number;
-  booking_url: string;
+// Check if API token is available
+if (!API_TOKEN) {
+  console.warn('Aviasales API token is not configured. Please add VITE_AVIASALES_API_TOKEN to your .env file.');
 }
 
 interface FlightSearchParams {
-  origin: string;
-  destination: string;
-  depart_date: string;
+  origin: string;           // Airport code (e.g., MOW)
+  destination: string;      // Airport code (e.g., LHR)
+}
+
+interface FlightResponse {
+  success: boolean;
+  data: Array<{
+    price: number;
+    airline: string;
+    flight_number: string;
+    departure_at: string;
+    return_at?: string;
+    duration: number;
+  }>;
 }
 
 class AviasalesApi {
   private static instance: AviasalesApi;
-  private api;
 
-  private constructor() {
-    this.api = axios.create({
-      baseURL: API_BASE_URL,
-      headers: {
-        'Authorization': `Bearer ${API_TOKEN}`,
-        'Accept': 'application/json',
-      },
-    });
-  }
+  private constructor() {}
 
   public static getInstance(): AviasalesApi {
     if (!AviasalesApi.instance) {
@@ -44,107 +37,68 @@ class AviasalesApi {
     return AviasalesApi.instance;
   }
 
-  // Формирование партнерской ссылки
-  private generatePartnerUrl(flight: any): string {
-    const baseUrl = 'https://www.aviasales.ru';
-    const params = new URLSearchParams({
-      origin: flight.origin,
-      destination: flight.destination,
-      depart_date: flight.departure_at.split('T')[0],
-      return_date: flight.return_at ? flight.return_at.split('T')[0] : '',
-      adults: '1',
-      children: '0',
-      infants: '0',
-      with_request: 'true',
-      marker: PARTNER_ID
-    });
-
-    return `${baseUrl}/search?${params.toString()}`;
-  }
-
-  // Получение информации о перелетах для GPT
-  async getFlightInfo(params: FlightSearchParams): Promise<FlightInfo[]> {
+  async searchFlights(params: FlightSearchParams): Promise<string> {
     try {
-      const response = await this.api.get('/prices/latest', {
-        params: {
-          ...params,
-          currency: 'RUB',
-          limit: 5, // Ограничиваем количество результатов
-        }
+      // Validate IATA codes
+      const origin = params.origin.toUpperCase();
+      const destination = params.destination.toUpperCase();
+
+      if (!/^[A-Z]{3}$/.test(origin) || !/^[A-Z]{3}$/.test(destination)) {
+        console.error('Неверный формат IATA кода:', { origin, destination });
+        return 'Ошибка: неверный формат кода аэропорта. Используйте 3-буквенный код IATA.';
+      }
+
+      const url = `${API_BASE_URL}/v2/prices/latest?origin=${origin}&destination=${destination}&token=${API_TOKEN}`;
+      console.log('Запрос к API:', url.replace(API_TOKEN, '***'));
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        console.error('Ошибка ответа:', response.status, response.statusText);
+        const text = await response.text();
+        console.error('Ответ сервера:', text);
+        return `Ошибка: ${response.status} ${response.statusText}`;
+      }
+
+      const data = await response.json() as FlightResponse;
+      console.log('Ответ API:', data);
+
+      if (!data.success || !data.data || !data.data.length) {
+        console.log('Рейсы не найдены:', data);
+        return "Не удалось найти рейсы по вашему запросу.";
+      }
+
+      // Возьмем топ-3 рейса
+      const topFlights = data.data.slice(0, 3);
+
+      const formatted = topFlights.map((flight, index) => {
+        const depDate = new Date(flight.departure_at).toLocaleString('ru-RU');
+        const retDate = flight.return_at ? new Date(flight.return_at).toLocaleString('ru-RU') : 'нет обратного рейса';
+        return `${index + 1}. Авиакомпания: ${flight.airline}, вылет: ${depDate}, возврат: ${retDate}, цена: ${flight.price.toLocaleString()} ₽`;
       });
 
-      // Преобразуем данные в нужный формат
-      return (response.data as any).data.map((flight: any) => ({
-        origin: flight.origin,
-        destination: flight.destination,
-        price: flight.price,
-        airline: flight.airline,
-        flight_number: flight.flight_number,
-        departure_at: flight.departure_at,
-        arrival_at: flight.arrival_at,
-        transfers: flight.transfers,
-        duration: flight.duration_to,
-        booking_url: this.generatePartnerUrl(flight)
-      }));
+      return `✈️ Найдено несколько рейсов:\n\n${formatted.join('\n')}`;
+
     } catch (error) {
-      console.error('Error getting flight info:', error);
-      throw error;
+      console.error('Ошибка при запросе:', error);
+      return 'Ошибка при запросе. Проверьте консоль для деталей.';
     }
   }
 
-  // Получение списка аэропортов для валидации
-  async getAirports(): Promise<{ [code: string]: string }> {
-    try {
-      const response = await this.api.get('/airports');
-      const airports: { [code: string]: string } = {};
-      
-      (response.data as any[]).forEach((airport: any) => {
-        airports[airport.code] = airport.name;
-      });
-
-      return airports;
-    } catch (error) {
-      console.error('Error getting airports:', error);
-      throw error;
-    }
+  // Вспомогательный метод для форматирования одного рейса
+  formatFlightInfo(flight: FlightResponse['data'][0]): string {
+    const depDate = new Date(flight.departure_at).toLocaleString('ru-RU');
+    const retDate = flight.return_at ? new Date(flight.return_at).toLocaleString('ru-RU') : 'нет обратного рейса';
+    
+    return `
+Авиакомпания: ${flight.airline}
+Рейс: ${flight.flight_number}
+Вылет: ${depDate}
+Возврат: ${retDate}
+Длительность: ${Math.floor(flight.duration / 60)}ч ${flight.duration % 60}м
+Цена: ${flight.price.toLocaleString()} ₽
+    `.trim();
   }
 }
 
-export const aviasalesApi = AviasalesApi.getInstance();
-
-// Вспомогательная функция для форматирования данных о перелете для GPT
-export function formatFlightInfoForGPT(flights: FlightInfo[]): string {
-  if (!flights.length) {
-    return '# ✈️ Информация о рейсах\nК сожалению, рейсов по данному направлению не найдено.';
-  }
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleString('ru-RU', {
-      day: 'numeric',
-      month: 'long',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}ч ${mins}м`;
-  };
-
-  let response = '# ✈️ Информация о рейсах\n\n';
-
-  flights.forEach((flight, index) => {
-    response += `### Рейс ${index + 1}: ${flight.airline} ${flight.flight_number}\n`;
-    response += `- 🛫 **Вылет:** ${formatDate(flight.departure_at)}\n`;
-    response += `- 🛬 **Прилет:** ${formatDate(flight.arrival_at)}\n`;
-    response += `- ⏱️ **Длительность:** ${formatDuration(flight.duration)}\n`;
-    response += `- 🔄 **Пересадок:** ${flight.transfers}\n`;
-    response += `- 💰 **Цена:** ${flight.price.toLocaleString('ru-RU')} RUB\n`;
-    response += `- 🎫 **[Забронировать билет](${flight.booking_url})**\n\n`;
-  });
-
-  return response;
-} 
+export const aviasalesApi = AviasalesApi.getInstance(); 
