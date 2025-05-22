@@ -110,7 +110,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setSuccessMessage('');
     
     try {
-      const result = await signInOrSignUp(email, password);
+      await signInOrSignUp(email, password);
       
       // Показываем сообщение об успехе
       setSuccessMessage('Авторизация успешна!');
