@@ -1,5 +1,3 @@
-import axios from 'axios';
-
 const API_BASE_URL = 'https://api.travelpayouts.com';
 const API_TOKEN = import.meta.env.VITE_AVIASALES_API_TOKEN;
 
@@ -11,18 +9,24 @@ if (!API_TOKEN) {
 interface FlightSearchParams {
   origin: string;           // Airport code (e.g., MOW)
   destination: string;      // Airport code (e.g., LHR)
+  date_from: string;       // Departure date
+  date_to?: string;        // Return date (optional)
+  adults?: number;         // Number of adult passengers
+  children?: number;       // Number of child passengers
+  infants?: number;        // Number of infant passengers
+  trip_class?: 'Y' | 'C';  // Y for economy, C for business
+  currency?: string;       // Currency code (e.g., RUB)
 }
 
-interface FlightResponse {
-  success: boolean;
-  data: Array<{
-    price: number;
-    airline: string;
-    flight_number: string;
-    departure_at: string;
-    return_at?: string;
-    duration: number;
-  }>;
+interface FlightInfo {
+  price: number;
+  airline: string;
+  flight_number: string;
+  departure_at: string;
+  return_at?: string;
+  transfers: number;
+  duration_to: number;
+  duration_back?: number;
 }
 
 class AviasalesApi {
@@ -37,67 +41,77 @@ class AviasalesApi {
     return AviasalesApi.instance;
   }
 
-  async searchFlights(params: FlightSearchParams): Promise<string> {
-    try {
-      // Validate IATA codes
-      const origin = params.origin.toUpperCase();
-      const destination = params.destination.toUpperCase();
+  async searchFlights(params: FlightSearchParams): Promise<FlightInfo[]> {
+    const queryParams = new URLSearchParams({
+      origin: params.origin,
+      destination: params.destination,
+      departure_at: params.date_from,
+      ...(params.date_to && { return_at: params.date_to }),
+      adults: (params.adults || 1).toString(),
+      children: (params.children || 0).toString(),
+      infants: (params.infants || 0).toString(),
+      trip_class: params.trip_class || 'Y',
+      currency: params.currency || 'RUB',
+      token: API_TOKEN
+    });
 
-      if (!/^[A-Z]{3}$/.test(origin) || !/^[A-Z]{3}$/.test(destination)) {
-        console.error('Неверный формат IATA кода:', { origin, destination });
-        return 'Ошибка: неверный формат кода аэропорта. Используйте 3-буквенный код IATA.';
-      }
-
-      const url = `${API_BASE_URL}/v2/prices/latest?origin=${origin}&destination=${destination}&token=${API_TOKEN}`;
-      console.log('Запрос к API:', url.replace(API_TOKEN, '***'));
-
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        console.error('Ошибка ответа:', response.status, response.statusText);
-        const text = await response.text();
-        console.error('Ответ сервера:', text);
-        return `Ошибка: ${response.status} ${response.statusText}`;
-      }
-
-      const data = await response.json() as FlightResponse;
-      console.log('Ответ API:', data);
-
-      if (!data.success || !data.data || !data.data.length) {
-        console.log('Рейсы не найдены:', data);
-        return "Не удалось найти рейсы по вашему запросу.";
-      }
-
-      // Возьмем топ-3 рейса
-      const topFlights = data.data.slice(0, 3);
-
-      const formatted = topFlights.map((flight, index) => {
-        const depDate = new Date(flight.departure_at).toLocaleString('ru-RU');
-        const retDate = flight.return_at ? new Date(flight.return_at).toLocaleString('ru-RU') : 'нет обратного рейса';
-        return `${index + 1}. Авиакомпания: ${flight.airline}, вылет: ${depDate}, возврат: ${retDate}, цена: ${flight.price.toLocaleString()} ₽`;
-      });
-
-      return `✈️ Найдено несколько рейсов:\n\n${formatted.join('\n')}`;
-
-    } catch (error) {
-      console.error('Ошибка при запросе:', error);
-      return 'Ошибка при запросе. Проверьте консоль для деталей.';
+    const response = await fetch(`${API_BASE_URL}/aviasales/v3/prices_for_dates?${queryParams}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch flight data');
     }
+
+    const data = await response.json();
+    return data.data || [];
   }
 
-  // Вспомогательный метод для форматирования одного рейса
-  formatFlightInfo(flight: FlightResponse['data'][0]): string {
-    const depDate = new Date(flight.departure_at).toLocaleString('ru-RU');
-    const retDate = flight.return_at ? new Date(flight.return_at).toLocaleString('ru-RU') : 'нет обратного рейса';
+  formatFlightsForGPT(flights: FlightInfo[]): string {
+    if (!flights.length) {
+      return 'К сожалению, рейсов по данному направлению не найдено.';
+    }
+
+    const formatDuration = (minutes: number): string => {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return `${hours}ч ${mins}мин`;
+    };
+
+    const formatDateTime = (dateStr: string): string => {
+      const date = new Date(dateStr);
+      return date.toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    };
+
+    const formatPrice = (price: number): string => {
+      return price.toLocaleString('ru-RU');
+    };
+
+    let response = '';
+
+    // Сортируем рейсы по цене
+    const sortedFlights = [...flights].sort((a, b) => a.price - b.price);
     
-    return `
-Авиакомпания: ${flight.airline}
-Рейс: ${flight.flight_number}
-Вылет: ${depDate}
-Возврат: ${retDate}
-Длительность: ${Math.floor(flight.duration / 60)}ч ${flight.duration % 60}м
-Цена: ${flight.price.toLocaleString()} ₽
-    `.trim();
+    // Добавляем информацию о каждом рейсе
+    sortedFlights.forEach((flight, index) => {
+      response += `### Вариант ${index + 1}\n`;
+      response += `- 💰 **Цена:** ${formatPrice(flight.price)} RUB\n`;
+      response += `- ✈️ **Авиакомпания:** ${flight.airline} ${flight.flight_number}\n`;
+      response += `- 🛫 **Вылет:** ${formatDateTime(flight.departure_at)}\n`;
+      if (flight.return_at) {
+        response += `- 🛬 **Обратный рейс:** ${formatDateTime(flight.return_at)}\n`;
+      }
+      response += `- ⏱️ **Длительность:** ${formatDuration(flight.duration_to)}\n`;
+      if (flight.duration_back) {
+        response += `- ⏱️ **Длительность обратного:** ${formatDuration(flight.duration_back)}\n`;
+      }
+      response += `- 🔄 **Пересадки:** ${flight.transfers}\n\n`;
+    });
+
+    return response;
   }
 }
 
