@@ -240,21 +240,33 @@ export function Sidebar({ className }: SidebarProps) {
           <div className="space-y-2">
             {/* User Profile / Auth Button */}
             {user ? (
-              <div className={`
-                flex items-center gap-3 px-3 h-10 rounded-xl
-                ${isSidebarCollapsed ? 'justify-center' : ''}
-              `}>
-                <img
-                  src="/images/user.png"
-                  alt="User"
-                  className={`rounded-full ${isSidebarCollapsed ? 'w-8 h-8' : 'w-8 h-8'}`}
-                />
+              <Link
+                to="/profile"
+                className={`
+                  group flex items-center gap-3 px-3 h-10 rounded-xl
+                  text-gray-600 hover:bg-gray-50 hover:text-gray-900
+                  transition-all duration-200
+                  ${isSidebarCollapsed ? 'justify-center' : ''}
+                `}
+                title="Перейти в профиль"
+              >
+                <div className="relative shrink-0">
+                  <img
+                    src="/images/user.png"
+                    alt="User"
+                    className={`rounded-full ring-2 ring-transparent group-hover:ring-black/10 transition-all ${isSidebarCollapsed ? 'w-8 h-8' : 'w-8 h-8'}`}
+                  />
+                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                </div>
                 {!isSidebarCollapsed && (
-                  <span className="text-sm text-gray-700 truncate">
-                    {user.email}
-                  </span>
+                  <div className="flex items-center gap-1 min-w-0 flex-1">
+                    <span className="text-sm truncate group-hover:text-black transition-colors">
+                      {user.email}
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors shrink-0" />
+                  </div>
                 )}
-              </div>
+              </Link>
             ) : (
               <button
                 onClick={() => setShowAuthModal(true)}

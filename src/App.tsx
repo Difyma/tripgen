@@ -8,6 +8,7 @@ import CreatorPage from './components/CreatorPage';
 import FlightsPage from './components/FlightTestPage';
 import HotelTestPage from './components/HotelTestPage';
 import FlightTestPage from './components/FlightTestPage';
+import ProfilePage from './components/ProfilePage';
 import { AuthProvider } from './contexts/AuthContext';
 import { SidebarProvider } from './contexts/SidebarContext';
 
@@ -26,6 +27,7 @@ export function App() {
                 <Route path="/flights" element={<FlightsPage />} />
                 <Route path="/hotels" element={<HotelTestPage />} />
                 <Route path="/flight" element={<FlightTestPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
             </Route>
           </Routes>
         </Router>

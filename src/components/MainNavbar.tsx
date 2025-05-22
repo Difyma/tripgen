@@ -1,4 +1,4 @@
-import { Users, MessageSquare } from 'lucide-react';
+import { Users, MessageSquare, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -26,16 +26,26 @@ export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
             <Link to="/about" className="text-xs sm:text-sm text-gray-600 hover:text-black transition-colors">О нас</Link>
             <div className="flex items-center gap-1 sm:gap-4">
               {user ? (
-                <div className="flex items-center gap-3">
-                  <img
-                    src="/images/user.png"
-                    alt="User"
-                    className="w-8 h-8 rounded-full"
-                  />
-                  <span className="text-sm text-gray-700 hidden sm:block">
-                    {user.email}
-                  </span>
-                </div>
+                <Link 
+                  to="/profile" 
+                  className="group flex items-center gap-3 px-2 py-1 rounded-full hover:bg-gray-50 transition-all"
+                  title="Перейти в профиль"
+                >
+                  <div className="relative">
+                    <img
+                      src="/images/user.png"
+                      alt="User"
+                      className="w-8 h-8 rounded-full ring-2 ring-transparent group-hover:ring-black/10 transition-all"
+                    />
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm text-gray-700 hidden sm:block group-hover:text-black transition-colors">
+                      {user.email}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+                  </div>
+                </Link>
               ) : (
                 <button 
                   className="w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-full transition-colors"

@@ -12,7 +12,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { AuthModal } from './AuthModal';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { useSidebar } from '../contexts/SidebarContext';
 const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
@@ -92,7 +92,7 @@ const SYSTEM_PROMPT = `Ты — опытный travel-эксперт и проф
    # ✈️ Детали перелета
    # 🏨 Где остановиться
 # 🍽️ Где поесть
-   # �� Что посмотреть
+   # 🎯 Что посмотреть
 
 2. Подзаголовки:
    ## 💫 Оптимальный вариант
@@ -863,6 +863,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-3">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 sm:gap-3">
+
             {/* Location Filter */}
             <div className="relative flex-1 min-w-[160px]">
               <input
