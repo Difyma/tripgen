@@ -6,8 +6,13 @@ const FlightsPage: React.FC = () => {
   const [searchResults, setSearchResults] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  const handleSearch = (results: string) => {
-    setSearchResults(results);
+  const handleSearch = async (results: string) => {
+    setLoading(true);
+    try {
+      setSearchResults(results);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -20,12 +25,14 @@ const FlightsPage: React.FC = () => {
         <div className="max-w-4xl mx-auto space-y-8">
           <FlightSearch onSearch={handleSearch} />
           
-          <div className="mt-8">
-            <h2 className="text-xl font-semibold mb-4">
-              Результаты поиска
-            </h2>
-            <FlightResults results={searchResults} loading={loading} />
-          </div>
+          {loading ? (
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Загрузка результатов...</p>
+            </div>
+          ) : searchResults && (
+            <FlightResults results={searchResults} />
+          )}
         </div>
       </div>
     </div>

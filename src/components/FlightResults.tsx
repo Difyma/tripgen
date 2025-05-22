@@ -3,10 +3,10 @@ import { Loader } from 'lucide-react';
 
 interface FlightResultsProps {
   results: string;
-  loading: boolean;
+  loading?: boolean;
 }
 
-const FlightResults: React.FC<FlightResultsProps> = ({ results, loading }) => {
+const FlightResults: React.FC<FlightResultsProps> = ({ results, loading = false }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
