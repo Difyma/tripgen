@@ -1,4 +1,4 @@
-import { Search, Users, MessageSquare } from 'lucide-react';
+import { Users, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface MainNavbarProps {
