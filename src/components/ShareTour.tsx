@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, MessageSquare, Mail, MapPin, Camera, Calendar, Map } from 'lucide-react';
+import { Users, MessageSquare, Mail, MapPin, Camera, Calendar, Map, Share2, Copy } from 'lucide-react';
 
 const ShareTour = () => {
   const handleCopyLink = () => {

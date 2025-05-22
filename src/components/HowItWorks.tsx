@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Search, Calendar, MapPin, Plane, MessageSquare } from 'lucide-react';
+import { MessageSquare, MapPin, Calendar } from 'lucide-react';
 
 const HowItWorks = () => {
   return (
@@ -57,7 +57,7 @@ const HowItWorks = () => {
                   />
                 </div>
                 <div className="absolute -bottom-3 left-4 px-4 py-2 bg-white rounded-full flex items-center gap-2 shadow-lg group-hover:scale-105 transition-transform">
-                  <Search className="w-5 h-5" />
+                  <MessageSquare className="w-5 h-5" />
                   <span className="font-medium text-sm">Search</span>
                 </div>
               </div>
@@ -123,7 +123,7 @@ const HowItWorks = () => {
                   />
                 </div>
                 <div className="absolute -bottom-3 right-4 px-4 py-2 bg-white rounded-full flex items-center gap-2 shadow-lg group-hover:scale-105 transition-transform">
-                  <Plane className="w-5 h-5" />
+                  <MessageSquare className="w-5 h-5" />
                   <span className="font-medium text-sm">Start Journey</span>
                 </div>
               </div>

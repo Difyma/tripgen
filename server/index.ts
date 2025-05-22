@@ -1,15 +1,27 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import gptRouter from './gptProxy.js';
-import flightsRouter from './routes/flights.ts';
+import flightsRouter from './routes/flights.js';
 
-// Load environment variables
-dotenv.config();
-console.log('Environment loaded');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.resolve(__dirname, '..');
+
+// Load environment variables from root directory
+dotenv.config({ path: path.join(rootDir, '.env') });
+
+// Log environment status
+console.log('Environment loaded from:', path.join(rootDir, '.env'));
+console.log('Environment variables status:', {
+  YANDEX_API_KEY: !!process.env.YANDEX_API_KEY,
+  YANDEX_FOLDER_ID: !!process.env.YANDEX_FOLDER_ID
+});
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 console.log('Initializing server...');
 
@@ -33,12 +45,12 @@ app.get('/', (req, res) => {
 });
 
 // Routes
-app.use('/', gptRouter);
+app.use('/api', gptRouter);
 app.use('/api/flights', flightsRouter);
 console.log('Routes configured');
 
 // Error handling middleware
-app.use((err, req, res, next) => {
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Global error handler:', err);
   res.status(500).json({
     error: 'Что-то пошло не так!',

@@ -5,6 +5,13 @@ import cors from 'cors';
 
 dotenv.config();
 
+// Проверяем загрузку переменных окружения
+console.log('Environment variables loaded:', {
+  hasApiKey: !!process.env.YANDEX_API_KEY,
+  hasFolderId: !!process.env.YANDEX_FOLDER_ID,
+  folderId: process.env.YANDEX_FOLDER_ID
+});
+
 const router = express.Router();
 
 // Enable CORS with specific options
@@ -26,6 +33,11 @@ router.get('/test', (req, res) => {
 // Middleware для проверки наличия необходимых переменных окружения
 const checkEnvVariables = (req, res, next) => {
   const { YANDEX_API_KEY, YANDEX_FOLDER_ID } = process.env;
+  console.log('Checking environment variables in middleware:', {
+    hasApiKey: !!YANDEX_API_KEY,
+    hasFolderId: !!YANDEX_FOLDER_ID
+  });
+  
   if (!YANDEX_API_KEY || !YANDEX_FOLDER_ID) {
     console.error('Missing environment variables:', {
       hasApiKey: !!YANDEX_API_KEY,
@@ -61,6 +73,8 @@ router.post('/yandex-gpt', checkEnvVariables, async (req, res) => {
     };
 
     console.log('Sending request to Yandex GPT:', JSON.stringify(apiRequestBody, null, 2));
+    console.log('Using API Key:', process.env.YANDEX_API_KEY?.substring(0, 5) + '...');
+    console.log('Using Folder ID:', process.env.YANDEX_FOLDER_ID);
 
     const response = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
       method: 'POST',

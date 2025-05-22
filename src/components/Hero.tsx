@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Search, Calendar, Users, MessageSquare } from 'lucide-react';
+import { Search, Calendar, Users } from 'lucide-react';
 import { useState } from 'react';
 import { 
   Popover,
@@ -9,6 +9,8 @@ import {
 import { Calendar as CalendarComponent } from "./ui/calendar";
 import { format } from "date-fns";
 import { Input } from "./ui/input";
+import { MainNavbar } from './MainNavbar';
+import { AuthModal } from './AuthModal';
 
 interface SearchFormData {
   location: string;
@@ -33,86 +35,19 @@ const Hero = () => {
 
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authStep, setAuthStep] = useState<'email' | 'otp'>('email');
-  const [authEmail, setAuthEmail] = useState('');
-  const [authOtp, setAuthOtp] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState('');
 
   const handleSearch = () => {
     console.log('Search clicked', formData);
     // Здесь будет обработка поиска
   };
 
-  const handleSendEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthLoading(true);
-    setAuthError('');
-    // TODO: заменить на реальный запрос
-    setTimeout(() => {
-      setAuthStep('otp');
-      setAuthLoading(false);
-    }, 1000);
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthLoading(true);
-    setAuthError('');
-    // TODO: заменить на реальный запрос
-    setTimeout(() => {
-      if (authOtp === '123456') { // для теста
-        setShowAuthModal(false);
-        setAuthStep('email');
-        setAuthEmail('');
-        setAuthOtp('');
-        setAuthError('');
-      } else {
-        setAuthError('Неверный код');
-      }
-      setAuthLoading(false);
-    }, 1000);
-  };
-
   return (
     <div className="min-h-screen bg-[#FBFBFD]">
       {/* Navigation */}
-      <nav className="w-full py-2 px-2 sm:py-4 sm:px-8 bg-white/80 backdrop-blur-xl fixed top-0 left-0 z-50 border-b border-gray-200/50">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-1 sm:gap-0.5">
-              <img 
-                src="/images/TRIPGEN_logo_2.png" 
-                alt="TripGen Logo" 
-                className="w-8 h-8 sm:w-12 sm:h-12"
-              />
-              <div className="text-base sm:text-xl font-semibold tracking-wide text-gray-800 font-cal">TRIPGEN</div>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-12">
-              <a href="#" className="text-xs sm:text-sm text-gray-600 hover:text-black transition-colors">Как это работает</a>
-              <a href="#" className="text-xs sm:text-sm text-gray-600 hover:text-black transition-colors">О нас</a>
-              <div className="flex items-center gap-1 sm:gap-4">
-                <button className="w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-full transition-colors">
-                  <Search className="w-4 h-4" />
-                </button>
-                <button className="w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-full transition-colors"
-                  onClick={() => setShowAuthModal(true)}
-                  aria-label="Войти или зарегистрироваться"
-                >
-                  <Users className="w-4 h-4" />
-                </button>
-                <a 
-                  href="/chat" 
-                  className="flex items-center gap-1 sm:gap-2 bg-black text-white px-2 py-1 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-900 transition-colors"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  <span>Начать чат</span>
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <MainNavbar onAuthClick={() => setShowAuthModal(true)} />
+
+      {/* Auth Modal */}
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
 
       {/* Hero Content */}
       <div className="min-h-screen pt-20">
@@ -248,133 +183,80 @@ const Hero = () => {
                     <PopoverContent className="w-80">
                       <div className="space-y-4">
                         <h4 className="font-medium">Number of guests</h4>
-                        <div className="flex items-center gap-4">
-                          <button 
-                            className="w-8 h-8 rounded-full border flex items-center justify-center"
-                            onClick={() => setFormData({ ...formData, guests: Math.max(1, formData.guests - 1) })}
-                          >
-                            -
-                          </button>
-                          <span>{formData.guests}</span>
-                          <button 
-                            className="w-8 h-8 rounded-full border flex items-center justify-center"
-                            onClick={() => setFormData({ ...formData, guests: formData.guests + 1 })}
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        <h4 className="font-medium">Children</h4>
-                        <div className="flex items-center gap-4">
-                          <button 
-                            className="w-8 h-8 rounded-full border flex items-center justify-center"
-                            onClick={() => setFormData({ ...formData, children: Math.max(0, formData.children - 1) })}
-                          >
-                            -
-                          </button>
-                          <span>{formData.children}</span>
-                          <button 
-                            className="w-8 h-8 rounded-full border flex items-center justify-center"
-                            onClick={() => setFormData({ ...formData, children: formData.children + 1 })}
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        <h4 className="font-medium">Pets</h4>
-                        <div className="flex items-center gap-4">
-                          <button 
-                            className="w-8 h-8 rounded-full border flex items-center justify-center"
-                            onClick={() => setFormData({ ...formData, pets: Math.max(0, formData.pets - 1) })}
-                          >
-                            -
-                          </button>
-                          <span>{formData.pets}</span>
-                          <button 
-                            className="w-8 h-8 rounded-full border flex items-center justify-center"
-                            onClick={() => setFormData({ ...formData, pets: formData.pets + 1 })}
-                          >
-                            +
-                          </button>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span>Adults</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setFormData(prev => ({ ...prev, guests: Math.max(1, prev.guests - 1) }))}
+                                className="w-8 h-8 flex items-center justify-center border rounded-full hover:bg-black/5"
+                              >
+                                -
+                              </button>
+                              <span>{formData.guests}</span>
+                              <button
+                                onClick={() => setFormData(prev => ({ ...prev, guests: prev.guests + 1 }))}
+                                className="w-8 h-8 flex items-center justify-center border rounded-full hover:bg-black/5"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Children</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setFormData(prev => ({ ...prev, children: Math.max(0, prev.children - 1) }))}
+                                className="w-8 h-8 flex items-center justify-center border rounded-full hover:bg-black/5"
+                              >
+                                -
+                              </button>
+                              <span>{formData.children}</span>
+                              <button
+                                onClick={() => setFormData(prev => ({ ...prev, children: prev.children + 1 }))}
+                                className="w-8 h-8 flex items-center justify-center border rounded-full hover:bg-black/5"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Pets</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setFormData(prev => ({ ...prev, pets: Math.max(0, prev.pets - 1) }))}
+                                className="w-8 h-8 flex items-center justify-center border rounded-full hover:bg-black/5"
+                              >
+                                -
+                              </button>
+                              <span>{formData.pets}</span>
+                              <button
+                                onClick={() => setFormData(prev => ({ ...prev, pets: prev.pets + 1 }))}
+                                className="w-8 h-8 flex items-center justify-center border rounded-full hover:bg-black/5"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </PopoverContent>
                   </Popover>
 
-                  <div className="flex items-center justify-center p-2">
-                    <button 
-                      onClick={handleSearch}
-                      className="w-full bg-black text-white py-4 px-6 rounded-xl hover:bg-black/90 transition-colors text-sm font-medium"
-                    >
-                      Search
-                    </button>
-                  </div>
+                  {/* Search Button */}
+                  <button
+                    onClick={handleSearch}
+                    className="flex items-center justify-center gap-2 bg-black text-white p-4 rounded-xl hover:bg-gray-900 transition-colors"
+                  >
+                    <Search className="w-4 h-4" />
+                    <span>Search</span>
+                  </button>
                 </div>
               </div>
             </motion.div>
           </div>
         </div>
       </div>
-
-      {/* Popover для авторизации/регистрации */}
-      {showAuthModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => { setShowAuthModal(false); setAuthStep('email'); setAuthEmail(''); setAuthOtp(''); setAuthError(''); }}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="bg-white rounded-2xl shadow-2xl max-w-xs w-full p-6 relative flex flex-col gap-4"
-            onClick={e => e.stopPropagation()}
-          >
-            <button
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 p-1 rounded-full"
-              onClick={() => { setShowAuthModal(false); setAuthStep('email'); setAuthEmail(''); setAuthOtp(''); setAuthError(''); }}
-              aria-label="Закрыть"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-            <h2 className="text-xl font-semibold text-center mb-2">Вход / Регистрация</h2>
-            <form className="flex flex-col gap-3" onSubmit={authStep === 'email' ? handleSendEmail : handleVerifyOtp}>
-              {authStep === 'email' ? (
-                <>
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={authEmail}
-                    onChange={e => setAuthEmail(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-black focus:border-transparent transition-shadow text-sm"
-                    required
-                    autoFocus
-                  />
-                  <button type="submit" className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors mt-2" disabled={authLoading}>
-                    {authLoading ? 'Отправка...' : 'Получить код'}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <input
-                    type="text"
-                    placeholder="Код из письма"
-                    value={authOtp}
-                    onChange={e => setAuthOtp(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-black focus:border-transparent transition-shadow text-sm"
-                    required
-                    autoFocus
-                  />
-                  <button type="submit" className="w-full bg-black text-white py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors mt-2" disabled={authLoading}>
-                    {authLoading ? 'Проверка...' : 'Войти'}
-                  </button>
-                  <button type="button" className="text-xs text-gray-500 mt-2" onClick={() => { setAuthStep('email'); setAuthOtp(''); setAuthError(''); }}>
-                    Изменить email
-                  </button>
-                </>
-              )}
-              {authError && <div className="text-red-500 text-xs text-center">{authError}</div>}
-            </form>
-          </motion.div>
-        </div>
-      )}
     </div>
   );
 };

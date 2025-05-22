@@ -1,4 +1,15 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { MapPin, Calendar, Users2, Clock } from 'lucide-react';
+
+interface TourStop {
+  id: number;
+  time: string;
+  title: string;
+  description: string;
+  image: string;
+  duration: string;
+}
 
 const ExampleTrip = () => {
   return (

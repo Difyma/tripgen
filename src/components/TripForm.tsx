@@ -1,7 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, ClipboardList, Settings } from 'lucide-react';
+import { MapPin, Calendar, Users, DollarSign } from 'lucide-react';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { ru } from 'date-fns/locale';
+
+interface TripFormProps {
+  onSubmit: (data: any) => void;
+  onClose: () => void;
+}
 
 const TripForm = () => {
   return (
@@ -92,17 +102,22 @@ const TripForm = () => {
             {
               title: 'Персонализация',
               description: 'Маршрут создается с учетом ваших интересов и предпочтений',
-              icon: Sparkles
+              icon: MapPin
             },
             {
               title: 'Детализация',
               description: 'Полное описание мест, активностей и рекомендаций',
-              icon: ClipboardList
+              icon: Calendar
             },
             {
               title: 'Гибкость',
               description: 'Возможность корректировать маршрут в реальном времени',
-              icon: Settings
+              icon: Users
+            },
+            {
+              title: 'Экономия',
+              description: 'Экономия времени и средств',
+              icon: DollarSign
             }
           ].map((feature, index) => (
             <motion.div

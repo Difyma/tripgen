@@ -1,16 +1,21 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Plus, MessageSquare, Compass, Heart, Bell, Settings, ChevronRight, ChevronLeft, Users } from 'lucide-react';
 import { CreateTripModal } from './CreateTripModal';
+import { AuthModal } from './AuthModal';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SidebarProps {
   className?: string;
 }
 
 export function Sidebar({ className }: SidebarProps) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showChatList, setShowChatList] = useState(false);
   const [isCreateTripModalOpen, setIsCreateTripModalOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const location = useLocation();
   const [userChats] = useState([
     { id: 1, name: 'Trip to Paris' },
@@ -20,6 +25,23 @@ export function Sidebar({ className }: SidebarProps) {
 
   const isActivePath = (path: string) => {
     return location.pathname.startsWith(path);
+  };
+
+  const handleInviteFriends = () => {
+    if (!user) {
+      setShowAuthModal(true);
+    } else {
+      // Handle inviting friends when user is authenticated
+      console.log('Implement invite friends functionality');
+    }
+  };
+
+  const handleNewChat = () => {
+    navigate(`/chat?new=${Date.now()}`);
+  };
+
+  const toggleChatList = () => {
+    setShowChatList(!showChatList);
   };
 
   return (
@@ -40,7 +62,7 @@ export function Sidebar({ className }: SidebarProps) {
               {!isSidebarCollapsed && <span className="text-sm">Создать путешествие</span>}
             </button>
             <button 
-              onClick={() => setShowChatList(!showChatList)}
+              onClick={handleNewChat}
               className={`w-full bg-gray-50 text-gray-900 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors flex items-center gap-2 ${isSidebarCollapsed ? 'justify-center' : ''}`}
             >
               <MessageSquare className="w-4 h-4" />
@@ -60,8 +82,8 @@ export function Sidebar({ className }: SidebarProps) {
         </div>
         <nav className="flex-1 px-2">
           <div className="space-y-1">
-            <Link 
-              to="/chat" 
+            <button 
+              onClick={toggleChatList}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''} ${isActivePath('/chat') ? 'bg-gray-100 text-gray-900' : 'text-gray-600'}`}
             >
               <MessageSquare className="w-4 h-4" />
@@ -71,7 +93,7 @@ export function Sidebar({ className }: SidebarProps) {
                   <span className="ml-auto bg-gray-100 text-xs px-2 py-0.5 rounded-full">{userChats.length}</span>
                 </>
               )}
-            </Link>
+            </button>
             <Link 
               to="/trips" 
               className={`flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''} ${isActivePath('/trips') ? 'bg-gray-100 text-gray-900' : 'text-gray-600'}`}
@@ -101,7 +123,10 @@ export function Sidebar({ className }: SidebarProps) {
               <Settings className="w-4 h-4" />
               {!isSidebarCollapsed && <span className="text-sm">Настройки</span>}
             </button>
-            <button className={`flex items-center gap-2 px-3 py-2 text-gray-600 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''}`}>
+            <button 
+              onClick={handleInviteFriends}
+              className={`flex items-center gap-2 px-3 py-2 text-gray-600 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''}`}
+            >
               <Users className="w-4 h-4" />
               {!isSidebarCollapsed && <span className="text-sm">Пригласить друзей</span>}
             </button>
@@ -135,6 +160,13 @@ export function Sidebar({ className }: SidebarProps) {
           setIsCreateTripModalOpen(false);
         }}
       />
+
+      {showAuthModal && (
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+        />
+      )}
     </>
   );
 } 

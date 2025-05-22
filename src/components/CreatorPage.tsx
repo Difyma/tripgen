@@ -1,5 +1,7 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Globe, DollarSign, Users, Star, ChevronRight, ArrowRight, Coins, Gift, Share2, Trophy } from 'lucide-react';
+import { Globe, DollarSign, Users, Star, ChevronRight, ArrowRight, Coins, Gift, Share2, Trophy, Users2 } from 'lucide-react';
 import CreatorNavbar from './CreatorNavbar';
 
 const benefits = [
