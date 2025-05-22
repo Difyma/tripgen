@@ -1,11 +1,14 @@
 import { Users, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface MainNavbarProps {
   onAuthClick: () => void;
 }
 
 export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
+  const { user } = useAuth();
+
   return (
     <nav className="w-full py-2 px-2 sm:py-4 sm:px-8 bg-white/80 backdrop-blur-xl fixed top-0 left-0 z-50 border-b border-gray-200/50">
       <div className="max-w-[1200px] mx-auto">
@@ -22,13 +25,26 @@ export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
             <Link to="/" className="text-xs sm:text-sm text-gray-600 hover:text-black transition-colors">Как это работает</Link>
             <Link to="/about" className="text-xs sm:text-sm text-gray-600 hover:text-black transition-colors">О нас</Link>
             <div className="flex items-center gap-1 sm:gap-4">
-              <button 
-                className="w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-full transition-colors"
-                onClick={onAuthClick}
-                aria-label="Войти или зарегистрироваться"
-              >
-                <Users className="w-4 h-4" />
-              </button>
+              {user ? (
+                <div className="flex items-center gap-3">
+                  <img
+                    src="/images/user.png"
+                    alt="User"
+                    className="w-8 h-8 rounded-full"
+                  />
+                  <span className="text-sm text-gray-700 hidden sm:block">
+                    {user.email}
+                  </span>
+                </div>
+              ) : (
+                <button 
+                  className="w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-full transition-colors"
+                  onClick={onAuthClick}
+                  aria-label="Войти или зарегистрироваться"
+                >
+                  <Users className="w-4 h-4" />
+                </button>
+              )}
               <Link 
                 to="/creator" 
                 className="bg-white text-black border border-gray-200 px-4 py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"

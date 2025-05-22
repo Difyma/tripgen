@@ -3,8 +3,10 @@ import { CurrentTrip } from '../components/CurrentTrip';
 import { TripCard } from '../components/TripCard';
 import { trips } from '../data/trips';
 import type { Trip } from '../data/trips';
+import { useSidebar } from '../contexts/SidebarContext';
 
 export function TripsRoute() {
+  const { isSidebarCollapsed } = useSidebar();
   const [currentTrip, setCurrentTrip] = useState<Trip | undefined>();
   const [upcomingTrips, setUpcomingTrips] = useState<Trip[]>([]);
 
@@ -17,7 +19,7 @@ export function TripsRoute() {
   }, []);
 
   return (
-    <div className="flex-1">
+    <div className="flex-1 transition-all duration-300" style={{ marginLeft: isSidebarCollapsed ? '72px' : '280px' }}>
       <div className="border-b bg-white px-8 py-4">
         <h1 className="text-2xl font-semibold">Мои путешествия</h1>
       </div>

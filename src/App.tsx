@@ -9,24 +9,27 @@ import FlightsPage from './components/FlightTestPage';
 import HotelTestPage from './components/HotelTestPage';
 import FlightTestPage from './components/FlightTestPage';
 import { AuthProvider } from './contexts/AuthContext';
+import { SidebarProvider } from './contexts/SidebarContext';
 
 export function App() {
   return (
     <AuthProvider>
-    <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/creator" element={<CreatorPage />} />
-        <Route element={<AppLayout />}>
-            <Route path="/chat" element={<Chat key={Date.now()} />} />
-            <Route path="/trips" element={<TripsRoute />} />
-            <Route path="/trips/:id" element={<TripDetailsRoute />} />
-            <Route path="/flights" element={<FlightsPage />} />
-            <Route path="/hotels" element={<HotelTestPage />} />
-            <Route path="/flight" element={<FlightTestPage />} />
-        </Route>
-      </Routes>
-    </Router>
+      <SidebarProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/creator" element={<CreatorPage />} />
+            <Route element={<AppLayout />}>
+                <Route path="/chat" element={<Chat key={Date.now()} />} />
+                <Route path="/trips" element={<TripsRoute />} />
+                <Route path="/trips/:id" element={<TripDetailsRoute />} />
+                <Route path="/flights" element={<FlightsPage />} />
+                <Route path="/hotels" element={<HotelTestPage />} />
+                <Route path="/flight" element={<FlightTestPage />} />
+            </Route>
+          </Routes>
+        </Router>
+      </SidebarProvider>
     </AuthProvider>
   );
 }

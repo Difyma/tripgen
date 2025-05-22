@@ -1,26 +1,43 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Plus, MessageSquare, Compass, Heart, Bell, Settings, ChevronRight, ChevronLeft, Users } from 'lucide-react';
+import { Plus, MessageSquare, Compass, Heart, Bell, Settings, ChevronRight, ChevronLeft, Users, Send } from 'lucide-react';
 import { CreateTripModal } from './CreateTripModal';
 import { AuthModal } from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
+import { useSidebar } from '../contexts/SidebarContext';
 
 interface SidebarProps {
   className?: string;
 }
 
+interface Chat {
+  id: string | number;
+  name: string;
+  lastMessage?: string;
+  timestamp?: string;
+}
+
 export function Sidebar({ className }: SidebarProps) {
   const { user } = useAuth();
+  const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebar();
   const navigate = useNavigate();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showChatList, setShowChatList] = useState(false);
   const [isCreateTripModalOpen, setIsCreateTripModalOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const location = useLocation();
-  const [userChats] = useState([
-    { id: 1, name: 'Trip to Paris' },
-    { id: 2, name: 'Family vacation June' },
-    { id: 3, name: 'Business Trip' },
+  const [userChats] = useState<Chat[]>([
+    { id: 1, name: 'Путешествие в Париж', lastMessage: 'Давайте спланируем маршрут по основным достопримечательностям', timestamp: '2024-03-15' },
+    { id: 2, name: 'Отдых на Бали', lastMessage: 'Лучшие пляжи для серфинга в Улувату', timestamp: '2024-03-14' },
+    { id: 3, name: 'Тур по Японии', lastMessage: 'Сезон цветения сакуры в Киото', timestamp: '2024-03-13' },
+    { id: 4, name: 'Горнолыжный курорт', lastMessage: 'Шамони или Куршевель?', timestamp: '2024-03-12' },
+    { id: 5, name: 'Греческие острова', lastMessage: 'Паром из Афин до Санторини', timestamp: '2024-03-11' },
+    { id: 6, name: 'Выходные в Стамбуле', lastMessage: 'Рекомендации по отелям в районе Султанахмет', timestamp: '2024-03-10' },
+    { id: 7, name: 'Сафари в Кении', lastMessage: 'Национальный парк Масаи-Мара', timestamp: '2024-03-09' },
+    { id: 8, name: 'Круиз по Карибам', lastMessage: 'Лучшее время для посещения Багамских островов', timestamp: '2024-03-08' },
+    { id: 9, name: 'Поход в Непале', lastMessage: 'Маршрут до базового лагеря Эвереста', timestamp: '2024-03-07' },
+    { id: 10, name: 'Винный тур Тоскана', lastMessage: 'Дегустации в регионе Кьянти', timestamp: '2024-03-06' },
+    { id: 11, name: 'Северное сияние', lastMessage: 'Лапландия или Исландия?', timestamp: '2024-03-05' },
+    { id: 12, name: 'Рим на выходные', lastMessage: 'Билеты в Ватиканские музеи', timestamp: '2024-03-04' }
   ]);
 
   const isActivePath = (path: string) => {
@@ -46,120 +63,268 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <>
-      {/* Left Sidebar */}
-      <div className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ${className}`}>
-        <div className="p-4 relative">
-          <Link to="/" className={`flex items-center gap-2 mb-6 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
-            <img src="/images/TRIPGEN_logo_2.png" alt="Logo" className={`${isSidebarCollapsed ? 'w-10 h-10' : 'w-8 h-8'} transition-all duration-300`} />
-            {!isSidebarCollapsed && <span className="font-semibold">TRIPGEN</span>}
-          </Link>
-          <div className="space-y-2">
-            <button 
-              onClick={() => setIsCreateTripModalOpen(true)}
-              className={`w-full bg-black text-white rounded-lg hover:bg-gray-900 transition-colors flex items-center gap-2 ${
-                isSidebarCollapsed 
-                  ? 'justify-center h-10 w-10 mx-auto' 
-                  : 'px-3 py-1.5'
-              }`}
-            >
-              <Plus className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-4 h-4'} transition-all duration-300`} />
-              {!isSidebarCollapsed && <span className="text-sm">Создать путешествие</span>}
-            </button>
-            <button 
-              onClick={handleNewChat}
-              className={`w-full bg-gray-50 text-gray-900 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors flex items-center gap-2 ${
-                isSidebarCollapsed 
-                  ? 'justify-center h-10 w-10 mx-auto' 
-                  : 'px-3 py-1.5'
-              }`}
-            >
-              <MessageSquare className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-4 h-4'} transition-all duration-300`} />
-              {!isSidebarCollapsed && <span className="text-sm">Новый чат</span>}
-            </button>
-          </div>
-          {/* Toggle Button */}
+      <div
+        className={`
+          fixed left-0 top-0 bottom-0 z-20
+          flex flex-col
+          bg-white border-r border-gray-200
+          transition-all duration-300
+          ${isSidebarCollapsed ? 'w-[72px]' : 'w-[280px]'}
+          ${className || ''}
+        `}
+      >
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-3 px-4 h-[72px] border-b border-gray-200">
+          <img
+            src="/images/TRIPGEN_logo_2.png"
+            alt="TRIPGEN"
+            className={`transition-all duration-300 ${isSidebarCollapsed ? 'w-10 h-10' : 'w-8 h-8'}`}
+          />
+          <span className={`font-bold text-xl transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0' : 'opacity-100'}`}>
+            TRIPGEN
+          </span>
+        </Link>
+
+        {/* Action Buttons */}
+        <div className="p-2 space-y-2">
           <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors z-10"
+            onClick={() => setIsCreateTripModalOpen(true)}
+            className={`
+              w-full bg-black text-white
+              flex items-center gap-3
+              transition-all duration-300
+              hover:bg-gray-900
+              ${isSidebarCollapsed
+                ? 'h-10 w-10 p-0 justify-center mx-auto rounded-xl'
+                : 'px-4 h-10 rounded-xl'
+              }
+            `}
           >
-            {isSidebarCollapsed ? 
-              <ChevronRight className="w-4 h-4" /> : 
-              <ChevronLeft className="w-4 h-4" />
-            }
+            <Plus className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
+            <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+              Создать маршрут
+            </span>
           </button>
         </div>
-        <nav className="flex-1 px-2">
-          <div className="space-y-1">
-            <button 
-              onClick={toggleChatList}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''} ${isActivePath('/chat') ? 'bg-gray-100 text-gray-900' : 'text-gray-600'}`}
+
+        {/* Navigation */}
+        <div className="flex-1 overflow-y-auto py-2">
+          <nav className="px-2 space-y-1">
+            <div>
+              <Link
+                to="/chat"
+                className={`
+                  flex items-center gap-3 px-3 h-10 rounded-xl
+                  transition-colors duration-200
+                  ${isActivePath('/chat')
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }
+                `}
+                onClick={toggleChatList}
+              >
+                <MessageSquare className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
+                <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+                  Чаты
+                </span>
+                {!isSidebarCollapsed && (
+                  <ChevronRight className={`w-4 h-4 ml-auto transition-transform ${showChatList ? 'rotate-90' : ''}`} />
+                )}
+              </Link>
+
+              {/* Список чатов */}
+              {showChatList && !isSidebarCollapsed && (
+                <div className="mt-2 space-y-1">
+                  <button
+                    onClick={() => navigate(`/chat?new=${Date.now()}`)}
+                    className="w-full flex items-center gap-3 px-3 h-10 rounded-xl text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
+                  >
+                    <Plus className="w-5 h-5" />
+                    <span>Новый чат</span>
+                  </button>
+                  {userChats.map((chat) => (
+                    <Link
+                      key={chat.id}
+                      to={`/chat/${chat.id}`}
+                      className={`
+                        flex flex-col px-3 py-2 rounded-xl ml-2
+                        transition-colors duration-200
+                        ${location.pathname === `/chat/${chat.id}`
+                          ? 'bg-gray-100 text-gray-900'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-3">
+                        <MessageSquare className="w-4 h-4 shrink-0" />
+                        <span className="font-medium truncate">{chat.name}</span>
+                      </div>
+                      {chat.lastMessage && (
+                        <div className="ml-7 mt-1">
+                          <p className="text-xs text-gray-500 truncate">{chat.lastMessage}</p>
+                          {chat.timestamp && (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {new Date(chat.timestamp).toLocaleDateString('ru-RU', {
+                                day: 'numeric',
+                                month: 'short'
+                              })}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Link
+              to="/trips"
+              className={`
+                flex items-center gap-3 px-3 h-10 rounded-xl
+                transition-colors duration-200
+                ${isActivePath('/trips')
+                  ? 'bg-gray-100 text-gray-900'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }
+              `}
             >
-              <MessageSquare className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} transition-all duration-300`} />
+              <Compass className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
+              <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+                Мои путешествия
+              </span>
+            </Link>
+
+            <Link
+              to="/favorites"
+              className={`
+                flex items-center gap-3 px-3 h-10 rounded-xl
+                transition-colors duration-200
+                ${isActivePath('/favorites')
+                  ? 'bg-gray-100 text-gray-900'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }
+              `}
+            >
+              <Heart className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
+              <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+                Избранное
+              </span>
+            </Link>
+
+            <Link
+              to="/flights"
+              className={`
+                flex items-center gap-3 px-3 h-10 rounded-xl
+                transition-colors duration-200
+                ${isActivePath('/flights')
+                  ? 'bg-gray-100 text-gray-900'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }
+              `}
+            >
+              <Send className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'} rotate-45`} />
+              <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+                Авиабилеты
+              </span>
+            </Link>
+
+            <Link
+              to="/hotels"
+              className={`
+                flex items-center gap-3 px-3 h-10 rounded-xl
+                transition-colors duration-200
+                ${isActivePath('/hotels')
+                  ? 'bg-gray-100 text-gray-900'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }
+              `}
+            >
+              <Bell className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
+              <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+                Отели
+              </span>
+            </Link>
+          </nav>
+        </div>
+
+        {/* Footer */}
+        <div className="p-2 border-t border-gray-200">
+          <div className="space-y-2">
+            {/* User Profile / Auth Button */}
+            {user ? (
+              <div className={`
+                flex items-center gap-3 px-3 h-10 rounded-xl
+                ${isSidebarCollapsed ? 'justify-center' : ''}
+              `}>
+                <img
+                  src="/images/user.png"
+                  alt="User"
+                  className={`rounded-full ${isSidebarCollapsed ? 'w-8 h-8' : 'w-8 h-8'}`}
+                />
+                {!isSidebarCollapsed && (
+                  <span className="text-sm text-gray-700 truncate">
+                    {user.email}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className={`
+                  flex items-center gap-3 px-3 h-10 rounded-xl w-full
+                  text-gray-600 hover:bg-gray-50 hover:text-gray-900
+                  transition-colors duration-200
+                  ${isSidebarCollapsed ? 'justify-center' : ''}
+                `}
+              >
+                <Users className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
+                {!isSidebarCollapsed && (
+                  <span>Войти</span>
+                )}
+              </button>
+            )}
+
+            {/* Settings */}
+            <Link
+              to="/settings"
+              className={`
+                flex items-center gap-3 px-3 h-10 rounded-xl
+                text-gray-600 hover:bg-gray-50 hover:text-gray-900
+                transition-colors duration-200
+                ${isSidebarCollapsed ? 'justify-center' : ''}
+              `}
+            >
+              <Settings className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
               {!isSidebarCollapsed && (
+                <span>Настройки</span>
+              )}
+            </Link>
+
+            {/* Collapse Button */}
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className={`
+                flex items-center gap-3 px-3 h-10 rounded-xl w-full
+                text-gray-600 hover:bg-gray-50 hover:text-gray-900
+                transition-colors duration-200
+                ${isSidebarCollapsed ? 'justify-center' : ''}
+              `}
+            >
+              {isSidebarCollapsed ? (
+                <ChevronRight className="w-5 h-5" />
+              ) : (
                 <>
-                  <span className="text-sm">Чаты</span>
-                  <span className="ml-auto bg-gray-100 text-xs px-2 py-0.5 rounded-full">{userChats.length}</span>
+                  <ChevronLeft className="w-5 h-5" />
+                  <span>Свернуть</span>
                 </>
               )}
-            </button>
-            <Link 
-              to="/trips" 
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''} ${isActivePath('/trips') ? 'bg-gray-100 text-gray-900' : 'text-gray-600'}`}
-            >
-              <Compass className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} transition-all duration-300`} />
-              {!isSidebarCollapsed && <span className="text-sm">Мои путешествия</span>}
-            </Link>
-            <Link 
-              to="/saved" 
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''} ${isActivePath('/saved') ? 'bg-gray-100 text-gray-900' : 'text-gray-600'}`}
-            >
-              <Heart className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} transition-all duration-300`} />
-              {!isSidebarCollapsed && <span className="text-sm">Сохраненные</span>}
-            </Link>
-            <Link 
-              to="/updates" 
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''} ${isActivePath('/updates') ? 'bg-gray-100 text-gray-900' : 'text-gray-600'}`}
-            >
-              <Bell className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} transition-all duration-300`} />
-              {!isSidebarCollapsed && <span className="text-sm">Обновления</span>}
-            </Link>
-          </div>
-        </nav>
-        <div className="p-4 border-t border-gray-200">
-          <div className="space-y-2">
-            <button className={`flex items-center gap-2 px-3 py-2 text-gray-600 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''}`}>
-              <Settings className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} transition-all duration-300`} />
-              {!isSidebarCollapsed && <span className="text-sm">Настройки</span>}
-            </button>
-            <button 
-              onClick={handleInviteFriends}
-              className={`flex items-center gap-2 px-3 py-2 text-gray-600 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''}`}
-            >
-              <Users className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} transition-all duration-300`} />
-              {!isSidebarCollapsed && <span className="text-sm">Пригласить друзей</span>}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Chat List column */}
-      {showChatList && (
-        <div className="w-64 bg-gray-50 border-r border-gray-200 overflow-y-auto">
-          <div className="p-4 space-y-2">
-            <h2 className="text-sm font-semibold text-gray-700">Ваши чаты</h2>
-            {userChats.map(chat => (
-              <Link
-                key={chat.id}
-                to={`/chat/${chat.id}`}
-                className="block px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100"
-              >
-                {chat.name}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
+      {/* Modals */}
       <CreateTripModal
         isOpen={isCreateTripModalOpen}
         onClose={() => setIsCreateTripModalOpen(false)}

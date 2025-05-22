@@ -12,7 +12,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { AuthModal } from './AuthModal';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
+import { useSidebar } from '../contexts/SidebarContext';
 const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
@@ -272,6 +273,7 @@ const SuggestedQuestions = ({ onSelectQuestion }: { onSelectQuestion: (text: str
 };
 
 const Chat = () => {
+  const { isSidebarCollapsed } = useSidebar();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const initialQuery = searchParams.get('q');
@@ -856,7 +858,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-white transition-all duration-300" style={{ marginLeft: isSidebarCollapsed ? '72px' : '280px' }}>
       {/* Top Navigation */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-3">
         <div className="max-w-4xl mx-auto">
@@ -1214,10 +1216,10 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
             <div className="max-w-6xl mx-auto">
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
-                  <input
-                    type="text"
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -1232,14 +1234,14 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                       <div className="w-5 h-5 border-2 border-black/10 border-t-black/40 rounded-full animate-spin"></div>
                     </div>
                   )}
-                </div>
-                <button 
+              </div>
+              <button 
                   onClick={() => handleSendMessage()}
                   disabled={isLoading || !inputText.trim()}
                   className="shrink-0 w-11 h-11 flex items-center justify-center bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 disabled:hover:bg-black transition-colors"
                 >
                   <Send className="w-5 h-5" />
-                </button>
+              </button>
               </div>
             </div>
           </div>
