@@ -872,7 +872,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
               className="flex-1 min-w-[160px] h-10 flex items-center justify-center gap-2 px-4 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
             >
               <img src={AILogo} alt="TripGen" className="w-6 h-6" />
-              TripGen Builder
+              TRIPGEN МАРШРУТ
             </button>
             </div>
           </div>
