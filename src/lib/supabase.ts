@@ -1,16 +1,20 @@
-import { createClient, User, AuthResponse as SupabaseAuthResponse, AuthError as SupabaseAuthError, Session } from '@supabase/supabase-js';
+import { createClient, Session, AuthError as SupabaseAuthError } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://ponlvcgofztpyuyqeekh.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvbmx2Y2dvZnp0cHl1eXFlZWtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY3NDg0NTEsImV4cCI6MjA2MjMyNDQ1MX0.cEIx2eqeXxx2BIYiafP8xaaIO9RZuF0wWEO-6cNxjh0';
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+export interface User {
+  id: string;
+  email: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface AuthResponse {
-  message: string;
+  session: Session | null;
+  error: SupabaseAuthError | null;
 }
 
 interface UserData {
@@ -176,7 +180,7 @@ export const auth = {
       if (signInData?.user) {
         // Ensure profile exists even on sign in
         await ensureProfileExists(signInData.user.id, email);
-        return { message: 'Вход выполнен успешно' };
+        return { session: signInData.session, error: null };
       }
 
       // If sign in failed, try to sign up
@@ -206,7 +210,7 @@ export const auth = {
         throw new Error('Ошибка создания профиля пользователя');
       }
 
-      return { message: 'Регистрация выполнена успешно' };
+      return { session: signUpData.session, error: null };
     } catch (error: any) {
       console.error('Authentication error details:', {
         message: error.message,
