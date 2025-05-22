@@ -62,12 +62,12 @@ const getActivityImage = (type: string) => {
 };
 
 const getRandomTime = (type: string) => {
-  if (type === 'hotel') return 'Check-in 3:00 PM (6 nights)';
-  if (type === 'restaurant' || type === 'cafe') return '7:00 PM - 9:00 PM';
-  return '10:00 AM - 12:00 PM';
+  if (type === 'hotel') return 'Заезд в 15:00 (6 ночей)';
+  if (type === 'restaurant' || type === 'cafe') return '19:00 - 21:00';
+  return '10:00 - 12:00';
 };
 
-const getRandomDistance = () => `${(Math.random() * 2 + 0.2).toFixed(2)} mi`;
+const getRandomDistance = () => `${(Math.random() * 2 + 0.2).toFixed(2)} км`;
 
 const parseMessage = (text: string): Day[] => {
   const days: Day[] = [];
@@ -124,7 +124,7 @@ const TripBuilder: React.FC<TripBuilderProps> = ({
         <button
           onClick={onClose}
           className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-          aria-label="Close"
+          aria-label="Закрыть"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M18 6L6 18M6 6l12 12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -135,9 +135,9 @@ const TripBuilder: React.FC<TripBuilderProps> = ({
       <div className="p-6 pb-2 border-b border-gray-100">
         {/* Таб-бар */}
         <div className="flex gap-8 border-b mb-2">
-          <button className="pb-2 border-b-2 border-black font-medium">Itinerary</button>
-          <button className="pb-2 text-gray-400">Calendar</button>
-          <button className="pb-2 text-gray-400">Bookings</button>
+          <button className="pb-2 border-b-2 border-black font-medium">Маршрут</button>
+          <button className="pb-2 text-gray-400">Календарь</button>
+          <button className="pb-2 text-gray-400">Бронирования</button>
         </div>
         <div className="flex items-center justify-between mt-4">
           <div className="flex gap-2">
@@ -146,7 +146,7 @@ const TripBuilder: React.FC<TripBuilderProps> = ({
             <button className="p-2 rounded-full hover:bg-gray-100"><Trash2 className="w-5 h-5" /></button>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">Distances</span>
+            <span className="text-sm text-gray-500">Расстояния</span>
             <input type="checkbox" checked={showDistances} onChange={() => setShowDistances(v => !v)} className="accent-black w-4 h-4" />
           </div>
         </div>
@@ -158,14 +158,14 @@ const TripBuilder: React.FC<TripBuilderProps> = ({
           </div>
           <div className="flex items-center gap-1">
             <Users className="w-4 h-4" />
-            {travelers} {travelers === 1 ? 'traveler' : 'travelers'}
+            {travelers} {travelers === 1 ? 'путешественник' : travelers < 5 ? 'путешественника' : 'путешественников'}
           </div>
         </div>
       </div>
 
       {/* Список дней */}
       <div className="flex-1 overflow-y-auto p-6 pt-2">
-        <h2 className="text-lg font-semibold mb-4">Itinerary <span className="text-gray-400 font-normal">{days.length} days</span></h2>
+        <h2 className="text-lg font-semibold mb-4">Маршрут <span className="text-gray-400 font-normal">{days.length} {days.length === 1 ? 'день' : days.length < 5 ? 'дня' : 'дней'}</span></h2>
         {days.map((day) => (
           <div key={day.number} className="mb-8">
             {/* Заголовок дня */}
@@ -174,7 +174,7 @@ const TripBuilder: React.FC<TripBuilderProps> = ({
               onClick={() => setExpandedDays(expanded => expanded.includes(day.number) ? expanded.filter(d => d !== day.number) : [...expanded, day.number])}
             >
               {expandedDays.includes(day.number) ? <ChevronDown /> : <ChevronUp />}
-              <span>Day {day.number} <span className="ml-2 font-normal text-gray-500">{day.title}</span></span>
+              <span>День {day.number} <span className="ml-2 font-normal text-gray-500">{day.title}</span></span>
             </button>
             <AnimatePresence>
               {expandedDays.includes(day.number) && (
@@ -200,11 +200,11 @@ const TripBuilder: React.FC<TripBuilderProps> = ({
                           <div className="text-xs text-gray-400 mt-1 truncate">{activity.description}</div>
                         </div>
                         <a href={activity.link} target="_blank" rel="noopener noreferrer" className="ml-2 px-3 py-1 bg-gray-100 rounded-lg text-sm font-medium flex items-center gap-1">
-                          {activity.type === 'hotel' ? 'Book' : 'Link'} <ExternalLink className="inline w-4 h-4 ml-1" />
+                          {activity.type === 'hotel' ? 'Забронировать' : 'Ссылка'} <ExternalLink className="inline w-4 h-4 ml-1" />
                         </a>
                       </div>
                     ))}
-                    <button className="mt-2 px-4 py-1 border rounded-lg text-gray-500 hover:bg-gray-50 flex items-center gap-1"><Plus className="w-4 h-4" /> Add</button>
+                    <button className="mt-2 px-4 py-1 border rounded-lg text-gray-500 hover:bg-gray-50 flex items-center gap-1"><Plus className="w-4 h-4" /> Добавить</button>
                   </div>
                 </motion.div>
               )}

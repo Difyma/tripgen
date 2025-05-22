@@ -28,18 +28,18 @@ interface TripFormData {
 }
 
 const travelVibes = [
-  'Luxurious Beachfront',
-  'Tropical Paradise',
-  'Romantic Getaway',
-  'Cultural Exploration',
-  'Private Villa Escape',
-  'Spa & Wellness',
-  'Gourmet Dining',
-  'Sunset Cruises',
-  'Adventure & Nature',
-  'Exclusive Resorts',
-  'Balinese Traditions',
-  'Secluded Beaches'
+  'Роскошный пляжный отдых',
+  'Тропический рай',
+  'Романтическое путешествие',
+  'Культурное исследование',
+  'Уединенная вилла',
+  'Спа и велнес',
+  'Гастрономический тур',
+  'Морские круизы',
+  'Приключения и природа',
+  'Эксклюзивные курорты',
+  'Традиции и обычаи',
+  'Уединенные пляжи'
 ];
 
 export function CreateTripModal({ isOpen, onClose, onSubmit }: CreateTripModalProps) {
@@ -102,7 +102,7 @@ export function CreateTripModal({ isOpen, onClose, onSubmit }: CreateTripModalPr
               </button>
             )}
             <h2 className="text-xl font-semibold">
-              {step === 1 ? 'Create trip' : 'What\'s your travel vibe?'}
+              {step === 1 ? 'Создать путешествие' : 'Какой стиль путешествия предпочитаете?'}
             </h2>
           </div>
           <button
@@ -121,11 +121,11 @@ export function CreateTripModal({ isOpen, onClose, onSubmit }: CreateTripModalPr
               <div className="space-y-6">
                 {/* Where */}
                 <div className="space-y-2">
-                  <Label>Where</Label>
+                  <Label>Куда</Label>
                   <div className="relative">
                     <Input
                       type="text"
-                      placeholder="Location"
+                      placeholder="Место назначения"
                       className="pl-10"
                       value={formData.location}
                       onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
@@ -141,57 +141,57 @@ export function CreateTripModal({ isOpen, onClose, onSubmit }: CreateTripModalPr
                       }
                     />
                     <Label htmlFor="road-trip" className="text-sm text-muted-foreground">
-                      Road trip?
+                      Автопутешествие?
                     </Label>
                   </div>
                 </div>
 
                 {/* When */}
                 <div className="space-y-2">
-                  <Label>When</Label>
+                  <Label>Когда</Label>
                   <Select onValueChange={(value) => setFormData(prev => ({ ...prev, dates: value }))}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select dates" />
+                      <SelectValue placeholder="Выберите даты" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="flexible">Flexible dates</SelectItem>
-                      <SelectItem value="exact">Exact dates</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="flexible">Гибкие даты</SelectItem>
+                      <SelectItem value="exact">Точные даты</SelectItem>
+                      <SelectItem value="monthly">По месяцам</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {/* Who */}
                 <div className="space-y-2">
-                  <Label>Who</Label>
+                  <Label>Кто</Label>
                   <Select 
                     value={formData.travelers.toString()}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, travelers: parseInt(value) }))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select travelers" />
+                      <SelectValue placeholder="Выберите количество" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">1 traveler</SelectItem>
-                      <SelectItem value="2">2 travelers</SelectItem>
-                      <SelectItem value="3">3 travelers</SelectItem>
-                      <SelectItem value="4">4+ travelers</SelectItem>
+                      <SelectItem value="1">1 путешественник</SelectItem>
+                      <SelectItem value="2">2 путешественника</SelectItem>
+                      <SelectItem value="3">3 путешественника</SelectItem>
+                      <SelectItem value="4">4+ путешественника</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {/* Budget */}
                 <div className="space-y-2">
-                  <Label>Budget</Label>
+                  <Label>Бюджет</Label>
                   <Select onValueChange={(value) => setFormData(prev => ({ ...prev, budget: value }))}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select budget" />
+                      <SelectValue placeholder="Выберите бюджет" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="flexible">Flexible budget</SelectItem>
-                      <SelectItem value="economy">Economy</SelectItem>
-                      <SelectItem value="moderate">Moderate</SelectItem>
-                      <SelectItem value="luxury">Luxury</SelectItem>
+                      <SelectItem value="flexible">Гибкий бюджет</SelectItem>
+                      <SelectItem value="economy">Эконом</SelectItem>
+                      <SelectItem value="moderate">Средний</SelectItem>
+                      <SelectItem value="luxury">Люкс</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -202,19 +202,19 @@ export function CreateTripModal({ isOpen, onClose, onSubmit }: CreateTripModalPr
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20" />
                 <img
                   src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&q=80"
-                  alt="Trip creation illustration"
+                  alt="Иллюстрация создания путешествия"
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute bottom-0 left-0 right-0 p-6 text-white bg-gradient-to-t from-black/60">
-                  <p className="text-2xl font-medium">Start your journey</p>
-                  <p className="text-sm text-white/90">Plan your perfect trip with us</p>
+                  <p className="text-2xl font-medium">Начните путешествие</p>
+                  <p className="text-sm text-white/90">Спланируйте идеальную поездку с нами</p>
                 </div>
               </div>
             </div>
           </div>
         ) : (
           <div className="p-6">
-            <p className="text-muted-foreground text-center mb-8">Select one or more</p>
+            <p className="text-muted-foreground text-center mb-8">Выберите один или несколько вариантов</p>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-4">
                 {travelVibes.slice(0, Math.ceil(travelVibes.length / 2)).map((vibe) => (
@@ -258,14 +258,14 @@ export function CreateTripModal({ isOpen, onClose, onSubmit }: CreateTripModalPr
                 onClick={() => setStep(1)}
                 className="flex-1 bg-secondary text-secondary-foreground py-2.5 rounded-md text-sm font-medium hover:bg-secondary/90 transition-colors"
               >
-                Skip
+                Пропустить
               </button>
             )}
             <button
               onClick={handleNext}
               className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
             >
-              {step === 1 ? 'Next' : 'Generate itinerary'}
+              {step === 1 ? 'Далее' : 'Создать маршрут'}
             </button>
           </div>
         </div>

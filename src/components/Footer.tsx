@@ -4,23 +4,23 @@ import { motion } from 'framer-motion';
 import { Send } from 'lucide-react';
 
 const footerLinks = {
-  Explore: [
-    { name: 'Destination', href: '#' },
-    { name: 'Tour Package', href: '#' },
-    { name: 'Travel Blog', href: '#' },
-    { name: 'Photo Gallery', href: '#' }
+  Путешествия: [
+    { name: 'Направления', href: '#' },
+    { name: 'Туры и пакеты', href: '#' },
+    { name: 'Блог о путешествиях', href: '#' },
+    { name: 'Фотогалерея', href: '#' }
   ],
-  About: [
-    { name: 'About Us', href: '#' },
-    { name: 'Our Story', href: '#' },
-    { name: 'Our Team', href: '#' },
-    { name: 'Careers', href: '#' }
+  Компания: [
+    { name: 'О нас', href: '#' },
+    { name: 'Наша история', href: '#' },
+    { name: 'Команда', href: '#' },
+    { name: 'Для креаторов', href: '/creator' }
   ],
-  Support: [
-    { name: 'Contact Us', href: '#' },
-    { name: 'Terms of Use', href: '#' },
-    { name: 'Privacy Policy', href: '#' },
-    { name: 'FAQ', href: '#' }
+  Поддержка: [
+    { name: 'Связаться с нами', href: '#' },
+    { name: 'Условия использования', href: '#' },
+    { name: 'Политика конфиденциальности', href: '#' },
+    { name: 'Помощь', href: '#' }
   ]
 };
 
@@ -30,14 +30,14 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
           <div>
-            <h3 className="text-xl font-bold mb-6 text-gray-900">Newsletter</h3>
+            <h3 className="text-xl font-bold mb-6 text-gray-900">Рассылка</h3>
             <p className="text-gray-600 mb-6">
-              Sign up to get exclusive offers and travel tips
+              Подпишитесь на нашу рассылку, чтобы получать эксклюзивные предложения и советы по путешествиям
             </p>
             <form className="flex gap-2">
               <input
                 type="email"
-                placeholder="Your email"
+                placeholder="Ваш email"
                 className="flex-1 px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#094D92] focus:border-transparent"
               />
               <motion.button
@@ -72,17 +72,17 @@ const Footer = () => {
         <div className="mt-16 pt-8 border-t border-gray-200">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-gray-600 text-sm">
-              © 2024 Your Travel Company. All rights reserved.
+              © 2024 TRIPGEN. Все права защищены.
             </p>
             <div className="flex gap-6">
               <a href="#" className="text-gray-600 hover:text-[#094D92] transition-colors duration-300">
-                Facebook
+                Telegram
               </a>
               <a href="#" className="text-gray-600 hover:text-[#094D92] transition-colors duration-300">
-                Twitter
+                VK
               </a>
               <a href="#" className="text-gray-600 hover:text-[#094D92] transition-colors duration-300">
-                Instagram
+                Instagram*
               </a>
             </div>
           </div>

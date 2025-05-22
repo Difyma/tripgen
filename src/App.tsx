@@ -13,20 +13,20 @@ import { AuthProvider } from './contexts/AuthContext';
 export function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/creator" element={<CreatorPage />} />
-          <Route element={<AppLayout />}>
+    <Router>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/creator" element={<CreatorPage />} />
+        <Route element={<AppLayout />}>
             <Route path="/chat" element={<Chat key={Date.now()} />} />
             <Route path="/trips" element={<TripsRoute />} />
             <Route path="/trips/:id" element={<TripDetailsRoute />} />
             <Route path="/flights" element={<FlightsPage />} />
             <Route path="/hotels" element={<HotelTestPage />} />
             <Route path="/flight" element={<FlightTestPage />} />
-          </Route>
-        </Routes>
-      </Router>
+        </Route>
+      </Routes>
+    </Router>
     </AuthProvider>
   );
 }

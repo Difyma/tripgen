@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Send, 
   MapPin, 
@@ -17,6 +17,8 @@ const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
 import { useFlightInfo } from '../hooks/useFlightInfo';
+import { loadChatHistory, saveChatHistory } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 
 interface Message {
   id: number;
@@ -45,51 +47,239 @@ interface DateFilter {
   month?: { month: number; year: number };
 }
 
-const SYSTEM_PROMPT = `Ты — профессиональный турагент и travel-блогер с обширным опытом путешествий по всему миру. 
-Помоги пользователю спланировать незабываемую поездку в любую точку мира. 
+const SYSTEM_PROMPT = `Ты — опытный travel-эксперт и профессиональный travel-блогер, специализирующийся на создании уникальных путешествий. Твой стиль общения современный, дружелюбный и вдохновляющий.
 
-ВАЖНО: Когда я предоставляю информацию о рейсах в формате "# ✈️ Информация о рейсах", используй ТОЛЬКО эту информацию для рекомендаций по перелетам.
-Не говори, что у тебя нет доступа к данным. Вся необходимая информация будет в сообщении.
+ПРАВИЛА ОБЩЕНИЯ:
+1. Если пользователь не указал длительность поездки или даты:
+   • Обязательно уточни: "На сколько дней планируете поездку?"
+   • Предложи варианты: "Могу предложить маршруты на 3, 5, 7 или 10 дней"
+   • Спроси про сезон/месяц: "В какое время года планируете?"
 
-Когда пользователь спрашивает о перелетах:
-1. Анализируй предоставленные варианты и давай рекомендации:
-   - Сравни самый выгодный и самый быстрый варианты
-   - Объясни преимущества и недостатки каждого варианта
-   - Порекомендуй оптимальный выбор с учетом соотношения цена/время
-   - Если есть обратные рейсы, проанализируй их тоже
+2. После получения информации о длительности:
+   • Создай детальный план по дням
+   • Добавь тайминг для каждого пункта
+   • Учитывай время на переезды между локациями
+   • Добавляй время на отдых и свободное время
 
-2. Дополняй свой ответ полезной информацией:
-   - Особенности выбранных авиакомпаний
-   - Правила провоза багажа и ручной клади
-   - Дополнительные услуги на борту
-   - Советы по выбору места в самолете
-   - Рекомендации по времени прибытия в аэропорт
-   - Информация о терминалах и трансфере между ними
+ФОРМАТИРОВАНИЕ МАРШРУТА:
+# 📅 День 1: [Название дня]
 
-3. Учитывай контекст запроса:
-   - Если это деловая поездка, обрати внимание на удобство времени вылета/прилета
-   - Для отпуска важнее цена и комфорт
-   - При путешествии с детьми рекомендуй прямые рейсы
-   - Для длительных перелетов обращай внимание на качество сервиса
+## ⏰ Утро (08:00-12:00)
+• 08:00-09:00 🍳 Завтрак в отеле
+• 09:30-11:30 🏛️ Посещение [достопримечательность]
+• 11:30-12:00 ☕ Кофе-брейк
 
-4. Давай дополнительные советы:
-   - Лучшее время для покупки билетов
-   - Возможности накопления миль
-   - Особенности регистрации на рейс
-   - Правила безопасности и требования авиакомпаний
+## 🌞 День (12:00-17:00)
+• 12:00-13:30 🍽️ Обед в [ресторан]
+• 14:00-16:30 🎯 Экскурсия по [маршрут]
+• 16:30-17:00 🚶‍♂️ Прогулка/отдых
 
-При ответе ОБЯЗАТЕЛЬНО используй предоставленную информацию о конкретных рейсах и дополняй её своими экспертными рекомендациями.
-Если информация о рейсах предоставлена, НИКОГДА не говори, что у тебя нет доступа к данным.
+## 🌅 Вечер (17:00-22:00)
+• 17:00-19:00 🏰 Посещение [место]
+• 19:30-21:00 🍷 Ужин в [ресторан]
+• 21:00-22:00 🌃 Вечерняя прогулка
 
-Форматируй свои ответы, используя эмодзи и markdown для лучшей читаемости.`;
+СТИЛЬ ОТВЕТОВ:
+• Используй современный, легкий для чтения формат
+• Добавляй эмодзи для визуального разделения информации
+• Создавай четкую иерархию с помощью заголовков и подзаголовков
+• Выделяй ключевые моменты с помощью маркеров и акцентов
+
+ФОРМАТИРОВАНИЕ:
+1. Заголовки:
+   # 🌟 Главные рекомендации
+   # ✈️ Детали перелета
+   # 🏨 Где остановиться
+# 🍽️ Где поесть
+   # 🎯 Что посмотреть
+
+2. Подзаголовки:
+   ## 💫 Оптимальный вариант
+   ## 💰 Бюджетный вариант
+   ## ⭐ Premium опции
+
+3. Списки и пункты:
+   • Используй маркеры для перечислений
+   → Используй стрелки для последовательностей
+   ✓ Используй галочки для подтверждений
+   ⚡ Используй молнию для важных замечаний
+
+4. Выделения:
+   **жирный текст** для важной информации
+   *курсив* для дополнительных деталей
+   \`код\` для технических деталей
+
+5. Блоки информации:
+   📌 Для важных заметок
+   💡 Для полезных советов
+   ⚠️ Для предупреждений
+   🎁 Для бонусных рекомендаций
+
+ПРИМЕР ОТВЕТА С УТОЧНЕНИЕМ:
+"Отличный выбор! Чтобы составить идеальный маршрут по [место], мне нужно уточнить несколько деталей:
+
+📅 На сколько дней планируете поездку? 
+Могу предложить готовые маршруты на:
+• 3 дня - компактное знакомство с главными достопримечательностями
+• 5 дней - неспешное исследование города и окрестностей
+• 7 дней - полное погружение в местную культуру и быт
+• 10 дней - максимально насыщенная программа
+
+🗓️ В какое время года планируете путешествие?
+Это поможет мне учесть:
+• Сезонные активности и фестивали
+• Погодные условия
+• Часы работы достопримечательностей
+• Лучшие места для посещения в это время года"
+
+ПРИМЕР ДЕТАЛЬНОГО ПЛАНА НА ДЕНЬ:
+
+# 📅 День 2: Исторический центр и музеи
+
+## ⏰ Утро (08:00-12:00)
+• 08:00-09:00 🍳 Завтрак в отеле "Централь"
+• 09:00-09:30 🚶‍♂️ Прогулка до исторического центра
+• 09:30-11:30 🏛️ Экскурсия по Старому городу
+• 11:30-12:00 ☕ Кофе-брейк в кафе "Винтаж"
+
+## 🌞 День (12:00-17:00)
+• 12:00-13:30 🍽️ Обед в ресторане "Традиция"
+• 13:30-14:00 🚶‍♂️ Переход к музею
+• 14:00-16:30 🎨 Посещение Художественного музея
+• 16:30-17:00 🌳 Отдых в городском парке
+
+## 🌅 Вечер (17:00-22:00)
+• 17:00-19:00 🏰 Посещение крепости
+• 19:30-21:00 🍷 Ужин в панорамном ресторане "Высота"
+• 21:00-22:00 🌃 Вечерняя прогулка по набережной
+
+💡 **Полезные советы:**
+• Купите билеты в музей онлайн, чтобы избежать очередей
+• Забронируйте столик в ресторане "Высота" заранее
+• Возьмите с собой удобную обувь для прогулок
+
+⚡ **Важно знать:**
+• Художественный музей закрыт по понедельникам
+• Последний вход в крепость в 18:30
+• В ресторане "Высота" действует дресс-код
+
+КОГДА ПОЛЬЗОВАТЕЛЬ СПРАШИВАЕТ О ПЕРЕЛЕТАХ:
+1. Структурируй информацию о рейсах:
+   • Оптимальные варианты с ценами и временем
+   • Сравнение прямых и составных маршрутов
+   • Особенности каждого варианта
+   • Рекомендации по выбору
+
+2. Добавляй полезный контекст:
+   • Особенности авиакомпаний
+   • Правила багажа
+   • Дополнительные услуги
+   • Советы по комфорту
+
+3. Учитывай тип поездки:
+   • Для бизнеса → удобство и время
+   • Для отдыха → цена и комфорт
+   • С детьми → прямые рейсы
+   • Длительные → качество сервиса
+
+ВАЖНО: Когда я предоставляю информацию о рейсах в формате "# ✈️ Информация о рейсах", используй ТОЛЬКО эту информацию для рекомендаций по перелетам. Не говори, что у тебя нет доступа к данным. Вся необходимая информация будет в сообщении.
+
+ПРИМЕР ФОРМАТИРОВАНИЯ ОТВЕТА:
+
+# 🌟 Главные рекомендации
+Краткое описание основных моментов...
+
+## 💫 Оптимальный вариант
+• Детали лучшего предложения
+• Почему это оптимально
+• Что включено
+
+## 💰 Бюджетный вариант
+• Альтернативные опции
+• На чем можно сэкономить
+• Важные моменты
+
+📌 **Важно знать:**
+• Ключевой момент 1
+• Ключевой момент 2
+
+💡 **Полезные советы:**
+→ Совет 1
+→ Совет 2
+
+⚡ **Лайфхаки:**
+✓ Лайфхак 1
+✓ Лайфхак 2
+
+🎁 **Бонус:**
+Дополнительные рекомендации...`;
+
+// Добавляем массив предварительно подготовленных вопросов
+const SUGGESTED_QUESTIONS = [
+  {
+    id: 1,
+    text: "🌍 Посоветуй интересные места для путешествия летом",
+    category: "Вдохновение"
+  },
+  {
+    id: 2,
+    text: "✈️ Как найти дешевые авиабилеты?",
+    category: "Планирование"
+  },
+  {
+    id: 3,
+    text: "🏨 Где лучше остановиться в Париже?",
+    category: "Жилье"
+  },
+  {
+    id: 4,
+    text: "🎒 Что взять с собой в поездку?",
+    category: "Подготовка"
+  },
+  {
+    id: 5,
+    text: "🍽️ Какие местные блюда попробовать в Италии?",
+    category: "Еда"
+  },
+  {
+    id: 6,
+    text: "💰 Как спланировать бюджет путешествия?",
+    category: "Бюджет"
+  }
+];
+
+// Компонент для отображения подсказок
+const SuggestedQuestions = ({ onSelectQuestion }: { onSelectQuestion: (text: string) => void }) => {
+  return (
+    <div className="max-w-2xl mx-auto mb-6 px-4">
+      <h3 className="text-sm font-medium text-gray-500 mb-3">Популярные вопросы:</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {SUGGESTED_QUESTIONS.map((question) => (
+          <motion.button
+            key={question.id}
+            onClick={() => onSelectQuestion(question.text)}
+            className="text-left p-3 rounded-xl border border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50 transition-colors group"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <div className="text-xs text-gray-500 mb-1">{question.category}</div>
+            <div className="text-sm text-gray-900 group-hover:text-black">{question.text}</div>
+          </motion.button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const Chat = () => {
   const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const initialQuery = searchParams.get('q');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      text: "Привет, где бы ты хотел побывать? Я помогу тебе спланировать твое путешествие. Спрашивай меня о чем угодно, что связано с поездкой.",
+      text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
       isUser: false,
       role: 'assistant'
     }
@@ -113,12 +303,126 @@ const Chat = () => {
   const [dateFilter, setDateFilter] = useState<DateFilter>({ type: 'specific' });
   const { getFlightInfoForGPT } = useFlightInfo();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const { user } = useAuth();
+  const [hasInteracted, setHasInteracted] = useState(false);
+
+  const handleSendMessage = useCallback(async (textToSend?: string) => {
+    const messageText = textToSend || inputText;
+    if (!messageText.trim()) return;
+    
+    setHasInteracted(true);
+
+    const newMessage: Message = {
+      id: messages.length + 1,
+      text: messageText,
+      isUser: true,
+      role: 'user'
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+    setInputText('');
+    setIsLoading(true);
+
+    try {
+      // Извлекаем информацию о перелете из сообщения пользователя
+      const flightInfo = extractFlightInfo(messageText);
+      let flightData = '';
+      
+      // Если найдена информация о перелете, получаем данные о рейсах через API
+      if (flightInfo.origin && flightInfo.destination && flightInfo.date) {
+        try {
+          const formattedDate = parseRussianDate(flightInfo.date);
+          const formattedReturnDate = flightInfo.returnDate ? parseRussianDate(flightInfo.returnDate) : undefined;
+          
+          // Получаем информацию о рейсах через хук useFlightInfo
+          flightData = await getFlightInfoForGPT(
+            flightInfo.origin,
+            flightInfo.destination,
+            formattedDate,
+            formattedReturnDate,
+            flightInfo.passengers.adults,
+            flightInfo.passengers.children,
+            flightInfo.passengers.infants,
+            flightInfo.tripClass as 'Y' | 'C' // Явное приведение типа
+          );
+
+          // Добавляем дополнительный контекст для GPT
+          flightData = `\n\n# ✈️ Информация о рейсах\n\n` +
+                      `🔍 **Параметры поиска:**\n` +
+                      `- Маршрут: ${flightInfo.origin} → ${flightInfo.destination}\n` +
+                      `- Дата вылета: ${formattedDate}\n` +
+                      (formattedReturnDate ? `- Дата возврата: ${formattedReturnDate}\n` : '') +
+                      `- Пассажиры: ${flightInfo.passengers.adults} взр., ` +
+                      `${flightInfo.passengers.children} дет., ` +
+                      `${flightInfo.passengers.infants} мл.\n` +
+                      `- Класс: ${flightInfo.tripClass === 'C' ? 'Бизнес' : 'Эконом'}\n\n` +
+                      flightData;
+        } catch (error) {
+          console.error('Error fetching flight data:', error);
+          flightData = '\n\nК сожалению, не удалось получить информацию о рейсах. ' +
+                      'Пожалуйста, уточните параметры поиска или попробуйте позже.';
+        }
+      }
+
+      // Формируем сообщения для GPT с контекстом о рейсах
+      const messagesToSend = [
+        {
+          role: 'system',
+          text: SYSTEM_PROMPT
+        },
+        ...messages.map(msg => ({
+          role: msg.role,
+          text: msg.text
+        })),
+        {
+          role: 'user',
+          text: messageText + flightData
+        }
+      ];
+
+      const response = await fetch('/api/yandex-gpt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: messagesToSend }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from GPT');
+      }
+
+      const data = await response.json();
+      
+      // Добавляем ответ от GPT
+      const assistantMessage: Message = {
+        id: messages.length + 2,
+        text: data.text,
+        isUser: false,
+        role: 'assistant'
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Error in chat:', error);
+      const errorMessage: Message = {
+        id: messages.length + 2,
+        text: 'Извините, произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз.',
+        isUser: false,
+        role: 'assistant'
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [messages, getFlightInfoForGPT]);
 
   // Reset chat state when URL changes
   useEffect(() => {
+    // Сбрасываем состояние чата
     setMessages([{
       id: 1,
-      text: "Привет, где бы ты хотел побывать? Я помогу тебе спланировать твое путешествие. Спрашивай меня о чем угодно, что связано с поездкой.",
+      text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
       isUser: false,
       role: 'assistant'
     }]);
@@ -135,7 +439,61 @@ const Chat = () => {
       }
     });
     setDateFilter({ type: 'specific' });
-  }, [location.search]);
+    setHasInteracted(false); // Сбрасываем флаг взаимодействия для показа популярных вопросов
+    
+    // Если есть начальный запрос в URL, отправляем его
+    if (initialQuery) {
+      setTimeout(() => {
+        setInputText(decodeURIComponent(initialQuery));
+        handleSendMessage(decodeURIComponent(initialQuery));
+      }, 100);
+    }
+  }, [location.search]); // Зависимость от location.search для отслеживания изменений URL
+
+  // Автоматическая отправка сообщения при наличии параметра q
+  useEffect(() => {
+    const sendInitialMessage = async () => {
+      if (initialQuery && messages.length === 1) { // Проверяем, что есть только приветственное сообщение
+        setInputText(decodeURIComponent(initialQuery));
+        await handleSendMessage();
+      }
+    };
+    
+    sendInitialMessage();
+  }, [initialQuery, messages.length, handleSendMessage]);
+
+  // Загрузка истории чатов при входе пользователя
+  useEffect(() => {
+    const loadHistory = async () => {
+      if (user) {
+        try {
+          const history = await loadChatHistory();
+          if (history.length > 0) {
+            setMessages(history);
+          }
+        } catch (error) {
+          console.error('Error loading chat history:', error);
+        }
+      }
+    };
+
+    loadHistory();
+  }, [user]);
+
+  // Сохранение истории чатов при изменении сообщений
+  useEffect(() => {
+    const saveHistory = async () => {
+      if (user && messages.length > 1) { // Не сохраняем, если только приветственное сообщение
+        try {
+          await saveChatHistory(messages);
+        } catch (error) {
+          console.error('Error saving chat history:', error);
+        }
+      }
+    };
+
+    saveHistory();
+  }, [messages, user]);
 
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newLocation = e.target.value;
@@ -336,114 +694,6 @@ const Chat = () => {
     return '';
   };
 
-  const handleSendMessage = async () => {
-    if (!inputText.trim()) return;
-
-    const newMessage: Message = {
-      id: messages.length + 1,
-      text: inputText,
-      isUser: true,
-      role: 'user'
-    };
-
-    setMessages(prev => [...prev, newMessage]);
-    setInputText('');
-    setIsLoading(true);
-
-    try {
-      // Извлекаем информацию о перелете из сообщения пользователя
-      const flightInfo = extractFlightInfo(inputText);
-      let flightData = '';
-      
-      // Если найдена информация о перелете, получаем данные о рейсах через API
-      if (flightInfo.origin && flightInfo.destination && flightInfo.date) {
-        try {
-          const formattedDate = parseRussianDate(flightInfo.date);
-          const formattedReturnDate = flightInfo.returnDate ? parseRussianDate(flightInfo.returnDate) : undefined;
-          
-          // Получаем информацию о рейсах через хук useFlightInfo
-          flightData = await getFlightInfoForGPT(
-            flightInfo.origin,
-            flightInfo.destination,
-            formattedDate,
-            formattedReturnDate,
-            flightInfo.passengers.adults,
-            flightInfo.passengers.children,
-            flightInfo.passengers.infants,
-            flightInfo.tripClass as 'Y' | 'C' // Явное приведение типа
-          );
-
-          // Добавляем дополнительный контекст для GPT
-          flightData = `\n\n# ✈️ Информация о рейсах\n\n` +
-                      `🔍 **Параметры поиска:**\n` +
-                      `- Маршрут: ${flightInfo.origin} → ${flightInfo.destination}\n` +
-                      `- Дата вылета: ${formattedDate}\n` +
-                      (formattedReturnDate ? `- Дата возврата: ${formattedReturnDate}\n` : '') +
-                      `- Пассажиры: ${flightInfo.passengers.adults} взр., ` +
-                      `${flightInfo.passengers.children} дет., ` +
-                      `${flightInfo.passengers.infants} мл.\n` +
-                      `- Класс: ${flightInfo.tripClass === 'C' ? 'Бизнес' : 'Эконом'}\n\n` +
-                      flightData;
-        } catch (error) {
-          console.error('Error fetching flight data:', error);
-          flightData = '\n\nК сожалению, не удалось получить информацию о рейсах. ' +
-                      'Пожалуйста, уточните параметры поиска или попробуйте позже.';
-        }
-      }
-
-      // Формируем сообщения для GPT с контекстом о рейсах
-      const messagesToSend = [
-        {
-          role: 'system',
-          text: SYSTEM_PROMPT
-        },
-        ...messages.map(msg => ({
-          role: msg.role,
-          text: msg.text
-        })),
-        {
-          role: 'user',
-          text: inputText + flightData
-        }
-      ];
-
-      const response = await fetch('/api/yandex-gpt', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ messages: messagesToSend }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from GPT');
-      }
-
-      const data = await response.json();
-      
-      // Добавляем ответ от GPT
-      const assistantMessage: Message = {
-        id: messages.length + 2,
-        text: data.text,
-        isUser: false,
-        role: 'assistant'
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
-      console.error('Error in chat:', error);
-      const errorMessage: Message = {
-        id: messages.length + 2,
-        text: 'Извините, произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз.',
-        isUser: false,
-        role: 'assistant'
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -539,7 +789,7 @@ ${Array.from({ length: duration - 2 }, (_, i) => `
     // Extract places from different sections
     const sections = text.split('#');
     sections.forEach(section => {
-      if (section.includes('🎯 Рекомендации') || section.includes('🌟 Главные достопримечательности')) {
+      if (section.includes('🎯 Рекомендации') || section.includes('🏨 Главные достопримечательности')) {
         const matches = section.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g);
         for (const match of matches) {
           places.attractions.push(`🎯 ${match[1]}(${match[2]}) — Интересная достопримечательность`);
@@ -599,6 +849,35 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
       delete (window as any).createRoute;
     };
   }, [messages, filters.location]);
+
+  // Обновляем обработчик выбора вопроса
+  const handleSelectQuestion = (text: string) => {
+    handleSendMessage(text);
+  };
+
+  // Добавляем функцию для сброса чата
+  const handleNewChat = () => {
+    setMessages([{
+      id: 1,
+      text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
+      isUser: false,
+      role: 'assistant'
+    }]);
+    setInputText('');
+    setShowTripBuilder(false);
+    setFilters({
+      location: '',
+      travelers: 2,
+      children: 0,
+      pets: 0,
+      budget: {
+        min: 0,
+        max: 10000
+      }
+    });
+    setDateFilter({ type: 'specific' });
+    setHasInteracted(false); // Сбрасываем флаг взаимодействия
+  };
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -884,7 +1163,44 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
         <div className={`flex-1 flex flex-col min-h-0 ${showTripBuilder ? 'max-w-[calc(100%-600px)]' : ''}`}>
           <div className="flex-1 p-6 overflow-y-auto">
             <div className="max-w-6xl mx-auto space-y-6">
-              {messages.map((message) => (
+              {/* Показываем приветственное сообщение и подсказки до взаимодействия */}
+              {!hasInteracted && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-start items-end gap-3"
+                  >
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 flex items-center justify-center">
+                        <img 
+                          src={AILogo2} 
+                          alt="TRIPGEN Assistant" 
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    </div>
+                    <div className="max-w-[85%] w-full overflow-hidden">
+                      <div className="bg-gray-50 rounded-2xl rounded-bl-[4px] p-4">
+                        <div className="prose prose-sm max-w-none text-gray-900">
+                          {messages[0].text}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <SuggestedQuestions onSelectQuestion={handleSelectQuestion} />
+                  </motion.div>
+                </>
+              )}
+              
+              {/* Показываем остальные сообщения только после взаимодействия */}
+              {hasInteracted && messages.map((message) => (
                 <motion.div
                   key={message.id}
                   initial={{ opacity: 0, y: 10 }}
@@ -922,10 +1238,10 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
             <div className="max-w-6xl mx-auto">
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  <input
+                    type="text"
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -940,14 +1256,14 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                       <div className="w-5 h-5 border-2 border-black/10 border-t-black/40 rounded-full animate-spin"></div>
                     </div>
                   )}
-              </div>
-              <button 
-                onClick={handleSendMessage} 
+                </div>
+                <button 
+                  onClick={() => handleSendMessage()}
                   disabled={isLoading || !inputText.trim()}
                   className="shrink-0 w-11 h-11 flex items-center justify-center bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 disabled:hover:bg-black transition-colors"
                 >
                   <Send className="w-5 h-5" />
-              </button>
+                </button>
               </div>
             </div>
           </div>

@@ -155,4 +155,95 @@ export const auth = {
   onAuthStateChange: (callback: (event: any, session: any) => void) => {
     return supabase.auth.onAuthStateChange(callback);
   }
+};
+
+// Типы для чата
+export interface ChatMessage {
+  id: number;
+  text: string;
+  isUser: boolean;
+  role?: 'system' | 'user' | 'assistant';
+  showCreateRoute?: boolean;
+}
+
+export interface ChatHistory {
+  id: string;
+  user_id: string;
+  messages: ChatMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
+// Функции для работы с историей чатов
+export const saveChatHistory = async (messages: ChatMessage[]): Promise<void> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    console.log('User not authenticated, chat history will not be saved');
+    return;
+  }
+
+  try {
+    const { data: existingChat, error: fetchError } = await supabase
+      .from('chat_history')
+      .select()
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = не найдено
+      throw fetchError;
+    }
+
+    if (existingChat) {
+      // Обновляем существующую историю
+      const { error: updateError } = await supabase
+        .from('chat_history')
+        .update({ messages, updated_at: new Date().toISOString() })
+        .eq('id', existingChat.id);
+
+      if (updateError) throw updateError;
+    } else {
+      // Создаем новую запись
+      const { error: insertError } = await supabase
+        .from('chat_history')
+        .insert([{ 
+          user_id: user.id,
+          messages
+        }]);
+
+      if (insertError) throw insertError;
+    }
+  } catch (error) {
+    console.error('Error saving chat history:', error);
+    throw error;
+  }
+};
+
+export const loadChatHistory = async (): Promise<ChatMessage[]> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    console.log('User not authenticated, no chat history to load');
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('chat_history')
+      .select()
+      .eq('user_id', user.id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') { // Не найдено
+        return [];
+      }
+      throw error;
+    }
+
+    return data.messages;
+  } catch (error) {
+    console.error('Error loading chat history:', error);
+    throw error;
+  }
 }; 

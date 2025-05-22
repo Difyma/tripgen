@@ -50,22 +50,30 @@ export function Sidebar({ className }: SidebarProps) {
       <div className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ${className}`}>
         <div className="p-4 relative">
           <Link to="/" className={`flex items-center gap-2 mb-6 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
-            <img src="/images/TRIPGEN_logo_2.png" alt="Logo" className="w-8 h-8" />
+            <img src="/images/TRIPGEN_logo_2.png" alt="Logo" className={`${isSidebarCollapsed ? 'w-10 h-10' : 'w-8 h-8'} transition-all duration-300`} />
             {!isSidebarCollapsed && <span className="font-semibold">TRIPGEN</span>}
           </Link>
           <div className="space-y-2">
             <button 
               onClick={() => setIsCreateTripModalOpen(true)}
-              className={`w-full bg-black text-white px-3 py-1.5 rounded-lg hover:bg-gray-900 transition-colors flex items-center gap-2 ${isSidebarCollapsed ? 'justify-center' : ''}`}
+              className={`w-full bg-black text-white rounded-lg hover:bg-gray-900 transition-colors flex items-center gap-2 ${
+                isSidebarCollapsed 
+                  ? 'justify-center h-10 w-10 mx-auto' 
+                  : 'px-3 py-1.5'
+              }`}
             >
-              <Plus className="w-4 h-4" />
+              <Plus className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-4 h-4'} transition-all duration-300`} />
               {!isSidebarCollapsed && <span className="text-sm">Создать путешествие</span>}
             </button>
             <button 
               onClick={handleNewChat}
-              className={`w-full bg-gray-50 text-gray-900 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors flex items-center gap-2 ${isSidebarCollapsed ? 'justify-center' : ''}`}
+              className={`w-full bg-gray-50 text-gray-900 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors flex items-center gap-2 ${
+                isSidebarCollapsed 
+                  ? 'justify-center h-10 w-10 mx-auto' 
+                  : 'px-3 py-1.5'
+              }`}
             >
-              <MessageSquare className="w-4 h-4" />
+              <MessageSquare className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-4 h-4'} transition-all duration-300`} />
               {!isSidebarCollapsed && <span className="text-sm">Новый чат</span>}
             </button>
           </div>
@@ -86,7 +94,7 @@ export function Sidebar({ className }: SidebarProps) {
               onClick={toggleChatList}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''} ${isActivePath('/chat') ? 'bg-gray-100 text-gray-900' : 'text-gray-600'}`}
             >
-              <MessageSquare className="w-4 h-4" />
+              <MessageSquare className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} transition-all duration-300`} />
               {!isSidebarCollapsed && (
                 <>
                   <span className="text-sm">Чаты</span>
@@ -98,21 +106,21 @@ export function Sidebar({ className }: SidebarProps) {
               to="/trips" 
               className={`flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''} ${isActivePath('/trips') ? 'bg-gray-100 text-gray-900' : 'text-gray-600'}`}
             >
-              <Compass className="w-4 h-4" />
+              <Compass className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} transition-all duration-300`} />
               {!isSidebarCollapsed && <span className="text-sm">Мои путешествия</span>}
             </Link>
             <Link 
               to="/saved" 
               className={`flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''} ${isActivePath('/saved') ? 'bg-gray-100 text-gray-900' : 'text-gray-600'}`}
             >
-              <Heart className="w-4 h-4" />
+              <Heart className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} transition-all duration-300`} />
               {!isSidebarCollapsed && <span className="text-sm">Сохраненные</span>}
             </Link>
             <Link 
               to="/updates" 
               className={`flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''} ${isActivePath('/updates') ? 'bg-gray-100 text-gray-900' : 'text-gray-600'}`}
             >
-              <Bell className="w-4 h-4" />
+              <Bell className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} transition-all duration-300`} />
               {!isSidebarCollapsed && <span className="text-sm">Обновления</span>}
             </Link>
           </div>
@@ -120,14 +128,14 @@ export function Sidebar({ className }: SidebarProps) {
         <div className="p-4 border-t border-gray-200">
           <div className="space-y-2">
             <button className={`flex items-center gap-2 px-3 py-2 text-gray-600 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''}`}>
-              <Settings className="w-4 h-4" />
+              <Settings className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} transition-all duration-300`} />
               {!isSidebarCollapsed && <span className="text-sm">Настройки</span>}
             </button>
             <button 
               onClick={handleInviteFriends}
               className={`flex items-center gap-2 px-3 py-2 text-gray-600 rounded-lg hover:bg-gray-100 w-full ${isSidebarCollapsed ? 'justify-center' : ''}`}
             >
-              <Users className="w-4 h-4" />
+              <Users className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} transition-all duration-300`} />
               {!isSidebarCollapsed && <span className="text-sm">Пригласить друзей</span>}
             </button>
           </div>

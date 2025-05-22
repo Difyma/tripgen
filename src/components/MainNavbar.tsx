@@ -31,9 +31,9 @@ export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
               </button>
               <Link 
                 to="/creator" 
-                className="bg-black text-white px-4 py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-900 transition-colors flex items-center gap-2"
+                className="bg-white text-black border border-gray-200 px-4 py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
               >
-                <img src="/images/web-brower.png" alt="Для креаторов" className="w-4 h-4 brightness-0 invert" />
+                <img src="/images/web-brower.png" alt="Для креаторов" className="w-4 h-4" />
                 <span>Для креаторов</span>
               </Link>
               <Link 
