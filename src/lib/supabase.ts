@@ -22,27 +22,38 @@ interface AuthResponse {
 const ensureProfileExists = async (userId: string, email: string): Promise<Error | null> => {
   try {
     // First try to get existing profile
-    const { data: existingProfile } = await supabase
+    const { data: existingProfile, error: fetchError } = await supabase
       .from('profiles')
       .select('id')
       .eq('id', userId)
       .single();
+
+    if (fetchError && !fetchError.message.includes('No rows found')) {
+      console.error('Error fetching profile:', fetchError);
+      return new Error('Ошибка при проверке профиля');
+    }
 
     if (existingProfile) {
       return null; // Profile already exists
     }
 
     // If no profile exists, create one with minimal fields
-    const { error } = await supabase
+    const { error: insertError } = await supabase
       .from('profiles')
       .insert({
         id: userId,
-        email: email
+        email: email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
 
-    if (error) {
-      console.error('Error ensuring profile exists:', error);
-      return new Error(error.message);
+    if (insertError) {
+      console.error('Error creating profile:', insertError);
+      // Если профиль уже существует (конфликт), это не ошибка
+      if (insertError.code === '23505') { // код ошибки уникального ограничения
+        return null;
+      }
+      return new Error(insertError.message);
     }
     return null;
   } catch (error: any) {
@@ -69,7 +80,7 @@ export const auth = {
       if (signInData?.user) {
         // Ensure profile exists even on sign in
         await ensureProfileExists(signInData.user.id, email);
-        return { session: signInData.session, error: null, message: '' };
+        return { session: signInData.session, error: null, message: 'Авторизация успешна!' };
       }
 
       // If sign in failed, try to sign up
@@ -99,7 +110,7 @@ export const auth = {
         throw new Error('Ошибка создания профиля пользователя');
       }
 
-      return { session: signUpData.session, error: null, message: '' };
+      return { session: signUpData.session, error: null, message: 'Регистрация успешна!' };
     } catch (error: any) {
       console.error('Authentication error details:', {
         message: error.message,

@@ -111,17 +111,19 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     
     try {
       const result = await signInOrSignUp(email, password);
-      setSuccessMessage(result.message);
       
-      if (result.message.includes('успешно')) {
-        setTimeout(() => {
-          setEmail('');
-          setPassword('');
-          setErrorMessage('');
-          setSuccessMessage('');
-          onClose();
-        }, 1500);
-      }
+      // Показываем сообщение об успехе
+      setSuccessMessage('Авторизация успешна!');
+      
+      // Закрываем модальное окно через 1.5 секунды
+      setTimeout(() => {
+        setEmail('');
+        setPassword('');
+        setErrorMessage('');
+        setSuccessMessage('');
+        onClose();
+      }, 1500);
+      
     } catch (err: any) {
       console.error('Error during authentication:', err);
       setErrorMessage(err.message);
