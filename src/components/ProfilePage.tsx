@@ -1,10 +1,8 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
-  Settings, 
   Mail, 
   Calendar, 
-  MapPin, 
   Camera, 
   Lock, 
   ChevronRight, 
@@ -36,7 +34,6 @@ interface UserProfile {
 const ProfilePage = () => {
   const { user, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
