@@ -855,30 +855,6 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
     handleSendMessage(text);
   };
 
-  // Добавляем функцию для сброса чата
-  const handleNewChat = () => {
-    setMessages([{
-      id: 1,
-      text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
-      isUser: false,
-      role: 'assistant'
-    }]);
-    setInputText('');
-    setShowTripBuilder(false);
-    setFilters({
-      location: '',
-      travelers: 2,
-      children: 0,
-      pets: 0,
-      budget: {
-        min: 0,
-        max: 10000
-      }
-    });
-    setDateFilter({ type: 'specific' });
-    setHasInteracted(false); // Сбрасываем флаг взаимодействия
-  };
-
   return (
     <div className="h-full flex flex-col bg-white">
       {/* Top Navigation */}
