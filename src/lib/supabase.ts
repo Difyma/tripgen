@@ -188,7 +188,7 @@ export const auth = {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password
-      }) as AuthSignUpResponse;
+      });
 
       // Log sign up attempt result
       if (signUpError) {

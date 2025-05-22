@@ -137,13 +137,6 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     }
   };
 
-  const getProgressBarWidth = () => {
-    if (!isLimited || !limitExpiry) return '0%';
-    const total = (limitExpiry - Date.now()) / 1000;
-    const percentage = (waitTime / total) * 100;
-    return `${Math.max(0, Math.min(100, percentage))}%`;
-  };
-
   return (
     <AnimatePresence>
       {isOpen && (

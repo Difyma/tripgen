@@ -183,100 +183,6 @@ const Chat = () => {
     }));
   };
 
-  const validateRequiredFields = () => {
-    const errors = [];
-    
-    if (!filters.location) {
-      errors.push("Пожалуйста, укажите место назначения");
-    }
-
-    // Проверка даты/длительности/месяца
-    const hasDateInfo = (
-      (dateFilter.type === 'specific' && dateFilter.startDate) ||
-      (dateFilter.type === 'duration' && dateFilter.duration) ||
-      (dateFilter.type === 'month' && dateFilter.month)
-    );
-    if (!hasDateInfo) {
-      errors.push("Пожалуйста, укажите даты поездки или длительность");
-    }
-
-    if (filters.travelers < 1) {
-      errors.push("Укажите количество путешественников");
-    }
-
-    if (filters.budget.min === 0 && filters.budget.max === 10000) {
-      errors.push("Пожалуйста, укажите предполагаемый бюджет");
-    }
-
-    return errors;
-  };
-
-  const recommendations: Recommendation[] = [
-    {
-      id: 1,
-      title: "Maruyasu Frankfurt Hauptwache",
-      image: "https://images.unsplash.com/photo-1617196034796-73dfa7b1fd56?w=800&q=80",
-      type: "Japanese",
-      location: "Innenstadt"
-    },
-    {
-      id: 2,
-      title: "Hauptwache",
-      image: "https://images.unsplash.com/photo-1577351594944-209b3c0f2179?w=800&q=80",
-      type: "Attraction",
-      location: "Innenstadt"
-    },
-    {
-      id: 3,
-      title: "Helium",
-      image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80",
-      type: "International",
-      location: "Innenstadt"
-    }
-  ];
-
-  const jumpBackItems = [
-    {
-      id: 1,
-      title: "Exploring Moscow Region: June...",
-      image: "https://images.unsplash.com/photo-1513326738677-b964603b136d?w=800&q=80"
-    },
-    {
-      id: 2,
-      title: "Take our travel quiz",
-      image: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&q=80"
-    },
-    {
-      id: 3,
-      title: "Create a trip",
-      image: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80"
-    }
-  ];
-
-  const inspiredItems = [
-    {
-      id: 1,
-      title: "FREE: Ultimate Street Food Guide",
-      image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80"
-    },
-    {
-      id: 2,
-      title: "COPENHAGEN: Secret Spots, Hidden Gems",
-      image: "https://images.unsplash.com/photo-1513622470522-26c3c8a854bc?w=800&q=80"
-    },
-    {
-      id: 3,
-      title: "8 Days Nepal Cultural Tour",
-      image: "https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=800&q=80"
-    }
-  ];
-
-  // Функция для генерации URL места
-  const generatePlaceUrl = (place: string): string => {
-    const encodedPlace = encodeURIComponent(place.trim());
-    return `https://www.google.com/maps/search/?api=1&query=${encodedPlace}`;
-  };
-
   const formatMessage = (text: string): string => {
     if (!text) return '';
 
@@ -546,16 +452,6 @@ const Chat = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Добавляем функцию для извлечения локации из текста
-  const extractLocationFromText = (text: string): string => {
-    const locationMatch = text.match(/(?:в|во|для|про)\s+([А-Яа-я\-]+(?:\s+[А-Яа-я\-]+)*)/i);
-    return locationMatch ? locationMatch[1] : 'Москва'; // По умолчанию используем Москву
-  };
-
-  const handleCreateTrip = (data: any) => {
-    console.log('Creating trip with data:', data);
   };
 
   const scrollToBottom = () => {

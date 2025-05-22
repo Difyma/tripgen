@@ -51,7 +51,7 @@ export const supabaseClient = {
       error: null
     })
   },
-  from: <K extends keyof Table>(table: K): QueryBuilder<Table[K]> => {
+  from: <K extends keyof Table>(_: K): QueryBuilder<Table[K]> => {
     const builder: QueryBuilder<Table[K]> = {
       select: () => builder,
       eq: () => builder,
