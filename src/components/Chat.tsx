@@ -40,7 +40,6 @@ interface Recommendation {
 
 interface FilterState {
   location: string;
-  date: string;
   travelers: number;
   children: number;
   pets: number;
@@ -110,7 +109,6 @@ const Chat = () => {
   
   const [filters, setFilters] = useState<FilterState>({
     location: '',
-    date: '',
     travelers: 2,
     children: 0,
     pets: 0,
@@ -143,7 +141,6 @@ const Chat = () => {
     setShowTripBuilder(false);
     setFilters({
       location: '',
-      date: '',
       travelers: 2,
       children: 0,
       pets: 0,
@@ -158,11 +155,6 @@ const Chat = () => {
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newLocation = e.target.value;
     setFilters(prev => ({ ...prev, location: newLocation }));
-    
-    // Generate itinerary if duration is set
-    if (dateFilter.type === 'duration' && dateFilter.duration) {
-      generateItinerary(newLocation, dateFilter.duration);
-    }
   };
 
   const handleTravelersChange = (increment: boolean) => {

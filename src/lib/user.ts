@@ -88,4 +88,31 @@ export const saveUserData = async (email: string): Promise<User | null> => {
     console.error('Error saving user data:', error);
     throw error;
   }
+};
+
+export const getUserProfile = async (userId: string): Promise<User | null> => {
+  try {
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !authData) {
+      console.error('Error getting user:', authError);
+      return null;
+    }
+
+    const { data: userData, error: dbError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (dbError) {
+      console.error('Error getting user profile:', dbError);
+      return null;
+    }
+
+    return userData;
+  } catch (error) {
+    console.error('Error in getUserProfile:', error);
+    return null;
+  }
 }; 
