@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, Users, Calendar, Undo2, Redo2, Trash2, External
 
 interface TripBuilderProps {
   message: string;
+  location?: string;
   duration: string;
   travelers: number;
   onClose: () => void;
@@ -108,6 +109,7 @@ const parseMessage = (text: string): Day[] => {
 
 const TripBuilder: React.FC<TripBuilderProps> = ({
   message,
+  location,
   duration,
   travelers,
   onClose
