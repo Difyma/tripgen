@@ -17,7 +17,6 @@ const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
 import { useFlightInfo } from '../hooks/useFlightInfo';
-import { useAuth } from '../contexts/AuthContext';
 
 interface Message {
   id: number;
@@ -113,7 +112,6 @@ const Chat = () => {
   const [showTripBuilder, setShowTripBuilder] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilter>({ type: 'specific' });
   const { getFlightInfoForGPT } = useFlightInfo();
-  const { user } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Reset chat state when URL changes
