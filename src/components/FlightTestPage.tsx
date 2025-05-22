@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MapPin, Calendar, Users, DollarSign, Loader2 } from 'lucide-react';
+import { MapPin, Calendar, Loader2 } from 'lucide-react';
 
 interface FlightSearchParams {
   origin: string;

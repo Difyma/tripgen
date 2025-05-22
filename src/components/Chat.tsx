@@ -27,14 +27,6 @@ interface Message {
   showCreateRoute?: boolean;
 }
 
-interface Recommendation {
-  id: number;
-  title: string;
-  image: string;
-  type: string;
-  location?: string;
-}
-
 interface FilterState {
   location: string;
   travelers: number;
@@ -609,15 +601,6 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
       delete (window as any).createRoute;
     };
   }, [messages, filters.location]);
-
-  const handleInviteFriends = () => {
-    if (!user) {
-      setShowAuthModal(true);
-    } else {
-      // Handle inviting friends when user is authenticated
-      console.log('Implement invite friends functionality');
-    }
-  };
 
   return (
     <div className="h-full flex flex-col bg-white">

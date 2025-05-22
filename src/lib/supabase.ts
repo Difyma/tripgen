@@ -18,106 +18,6 @@ interface AuthResponse {
   message: string;
 }
 
-interface UserData {
-  id: string;
-  email: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-interface AuthSignUpResponse {
-  data: {
-    user: User | null;
-    session: Session | null;
-  } | null;
-  error: SupabaseAuthError | null;
-}
-
-// Generate a random password
-const generatePassword = () => {
-  const length = 12;
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  return Array.from(crypto.getRandomValues(new Uint8Array(length)))
-    .map(x => charset[x % charset.length])
-    .join('');
-};
-
-// Helper function to check if error is rate limit
-const isRateLimitError = (error: any): boolean => {
-  if (!error) return false;
-  const message = error.message?.toLowerCase() || '';
-  return message.includes('rate limit') || error.status === 429;
-};
-
-// Helper function to check if error is invalid credentials
-const isInvalidCredentialsError = (error: any): boolean => {
-  if (!error) return false;
-  const message = error.message?.toLowerCase() || '';
-  return message.includes('invalid login credentials') || 
-         message.includes('invalid credentials') ||
-         error.status === 401;
-};
-
-// Helper function to create user in database
-const createUserInDatabase = async (userId: string, email: string): Promise<void> => {
-  try {
-    const { error } = await supabase
-      .from('users')
-      .upsert({
-        id: userId,
-        email: email,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'id'
-      });
-
-    if (error) {
-      console.error('Error creating user in database:', error);
-      // Don't throw the error here, just log it
-    }
-  } catch (error) {
-    console.error('Exception creating user in database:', error);
-    // Don't throw the error here, just log it
-  }
-};
-
-// Helper function to check if user exists in database
-const checkUserInDatabase = async (userId: string): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', userId)
-      .single();
-
-    if (error) {
-      console.error('Error checking user in database:', error);
-      return false;
-    }
-
-    return !!data;
-  } catch (error) {
-    console.error('Exception checking user in database:', error);
-    return false;
-  }
-};
-
-// Helper function to check if user exists in auth
-const checkUserExistsInAuth = async (email: string): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', email);
-
-    return !error && data && data.length > 0;
-  } catch (error) {
-    console.error('Error checking user in auth:', error);
-    return false;
-  }
-};
-
 // Helper function to ensure profile exists
 const ensureProfileExists = async (userId: string, email: string): Promise<Error | null> => {
   try {
@@ -150,18 +50,6 @@ const ensureProfileExists = async (userId: string, email: string): Promise<Error
     return error instanceof Error ? error : new Error('Unknown error ensuring profile exists');
   }
 };
-
-// Helper function to add delay with exponential backoff
-const wait = (attempts: number) => {
-  const baseDelay = 1000; // 1 second
-  const maxDelay = 30000; // 30 seconds
-  const delay = Math.min(baseDelay * Math.pow(2, attempts), maxDelay);
-  return new Promise(resolve => setTimeout(resolve, delay));
-};
-
-// Store the last attempt timestamp and count
-let lastAttemptTimestamp = 0;
-let attemptCount = 0;
 
 // Auth helper functions
 export const auth = {
@@ -255,33 +143,5 @@ export const auth = {
 
   onAuthStateChange: (callback: (event: any, session: any) => void) => {
     return supabase.auth.onAuthStateChange(callback);
-  }
-};
-
-// Remove unused functions and variables
-export const getUserProfile = async (userId: string): Promise<User | null> => {
-  try {
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !authData) {
-      console.error('Error getting user:', authError);
-      return null;
-    }
-
-    const { data: userData, error: dbError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (dbError) {
-      console.error('Error getting user profile:', dbError);
-      return null;
-    }
-
-    return userData;
-  } catch (error) {
-    console.error('Error in getUserProfile:', error);
-    return null;
   }
 }; 
