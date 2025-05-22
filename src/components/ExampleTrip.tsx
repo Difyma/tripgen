@@ -1,16 +1,4 @@
-import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MapPin, Calendar, Users2, Clock } from 'lucide-react';
-
-interface TourStop {
-  id: number;
-  time: string;
-  title: string;
-  description: string;
-  image: string;
-  duration: string;
-}
 
 const ExampleTrip = () => {
   return (

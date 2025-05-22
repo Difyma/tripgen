@@ -19,10 +19,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [waitTime, setWaitTime] = useState(0);
   const [initialWaitTime, setInitialWaitTime] = useState(0);
   const { signInOrSignUp, loading } = useAuth();
-  const { isLimited, limitExpiry, incrementAttempts, clearRateLimit } = useRateLimitStore();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isSignUp, setIsSignUp] = useState(false);
+  const { isLimited, limitExpiry, clearRateLimit } = useRateLimitStore();
 
   // Handle click outside
   useEffect(() => {

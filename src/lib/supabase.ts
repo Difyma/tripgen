@@ -15,6 +15,7 @@ export interface User {
 interface AuthResponse {
   session: Session | null;
   error: SupabaseAuthError | null;
+  message: string;
 }
 
 interface UserData {
@@ -180,7 +181,7 @@ export const auth = {
       if (signInData?.user) {
         // Ensure profile exists even on sign in
         await ensureProfileExists(signInData.user.id, email);
-        return { session: signInData.session, error: null };
+        return { session: signInData.session, error: null, message: '' };
       }
 
       // If sign in failed, try to sign up
@@ -210,7 +211,7 @@ export const auth = {
         throw new Error('Ошибка создания профиля пользователя');
       }
 
-      return { session: signUpData.session, error: null };
+      return { session: signUpData.session, error: null, message: '' };
     } catch (error: any) {
       console.error('Authentication error details:', {
         message: error.message,

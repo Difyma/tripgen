@@ -4,22 +4,19 @@ import {
   MapPin, 
   Users,
   Calendar as CalendarIcon,
-  DollarSign,
-  UserPlus
+  DollarSign
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { CreateTripModal } from './CreateTripModal';
 import { AuthModal } from './AuthModal';
 import { useLocation } from 'react-router-dom';
 const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
 import { useFlightInfo } from '../hooks/useFlightInfo';
-import { useHotelInfo } from '../hooks/useHotelInfo';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Message {
@@ -119,13 +116,11 @@ const Chat = () => {
   });
 
   const [inputText, setInputText] = useState('');
-  const [isCreateTripModalOpen, setIsCreateTripModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [currentMessage, setCurrentMessage] = useState<string>('');
   const [showTripBuilder, setShowTripBuilder] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilter>({ type: 'specific' });
   const { getFlightInfoForGPT } = useFlightInfo();
-  const { getHotelInfoForGPT } = useHotelInfo();
   const { user } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
 
