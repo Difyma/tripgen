@@ -1,5 +1,8 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Globe, DollarSign, Users, Star, ChevronRight, ArrowRight, Coins, Gift, Share2, Trophy } from 'lucide-react';
+import Navbar from './Navbar';
 import Hero from './Hero';
 import HowItWorks from './HowItWorks';
 import Services from './Services';

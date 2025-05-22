@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Users, MessageSquare, Mail, MapPin, Camera, Calendar, Map, Share2, Copy } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 const ShareTour = () => {
   const handleCopyLink = () => {
