@@ -44,19 +44,6 @@ export function Sidebar({ className }: SidebarProps) {
     return location.pathname.startsWith(path);
   };
 
-  const handleInviteFriends = () => {
-    if (!user) {
-      setShowAuthModal(true);
-    } else {
-      // Handle inviting friends when user is authenticated
-      console.log('Implement invite friends functionality');
-    }
-  };
-
-  const handleNewChat = () => {
-    navigate(`/chat?new=${Date.now()}`);
-  };
-
   const toggleChatList = () => {
     setShowChatList(!showChatList);
   };
