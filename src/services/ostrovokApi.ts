@@ -120,7 +120,7 @@ export function formatHotelInfoForGPT(hotels: HotelInfo[]): string {
 
   let response = '# 🏨 Рекомендуемые отели\n\n';
 
-  hotels.forEach((hotel, index) => {
+  hotels.forEach(hotel => {
     response += `### ${hotel.name} ${formatStars(hotel.stars)}\n`;
     response += `- 📍 **Адрес:** ${hotel.address}\n`;
     response += `- 💰 **Цена от:** ${formatPrice(hotel.price)} ${hotel.currency}\n`;

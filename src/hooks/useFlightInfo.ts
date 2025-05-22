@@ -1,8 +1,17 @@
 import { useState } from 'react';
-import { aviasalesApi, formatFlightInfoForGPT } from '../services/aviasalesApi';
+import { aviasalesApi } from '../services/aviasalesApi';
 
 interface UseFlightInfoResult {
-  getFlightInfoForGPT: (origin: string, destination: string, date: string) => Promise<string>;
+  getFlightInfoForGPT: (
+    origin: string,
+    destination: string,
+    dateFrom: string,
+    dateTo?: string,
+    adults?: number,
+    children?: number,
+    infants?: number,
+    tripClass?: 'Y' | 'C'
+  ) => Promise<string>;
   isLoading: boolean;
   error: string | null;
 }
@@ -14,23 +23,36 @@ export function useFlightInfo(): UseFlightInfoResult {
   const getFlightInfoForGPT = async (
     origin: string,
     destination: string,
-    date: string
+    dateFrom: string,
+    dateTo?: string,
+    adults: number = 1,
+    children: number = 0,
+    infants: number = 0,
+    tripClass: 'Y' | 'C' = 'Y'
   ): Promise<string> => {
     setIsLoading(true);
     setError(null);
 
     try {
       // Получаем информацию о перелетах
-      const flights = await aviasalesApi.getFlightInfo({
+      const flightInfo = await aviasalesApi.searchFlights({
         origin: origin.toUpperCase(),
         destination: destination.toUpperCase(),
-        depart_date: date
+        date_from: dateFrom,
+        date_to: dateTo,
+        adults,
+        children,
+        infants,
+        trip_class: tripClass,
+        currency: 'RUB'
       });
 
       // Форматируем информацию для GPT
-      return formatFlightInfoForGPT(flights);
+      return aviasalesApi.formatFlightsForGPT(flightInfo);
     } catch (err) {
-      const errorMessage = 'Не удалось получить информацию о перелетах';
+      const errorMessage = err instanceof Error 
+        ? `Ошибка при поиске рейсов: ${err.message}`
+        : 'Не удалось получить информацию о перелетах';
       setError(errorMessage);
       return errorMessage;
     } finally {
