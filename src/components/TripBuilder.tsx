@@ -107,7 +107,7 @@ const parseMessage = (text: string): Day[] => {
   return days;
 };
 
-const TripBuilder = ({ message, duration, travelers, onClose }: TripBuilderProps) => {
+const TripBuilder = ({ message, location, duration, travelers, onClose }: TripBuilderProps) => {
   const [expandedDays, setExpandedDays] = useState<number[]>([1]);
   const [showDistances, setShowDistances] = useState(true);
 
