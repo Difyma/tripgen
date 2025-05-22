@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Search, Calendar, Users } from 'lucide-react';
+import { Search, Calendar, Users, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { 
   Popover,
@@ -11,6 +11,8 @@ import { format } from "date-fns";
 import { Input } from "./ui/input";
 import { MainNavbar } from './MainNavbar';
 import { AuthModal } from './AuthModal';
+import { useNavigate } from 'react-router-dom';
+import { ru } from 'date-fns/locale';
 
 interface SearchFormData {
   location: string;
@@ -35,10 +37,37 @@ const Hero = () => {
 
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const handleSearch = () => {
-    console.log('Search clicked', formData);
-    // Здесь будет обработка поиска
+    // Проверяем заполнение обязательных полей
+    if (!formData.location) {
+      setValidationError('Пожалуйста, укажите место назначения');
+      return;
+    }
+    if (!formData.checkIn) {
+      setValidationError('Пожалуйста, выберите дату заезда');
+      return;
+    }
+    if (!formData.checkOut) {
+      setValidationError('Пожалуйста, выберите дату выезда');
+      return;
+    }
+
+    // Если все поля заполнены, очищаем ошибку
+    setValidationError(null);
+
+    // Формируем текст запроса для чата
+    const searchQuery = `Найди варианты поездки ${formData.location ? `в ${formData.location}` : ''} ` +
+      `с ${formData.checkIn ? format(formData.checkIn, 'dd.MM.yyyy', { locale: ru }) : ''} ` +
+      `по ${formData.checkOut ? format(formData.checkOut, 'dd.MM.yyyy', { locale: ru }) : ''} ` +
+      `для ${formData.guests} ${formData.guests === 1 ? 'человека' : 'человек'}` +
+      `${formData.children > 0 ? `, ${formData.children} ${formData.children === 1 ? 'ребенок' : formData.children < 5 ? 'ребенка' : 'детей'}` : ''}` +
+      `${formData.pets > 0 ? `, ${formData.pets} ${formData.pets === 1 ? 'питомец' : formData.pets < 5 ? 'питомца' : 'питомцев'}` : ''}.`;
+
+    // Перенаправляем на страницу чата с закодированным запросом
+    navigate(`/chat?q=${encodeURIComponent(searchQuery)}`);
   };
 
   return (
@@ -97,7 +126,7 @@ const Hero = () => {
                   {/* Location */}
                   <Popover open={isLocationOpen} onOpenChange={setIsLocationOpen}>
                     <PopoverTrigger asChild>
-                      <button className="flex flex-col items-center p-4 hover:bg-black/5 rounded-xl transition-colors text-center group">
+                      <button className="flex flex-col items-center p-3 hover:bg-black/5 rounded-xl transition-colors text-center group">
                         <div className="flex items-center gap-2 text-gray-500 mb-1">
                           <Search className="w-4 h-4" />
                           <span className="text-xs">Место</span>
@@ -122,7 +151,7 @@ const Hero = () => {
                   {/* Check In */}
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button className="flex flex-col items-center p-4 hover:bg-black/5 rounded-xl transition-colors text-center group">
+                      <button className="flex flex-col items-center p-3 hover:bg-black/5 rounded-xl transition-colors text-center group">
                         <div className="flex items-center gap-2 text-gray-500 mb-1">
                           <Calendar className="w-4 h-4" />
                           <span className="text-xs">Заезд</span>
@@ -145,7 +174,7 @@ const Hero = () => {
                   {/* Check Out */}
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button className="flex flex-col items-center p-4 hover:bg-black/5 rounded-xl transition-colors text-center group">
+                      <button className="flex flex-col items-center p-3 hover:bg-black/5 rounded-xl transition-colors text-center group">
                         <div className="flex items-center gap-2 text-gray-500 mb-1">
                           <Calendar className="w-4 h-4" />
                           <span className="text-xs">Выезд</span>
@@ -168,7 +197,7 @@ const Hero = () => {
                   {/* Guests */}
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button className="flex flex-col items-center p-4 hover:bg-black/5 rounded-xl transition-colors text-center group">
+                      <button className="flex flex-col items-center p-3 hover:bg-black/5 rounded-xl transition-colors text-center group">
                         <div className="flex items-center gap-2 text-gray-500 mb-1">
                           <Users className="w-4 h-4" />
                           <span className="text-xs">Гости</span>
@@ -246,12 +275,18 @@ const Hero = () => {
                   {/* Search Button */}
                   <button
                     onClick={handleSearch}
-                    className="flex items-center justify-center gap-2 bg-black text-white p-4 rounded-xl hover:bg-gray-900 transition-colors"
+                    className="flex items-center justify-center gap-1.5 bg-black text-white px-3 py-2 rounded-xl hover:bg-gray-900 transition-colors text-sm"
                   >
-                    <Search className="w-4 h-4" />
+                    <Search className="w-3.5 h-3.5" />
                     <span>Поиск</span>
                   </button>
                 </div>
+                {validationError && (
+                  <div className="mt-2 text-red-500 text-sm flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {validationError}
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
