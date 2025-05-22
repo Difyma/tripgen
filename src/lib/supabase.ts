@@ -91,7 +91,7 @@ export const auth = {
 
       // Log sign up attempt result
       if (signUpError) {
-        console.log('Sign up attempt failed:', signUpError);
+        console.log('Попытка регистрации не удалась:', signUpError);
         if (signUpError.message.includes('User already registered')) {
           throw new Error('Неверный email или пароль');
         }
@@ -106,13 +106,13 @@ export const auth = {
       // Create profile for new user
       const profileError = await ensureProfileExists(signUpData.user.id, email);
       if (profileError) {
-        console.log('Profile creation failed:', profileError);
+        console.log('Ошибка создания профиля:', profileError);
         throw new Error('Ошибка создания профиля пользователя');
       }
 
       return { session: signUpData.session, error: null, message: 'Регистрация успешна!' };
     } catch (error: any) {
-      console.error('Authentication error details:', {
+      console.error('Детали ошибки аутентификации:', {
         message: error.message,
         status: error.status,
         name: error.name,
