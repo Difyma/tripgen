@@ -21,17 +21,7 @@ export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
           <div className="flex items-center gap-2 sm:gap-8">
             <Link to="/" className="text-xs sm:text-sm text-gray-600 hover:text-black transition-colors">Как это работает</Link>
             <Link to="/about" className="text-xs sm:text-sm text-gray-600 hover:text-black transition-colors">О нас</Link>
-            <Link 
-              to="/creator" 
-              className="bg-black text-white px-4 py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-900 transition-colors flex items-center gap-2"
-            >
-              <img src="/images/web-brower.png" alt="Для креаторов" className="w-4 h-4 brightness-0 invert" />
-              <span>Для креаторов</span>
-            </Link>
             <div className="flex items-center gap-1 sm:gap-4">
-              <button className="w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-full transition-colors">
-                <Search className="w-4 h-4" />
-              </button>
               <button 
                 className="w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-full transition-colors"
                 onClick={onAuthClick}
@@ -39,6 +29,13 @@ export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
               >
                 <Users className="w-4 h-4" />
               </button>
+              <Link 
+                to="/creator" 
+                className="bg-black text-white px-4 py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-900 transition-colors flex items-center gap-2"
+              >
+                <img src="/images/web-brower.png" alt="Для креаторов" className="w-4 h-4 brightness-0 invert" />
+                <span>Для креаторов</span>
+              </Link>
               <Link 
                 to="/chat" 
                 className="flex items-center gap-1 sm:gap-2 bg-black text-white px-2 py-1 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium hover:bg-gray-900 transition-colors"
