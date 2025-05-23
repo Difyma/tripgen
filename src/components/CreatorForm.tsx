@@ -100,8 +100,9 @@ export const CreatorForm = ({ isOpen, onClose }: CreatorFormProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50">
-        <div className="bg-white rounded-2xl w-full max-w-[800px] max-h-[90vh] overflow-y-auto p-8 mx-4 relative">
+      <DialogContent className="fixed inset-0 z-[1000] overflow-hidden">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[800px] max-h-[90vh] overflow-y-auto bg-white rounded-2xl p-8 mx-4 shadow-2xl">
           <DialogHeader className="mb-8">
             <DialogTitle className="text-4xl font-cal text-center">Стать креатором TripGen</DialogTitle>
             <DialogDescription className="text-lg text-gray-600 text-center mt-4">
