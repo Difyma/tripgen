@@ -12,18 +12,18 @@
       }
     },
     {
-      "src": "server/**/*.ts",
+      "src": "api/**/*.ts",
       "use": "@vercel/node"
     }
   ],
   "rewrites": [
     {
       "source": "/api/yandex-gpt",
-      "destination": "/server/gptProxy.ts"
+      "destination": "/api/yandex-gpt"
     },
     {
       "source": "/api/creators",
-      "destination": "/api/creators.ts"
+      "destination": "/api/creators"
     },
     {
       "source": "/(.*)",
