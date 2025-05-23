@@ -392,13 +392,25 @@ const Chat = () => {
         body: JSON.stringify({ messages: messagesToSend }),
       });
 
+      console.log('API Response status:', response.status);
+      console.log('API Response headers:', Object.fromEntries(response.headers.entries()));
+
       let data;
       try {
         const responseText = await response.text();
+        console.log('Response text length:', responseText.length);
+        console.log('Response text:', responseText);
+
+        if (!responseText || responseText.trim() === '') {
+          throw new Error('Empty response from server');
+        }
+
         try {
           data = JSON.parse(responseText);
+          console.log('Successfully parsed response data:', data);
         } catch (parseError) {
           console.error('Error parsing response JSON:', parseError);
+          console.error('Response text that failed to parse:', responseText);
           throw new Error('Invalid response format from server');
         }
       } catch (error) {
@@ -407,13 +419,13 @@ const Chat = () => {
       }
 
       if (!response.ok) {
-        throw new Error(
-          data.error || 
+        const errorMessage = data.error || 
           (data.details && typeof data.details === 'object' 
             ? data.details.message 
             : data.details) || 
-          `Server error: ${response.status} ${response.statusText}`
-        );
+          `Server error: ${response.status} ${response.statusText}`;
+        console.error('API error:', errorMessage);
+        throw new Error(errorMessage);
       }
       
       if (!data.text) {

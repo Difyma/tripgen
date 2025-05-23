@@ -158,16 +158,49 @@ export default async function handler(req: Request) {
       body: JSON.stringify(apiRequestBody)
     });
 
+    console.log('Yandex GPT API response status:', response.status);
+    console.log('Yandex GPT API response headers:', Object.fromEntries(response.headers.entries()));
+
     let responseText;
     try {
       responseText = await response.text();
-      console.log('Raw response:', responseText);
+      console.log('Raw response text length:', responseText.length);
+      console.log('Raw response text:', responseText);
       
+      if (!responseText || responseText.trim() === '') {
+        console.error('Empty response from Yandex GPT API');
+        return new Response(
+          JSON.stringify({ 
+            error: 'Empty response from Yandex GPT API',
+            details: 'The API returned an empty response'
+          }),
+          {
+            status: 500,
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          }
+        );
+      }
+
       // Try to parse the response text to validate JSON format
       try {
-        JSON.parse(responseText);
+        const parsedResponse = JSON.parse(responseText);
+        console.log('Successfully parsed JSON response');
+        return new Response(
+          JSON.stringify({ text: parsedResponse.result?.alternatives?.[0]?.message?.text || '' }),
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          }
+        );
       } catch (parseError) {
         console.error('Invalid JSON in response:', parseError);
+        console.error('Response text that failed to parse:', responseText);
         return new Response(
           JSON.stringify({ 
             error: 'Invalid JSON response from Yandex GPT API',
@@ -198,88 +231,6 @@ export default async function handler(req: Request) {
         }
       );
     }
-
-    if (!response.ok) {
-      console.error('Yandex GPT API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        response: responseText
-      });
-      return new Response(
-        JSON.stringify({ 
-          error: 'Ошибка при обращении к Yandex GPT API',
-          details: responseText
-        }),
-        {
-          status: response.status,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        }
-      );
-    }
-
-    let data: YandexGPTResponse;
-    try {
-      data = JSON.parse(responseText);
-    } catch (error) {
-      console.error('Error parsing JSON response:', error);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Ошибка при разборе ответа от API',
-          details: 'Invalid JSON response'
-        }),
-        {
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        }
-      );
-    }
-
-    console.log('Yandex GPT response received:', {
-      status: 'success',
-      hasResult: !!data.result,
-      hasAlternatives: !!data.result?.alternatives?.length,
-      response: data
-    });
-    
-    const text = data.result?.alternatives?.[0]?.message?.text;
-    
-    if (!text) {
-      console.error('Empty response from Yandex GPT:', {
-        data,
-        error: 'No text in response'
-      });
-      return new Response(
-        JSON.stringify({ 
-          error: 'Пустой ответ от сервера',
-          details: 'Ответ получен, но текст отсутствует'
-        }),
-        {
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        }
-      );
-    }
-
-    console.log('Successfully processed GPT request');
-    return new Response(
-      JSON.stringify({ text }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
-      }
-    );
 
   } catch (error) {
     console.error('Server error:', error);
