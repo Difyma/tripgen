@@ -17,10 +17,11 @@ const router = express.Router();
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://tripgen.vercel.app', 'https://ai-travel.vercel.app']
-    : '*',
-  methods: ['POST', 'OPTIONS'],
+    : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000'],
+  methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 204
 };
 
 router.use(cors(corsOptions));
@@ -92,6 +93,16 @@ const checkEnvVariables = (req: Request, res: Response, next: NextFunction): voi
 router.post('/yandex-gpt', checkEnvVariables, async (req: Request, res: Response): Promise<void> => {
   try {
     console.log('=== Starting GPT request processing ===');
+    console.log('Environment:', {
+      NODE_ENV: process.env.NODE_ENV,
+      hasYandexKey: !!process.env.YANDEX_API_KEY,
+      hasYandexFolder: !!process.env.YANDEX_FOLDER_ID,
+      corsOrigin: corsOptions.origin
+    });
+    console.log('Request headers:', {
+      ...req.headers,
+      authorization: req.headers.authorization ? '***' : undefined
+    });
     console.log('Request body:', JSON.stringify(req.body, null, 2));
     
     const requestBody = req.body as RequestBody;

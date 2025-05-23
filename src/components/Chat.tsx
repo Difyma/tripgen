@@ -390,11 +390,15 @@ const Chat = () => {
         body: JSON.stringify({ messages: messagesToSend }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to get response from GPT');
+        throw new Error(data.error || data.details?.message || 'Failed to get response from GPT');
       }
 
-      const data = await response.json();
+      if (!data.text) {
+        throw new Error('Empty response from GPT');
+      }
       
       // Добавляем ответ от GPT
       const assistantMessage: Message = {
@@ -409,7 +413,9 @@ const Chat = () => {
       console.error('Error in chat:', error);
       const errorMessage: Message = {
         id: messages.length + 2,
-        text: 'Извините, произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз.',
+        text: error instanceof Error 
+          ? `Извините, произошла ошибка: ${error.message}. Пожалуйста, попробуйте еще раз.`
+          : 'Извините, произошла неизвестная ошибка. Пожалуйста, попробуйте еще раз.',
         isUser: false,
         role: 'assistant'
       };
