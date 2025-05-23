@@ -162,11 +162,31 @@ export default async function handler(req: Request) {
     try {
       responseText = await response.text();
       console.log('Raw response:', responseText);
+      
+      // Try to parse the response text to validate JSON format
+      try {
+        JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Invalid JSON in response:', parseError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Invalid JSON response from Yandex GPT API',
+            details: 'The response could not be parsed as JSON'
+          }),
+          {
+            status: 500,
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          }
+        );
+      }
     } catch (error) {
       console.error('Error reading response:', error);
       return new Response(
         JSON.stringify({ 
-          error: 'Ошибка при чтении ответа от API',
+          error: 'Error reading response from API',
           details: error instanceof Error ? error.message : 'Unknown error'
         }),
         {

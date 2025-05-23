@@ -392,7 +392,19 @@ const Chat = () => {
         body: JSON.stringify({ messages: messagesToSend }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        const responseText = await response.text();
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Error parsing response JSON:', parseError);
+          throw new Error('Invalid response format from server');
+        }
+      } catch (error) {
+        console.error('Error reading response:', error);
+        throw new Error('Failed to read server response');
+      }
 
       if (!response.ok) {
         throw new Error(
