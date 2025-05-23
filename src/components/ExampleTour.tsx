@@ -59,13 +59,13 @@ const ExampleTour = () => {
           </p>
         </div>
 
-        <div className="flex gap-8">
+        <div className="flex flex-col sm:flex-row gap-8">
           {/* Left Column - Tour Details */}
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            className="w-1/2 bg-white rounded-3xl shadow-lg overflow-hidden"
+            className="w-full sm:w-1/2 bg-white rounded-3xl shadow-lg overflow-hidden"
           >
             {/* Tour Header */}
             <div className="p-6 border-b border-gray-100">
@@ -162,9 +162,9 @@ const ExampleTour = () => {
             initial={{ opacity: 0, x: 20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            className="w-1/2 relative"
+            className="w-full sm:w-1/2 relative"
           >
-            <div className="sticky top-8 h-full rounded-3xl overflow-hidden shadow-lg">
+            <div className="sticky top-8 h-[700px] sm:h-full rounded-3xl overflow-hidden shadow-lg">
               <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent z-10" />
               <img 
                 src="https://images.unsplash.com/photo-1547448415-e9f5b28e570d?w=1200"
@@ -177,8 +177,8 @@ const ExampleTour = () => {
                   key={stop.id}
                   className="absolute z-20"
                   style={{
-                    top: `${25 + (index * 25)}%`,
-                    left: `${30 + (index * 15)}%`
+                    top: `calc(${10 + index * 16}% )`,
+                    left: `calc(${8 + index * 8}% )`,
                   }}
                 >
                   <div className="relative">
