@@ -24,6 +24,7 @@ export function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/creator" element={<CreatorPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route element={<AppLayout />}>
                 <Route path="/chat" element={<Chat key={Date.now()} />} />
                 <Route path="/trips" element={<TripsRoute />} />
@@ -31,7 +32,6 @@ export function App() {
                 <Route path="/flights" element={<FlightsPage />} />
                 <Route path="/hotels" element={<HotelTestPage />} />
                 <Route path="/flight" element={<FlightTestPage />} />
-                <Route path="/profile" element={<ProfilePage />} />
             </Route>
           </Routes>
         </Router>
