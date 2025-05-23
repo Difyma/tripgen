@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node --loader ts-node/esm gptProxy.ts",
-    "dev": "node --loader ts-node/esm index.ts",
+    "start": "node --loader ts-node/esm index.ts",
+    "dev": "nodemon --loader ts-node/esm index.ts",
     "watch": "tsc -w"
   },
   "dependencies": {
@@ -21,9 +21,9 @@
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
-    "@types/node": "^20.11.24",
+    "@types/node": "^20.17.50",
     "nodemon": "^3.0.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.8.3"
   }
 }
