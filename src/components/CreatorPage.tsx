@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { Globe, DollarSign, Users, Star, ChevronRight, ArrowRight, Coins, Gift, Share2, Trophy } from 'lucide-react';
-import CreatorNavbar from './CreatorNavbar';
+import { MainNavbar } from './MainNavbar';
+import Footer from './Footer';
 import { CreatorForm } from './CreatorForm';
 
 const benefits = [
@@ -83,9 +84,14 @@ const inspirationSteps = [
 const CreatorPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
+  const handleAuthClick = () => {
+    // Здесь можно добавить логику для авторизации
+    console.log('Auth clicked');
+  };
+
   return (
     <>
-      <CreatorNavbar />
+      <MainNavbar onAuthClick={handleAuthClick} />
       <div className="min-h-screen bg-[#FAFAFA] pt-16">
         {/* Hero Section */}
         <section className="relative overflow-hidden bg-white py-32">
@@ -457,6 +463,7 @@ const CreatorPage = () => {
 
         <CreatorForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} />
       </div>
+      <Footer />
     </>
   );
 };
