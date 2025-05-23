@@ -4,7 +4,8 @@ import {
   MapPin, 
   Users,
   Calendar as CalendarIcon,
-  DollarSign
+  DollarSign,
+  X
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -307,6 +308,7 @@ const Chat = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const { user } = useAuth();
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   const handleSendMessage = useCallback(async (textToSend?: string) => {
     const messageText = textToSend || inputText;
@@ -897,12 +899,295 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
   };
 
   return (
-    <div className="h-full flex flex-col bg-white transition-all duration-300" style={{ marginLeft: isSidebarCollapsed ? '72px' : '280px' }}>
+    <div className={`h-full flex flex-col bg-white transition-all duration-300 w-full ${isSidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[280px]'}`}>
       {/* Top Navigation */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-3">
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-2 sm:gap-3">
-
+          {/* Мобильная строка с фильтрами и tripgen */}
+          <div className="flex sm:hidden mb-2 gap-2">
+            <button
+              className="flex-1 flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm font-medium ml-12"
+              onClick={() => setShowMobileFilters((v) => !v)}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zm0 6a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2z"/></svg>
+              Фильтры
+            </button>
+            <button
+              onClick={handleTripGenClick}
+              className="flex-1 flex items-center justify-center gap-2 px-2 h-9 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-xs font-medium"
+            >
+              <img src={AILogo} alt="TripGen" className="w-5 h-5" />
+              Маршрут
+            </button>
+          </div>
+          {/* Мобильный фильтр-панель */}
+          {showMobileFilters && (
+            <div className="fixed inset-0 z-30 flex items-start justify-center sm:hidden">
+              <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowMobileFilters(false)} />
+              <div className="relative w-full max-w-md mx-auto mt-8 bg-white rounded-2xl shadow-xl p-4 animate-fade-in-up">
+                <button
+                  className="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  onClick={() => setShowMobileFilters(false)}
+                  aria-label="Закрыть фильтры"
+                >
+                  <X className="w-6 h-6 text-gray-500" />
+                </button>
+                <div className="flex flex-col gap-4">
+                  {/* Location Filter */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Куда едем"
+                      value={filters.location}
+                      onChange={handleLocationChange}
+                      className="w-full pl-8 pr-3 h-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 placeholder:text-gray-400"
+                    />
+                    <MapPin className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2" />
+                  </div>
+                  {/* Date Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="w-full h-10 pl-8 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 text-left relative">
+                        <CalendarIcon className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2" />
+                        <span className="block truncate mt-[7px]">
+                          {getDateFilterDisplay()}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <div className="p-3 border-b border-gray-100">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setDateFilter({ type: 'specific' })}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                              dateFilter.type === 'specific' 
+                                ? 'bg-black text-white' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Даты
+                          </button>
+                          <button
+                            onClick={() => setDateFilter({ type: 'duration' })}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                              dateFilter.type === 'duration' 
+                                ? 'bg-black text-white' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Длительность
+                          </button>
+                          <button
+                            onClick={() => setDateFilter({ type: 'month' })}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                              dateFilter.type === 'month' 
+                                ? 'bg-black text-white' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            Месяц
+                          </button>
+                        </div>
+                      </div>
+                      {dateFilter.type === 'specific' && (
+                        <Calendar
+                          mode="range"
+                          selected={{
+                            from: dateFilter.startDate,
+                            to: dateFilter.endDate
+                          }}
+                          onSelect={(range) => {
+                            if (range?.from) {
+                              setDateFilter({
+                                type: 'specific',
+                                startDate: range.from,
+                                endDate: range.to || range.from
+                              });
+                            }
+                          }}
+                          locale={ru}
+                          className="rounded-lg"
+                        />
+                      )}
+                      {dateFilter.type === 'duration' && (
+                        <div className="p-4 space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">Количество дней</label>
+                            <div className="flex items-center gap-2">
+                              {[3, 5, 7, 10, 14].map((days) => (
+                                <button
+                                  key={days}
+                                  onClick={() => handleDurationChange(days)}
+                                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                    dateFilter.duration === days
+                                      ? 'bg-black text-white'
+                                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                  }`}
+                                >
+                                  {days}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {dateFilter.type === 'month' && (
+                        <div className="p-4 grid grid-cols-3 gap-2">
+                          {Array.from({ length: 12 }, (_, i) => {
+                            const date = new Date(2024, i, 1);
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => handleMonthSelection(i, 2024)}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                  dateFilter.month?.month === i
+                                    ? 'bg-black text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                              >
+                                {format(date, 'LLL', { locale: ru })}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                  {/* Travelers Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="w-full h-10 pl-8 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 text-left relative">
+                        <Users className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2" />
+                        <span className="block truncate mt-[7px]">
+                          {filters.travelers} взр • {filters.children} реб • {filters.pets} пит
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-4 bg-white shadow-lg rounded-lg border border-gray-200" align="start">
+                      <div className="space-y-4">
+                        <h4 className="font-medium text-gray-900">Путешественники</h4>
+                        {/* Adults */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-gray-900">Взрослые</div>
+                            <div className="text-sm text-gray-500">От 13 лет</div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleTravelersChange(false)}
+                              className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                              disabled={filters.travelers <= 1}
+                            >
+                              -
+                            </button>
+                            <span className="w-4 text-center">{filters.travelers}</span>
+                            <button
+                              onClick={() => handleTravelersChange(true)}
+                              className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                        {/* Children */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-gray-900">Дети</div>
+                            <div className="text-sm text-gray-500">До 12 лет</div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleChildrenChange(false)}
+                              className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                              disabled={filters.children <= 0}
+                            >
+                              -
+                            </button>
+                            <span className="w-4 text-center">{filters.children}</span>
+                            <button
+                              onClick={() => handleChildrenChange(true)}
+                              className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                        {/* Pets */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-gray-900">Питомцы</div>
+                            <div className="text-sm text-gray-500">Домашние животные</div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handlePetsChange(false)}
+                              className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                              disabled={filters.pets <= 0}
+                            >
+                              -
+                            </button>
+                            <span className="w-4 text-center">{filters.pets}</span>
+                            <button
+                              onClick={() => handlePetsChange(true)}
+                              className="w-8 h-8 flex items-center justify-center border border-gray-200 rounded-lg hover:bg-gray-50"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  {/* Budget Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="w-full h-10 pl-8 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 text-left relative">
+                        <DollarSign className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2" />
+                        <span className="block truncate mt-[7px]">
+                          {filters.budget.min}₽ - {filters.budget.max}₽
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-4 bg-white shadow-lg rounded-lg border border-gray-200" align="start">
+                      <div className="space-y-4">
+                        <h4 className="font-medium text-gray-900">Бюджет</h4>
+                        <div className="flex items-center gap-4">
+                          <div className="flex-1">
+                            <label className="text-xs text-gray-500 mb-1.5 block">От</label>
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400">₽</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={filters.budget.min}
+                                onChange={(e) => handleBudgetChange('min', Number(e.target.value))}
+                                className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <label className="text-xs text-gray-500 mb-1.5 block">До</label>
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400">₽</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={filters.budget.max}
+                                onChange={(e) => handleBudgetChange('max', Number(e.target.value))}
+                                className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Фильтры: на мобильных collapsible, на десктопе всегда видны */}
+          <div className={`sm:flex items-center gap-2 sm:gap-3 ${showMobileFilters ? '' : 'hidden sm:flex'}`}>
             {/* Location Filter */}
             <div className="relative flex-1 min-w-[160px]">
               <input
@@ -1162,15 +1447,15 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
               </PopoverContent>
             </Popover>
 
-            {/* TripGen Generate Button */}
-            <div className="flex items-center gap-2">
-            <button
-              onClick={handleTripGenClick}
-              className="flex-1 min-w-[160px] h-10 flex items-center justify-center gap-2 px-4 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
-            >
-              <img src={AILogo} alt="TripGen" className="w-6 h-6" />
-              TRIPGEN МАРШРУТ
-            </button>
+            {/* TripGen Generate Button (desktop) */}
+            <div className="hidden sm:flex items-center gap-2">
+              <button
+                onClick={handleTripGenClick}
+                className="flex-1 min-w-[120px] h-10 flex items-center justify-center gap-2 px-4 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+              >
+                <img src={AILogo} alt="TripGen" className="w-6 h-6" />
+                TRIPGEN МАРШРУТ
+              </button>
             </div>
           </div>
         </div>
@@ -1253,13 +1538,13 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
           
           {/* Chat Input */}
           <div className="p-4 border-t border-gray-200">
-            <div className="max-w-6xl mx-auto">
-              <div className="flex items-center gap-2">
+            <div className="flex justify-center">
+              <div className="w-full max-w-xl mx-auto flex items-center gap-2">
                 <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  <input
+                    type="text"
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -1274,14 +1559,14 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                       <div className="w-5 h-5 border-2 border-black/10 border-t-black/40 rounded-full animate-spin"></div>
                     </div>
                   )}
-              </div>
-              <button 
+                </div>
+                <button 
                   onClick={() => handleSendMessage()}
                   disabled={isLoading || !inputText.trim()}
                   className="shrink-0 w-11 h-11 flex items-center justify-center bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 disabled:hover:bg-black transition-colors"
                 >
                   <Send className="w-5 h-5" />
-              </button>
+                </button>
               </div>
             </div>
           </div>
