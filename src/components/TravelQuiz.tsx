@@ -61,25 +61,27 @@ const TravelQuiz = () => {
             initial={{ opacity: 0, x: 20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            className="lg:pl-12"
+            className="lg:pl-12 px-4 sm:px-0"
           >
-            <h2 className="text-4xl lg:text-5xl font-semibold mb-6 tracking-tight">
-              Какой путешественник вы?
+            <h2 className="text-4xl lg:text-5xl font-semibold mb-6 tracking-tight text-center lg:text-left">
+              Какой вы путешественник ?
             </h2>
-            <p className="text-xl text-gray-600 mb-8">
+            <p className="text-xl text-gray-600 mb-8 text-center lg:text-left">
               Пройдите наш быстрый тест, и мы подберем идеальные направления и активности, 
               основываясь на ваших предпочтениях и стиле путешествий.
             </p>
             
-            <motion.button
-              onClick={handleOpenModal}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-gray-900 transition-colors"
-            >
-              Пройти тест
-              <ArrowRight className="w-5 h-5" />
-            </motion.button>
+            <div className="flex justify-center lg:justify-start">
+              <motion.button
+                onClick={handleOpenModal}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-gray-900 transition-colors"
+              >
+                Пройти тест
+                <ArrowRight className="w-5 h-5" />
+              </motion.button>
+            </div>
 
             {/* Features */}
             <div className="mt-12 grid gap-6">
