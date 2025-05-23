@@ -8,6 +8,7 @@ import CollectiveTour from './CollectiveTour';
 import TravelGallery from './TravelGallery';
 import CTASection from './CTASection';
 import TravelQuiz from './TravelQuiz';
+import ScrollToTopButton from './ScrollToTopButton';
 
 export function LandingPage() {
   return (
@@ -25,6 +26,7 @@ export function LandingPage() {
       </main>
 
       <Footer />
+      <ScrollToTopButton />
     </div>
   );
 } 
