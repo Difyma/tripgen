@@ -392,18 +392,20 @@ const Chat = () => {
         body: JSON.stringify({ messages: messagesToSend }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(
           data.error || 
-          data.details?.message || 
+          (data.details && typeof data.details === 'object' 
+            ? data.details.message 
+            : data.details) || 
           `Server error: ${response.status} ${response.statusText}`
         );
       }
-
-      const data = await response.json();
       
       if (!data.text) {
+        console.error('Empty response data:', data);
         throw new Error('Empty response from GPT');
       }
       

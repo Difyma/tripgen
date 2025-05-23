@@ -163,28 +163,49 @@ router.post('/yandex-gpt', checkEnvVariables, async (req: Request, res: Response
       body: JSON.stringify(apiRequestBody)
     });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Yandex GPT API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData
-      });
-      res.status(response.status).json({ 
-        error: 'Ошибка при обращении к Yandex GPT API',
-        details: {
-          status: response.status,
-          message: errorData
-        }
+    let responseText;
+    try {
+      responseText = await response.text();
+      console.log('Raw response:', responseText);
+    } catch (error) {
+      console.error('Error reading response:', error);
+      res.status(500).json({ 
+        error: 'Ошибка при чтении ответа от API',
+        details: error instanceof Error ? error.message : 'Unknown error'
       });
       return;
     }
 
-    const data = await response.json() as YandexGPTResponse;
+    if (!response.ok) {
+      console.error('Yandex GPT API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        response: responseText
+      });
+      res.status(response.status).json({ 
+        error: 'Ошибка при обращении к Yandex GPT API',
+        details: responseText
+      });
+      return;
+    }
+
+    let data: YandexGPTResponse;
+    try {
+      data = JSON.parse(responseText);
+    } catch (error) {
+      console.error('Error parsing JSON response:', error);
+      res.status(500).json({ 
+        error: 'Ошибка при разборе ответа от API',
+        details: 'Invalid JSON response'
+      });
+      return;
+    }
+
     console.log('Yandex GPT response received:', {
       status: 'success',
       hasResult: !!data.result,
-      hasAlternatives: !!data.result?.alternatives?.length
+      hasAlternatives: !!data.result?.alternatives?.length,
+      response: data
     });
     
     const text = data.result?.alternatives?.[0]?.message?.text;
