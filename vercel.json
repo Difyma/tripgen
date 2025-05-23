@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/**/*.ts",
+      "src": "pages/api/**/*.ts",
       "use": "@vercel/node"
     },
     {
@@ -15,8 +15,8 @@
   ],
   "rewrites": [
     {
-      "source": "/api/creators",
-      "destination": "/api/creators/route"
+      "source": "/api/:path*",
+      "destination": "/pages/api/:path*"
     },
     {
       "source": "/(.*)",

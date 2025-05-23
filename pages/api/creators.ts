@@ -1,14 +1,8 @@
-import { NextResponse } from 'next/server';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
 
 interface TelegramResponse {
   ok: boolean;
@@ -38,32 +32,38 @@ interface CreatorApplicationData {
   expectations: string;
 }
 
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: corsHeaders,
-  });
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
 
-export async function POST(request: Request) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return res.status(204).end();
+  }
+
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
-    const data = await request.json() as CreatorApplicationData;
+    const data = req.body as CreatorApplicationData;
 
     if (!data || !data.fullName) {
-      return new NextResponse(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Invalid request data',
-          error: 'Required fields are missing'
-        }),
-        { 
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        }
-      );
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request data',
+        error: 'Required fields are missing'
+      });
     }
 
     if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
@@ -93,34 +93,27 @@ export async function POST(request: Request) {
     
     await sendTelegramMessage(`💫 Почему хочет стать креатором:\n${data.expectations}`);
 
-    return new NextResponse(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Application submitted successfully' 
-      }),
-      { 
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
-      }
-    );
+    // Set CORS headers
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Application submitted successfully'
+    });
   } catch (error: any) {
     console.error('[CreatorApplication] Error:', error);
-    return new NextResponse(
-      JSON.stringify({ 
-        success: false, 
-        message: 'Failed to submit application',
-        error: error.message
-      }),
-      { 
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
-      }
-    );
+
+    // Set CORS headers
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to submit application',
+      error: error.message
+    });
   }
 } 
