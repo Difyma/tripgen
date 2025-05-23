@@ -100,136 +100,150 @@ export const CreatorForm = ({ isOpen, onClose }: CreatorFormProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-cal">Стать креатором TripGen</DialogTitle>
-          <DialogDescription>
-            Заполните форму, чтобы присоединиться к сообществу креаторов TripGen. 
-            Мы рассмотрим вашу заявку и свяжемся с вами.
-          </DialogDescription>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Полное имя *</Label>
-            <Input
-              id="fullName"
-              placeholder="Иван Иванов"
-              {...register('fullName')}
-              className={errors.fullName ? 'border-red-500' : ''}
-            />
-            {errors.fullName && (
-              <p className="text-sm text-red-500">{errors.fullName.message}</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
+      <DialogContent className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-2xl w-full max-w-[800px] max-h-[90vh] overflow-y-auto p-8 mx-4 relative">
+          <DialogHeader className="mb-8">
+            <DialogTitle className="text-4xl font-cal text-center">Стать креатором TripGen</DialogTitle>
+            <DialogDescription className="text-lg text-gray-600 text-center mt-4">
+              Заполните форму, чтобы присоединиться к сообществу креаторов TripGen. 
+              Мы рассмотрим вашу заявку и свяжемся с вами.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+            <div className="space-y-4">
+              <Label htmlFor="fullName" className="text-lg font-medium">Полное имя *</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                {...register('email')}
-                className={errors.email ? 'border-red-500' : ''}
+                id="fullName"
+                placeholder="Иван Иванов"
+                {...register('fullName')}
+                className={`h-12 text-lg rounded-xl border-2 ${errors.fullName ? 'border-red-500' : 'border-gray-200'}`}
               />
-              {errors.email && (
-                <p className="text-sm text-red-500">{errors.email.message}</p>
+              {errors.fullName && (
+                <p className="text-red-500 text-sm mt-1">{errors.fullName.message}</p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="phone">Телефон *</Label>
-              <Input
-                id="phone"
-                placeholder="+7 (999) 999-99-99"
-                {...register('phone')}
-                className={errors.phone ? 'border-red-500' : ''}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <Label htmlFor="email" className="text-lg font-medium">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="your@email.com"
+                  {...register('email')}
+                  className={`h-12 text-lg rounded-xl border-2 ${errors.email ? 'border-red-500' : 'border-gray-200'}`}
+                />
+                {errors.email && (
+                  <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <Label htmlFor="phone" className="text-lg font-medium">Телефон *</Label>
+                <Input
+                  id="phone"
+                  placeholder="+7 (999) 999-99-99"
+                  {...register('phone')}
+                  className={`h-12 text-lg rounded-xl border-2 ${errors.phone ? 'border-red-500' : 'border-gray-200'}`}
+                />
+                {errors.phone && (
+                  <p className="text-red-500 text-sm mt-1">{errors.phone.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <h4 className="text-lg font-medium">Социальные сети</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-4">
+                  <Label htmlFor="instagram" className="text-base">Instagram</Label>
+                  <Input
+                    id="instagram"
+                    placeholder="@username"
+                    {...register('instagram')}
+                    className="h-12 text-lg rounded-xl border-2 border-gray-200"
+                  />
+                </div>
+                <div className="space-y-4">
+                  <Label htmlFor="telegram" className="text-base">Telegram</Label>
+                  <Input
+                    id="telegram"
+                    placeholder="@username"
+                    {...register('telegram')}
+                    className="h-12 text-lg rounded-xl border-2 border-gray-200"
+                  />
+                </div>
+                <div className="space-y-4">
+                  <Label htmlFor="youtube" className="text-base">YouTube</Label>
+                  <Input
+                    id="youtube"
+                    placeholder="channel_url"
+                    {...register('youtube')}
+                    className="h-12 text-lg rounded-xl border-2 border-gray-200"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <Label htmlFor="bio" className="text-lg font-medium">О себе *</Label>
+              <Textarea
+                id="bio"
+                placeholder="Расскажите о себе, своих интересах и увлечениях..."
+                {...register('bio')}
+                className={`min-h-[120px] text-lg rounded-xl border-2 p-4 ${errors.bio ? 'border-red-500' : 'border-gray-200'}`}
               />
-              {errors.phone && (
-                <p className="text-sm text-red-500">{errors.phone.message}</p>
+              {errors.bio && (
+                <p className="text-red-500 text-sm mt-1">{errors.bio.message}</p>
               )}
             </div>
-          </div>
 
-          <div className="space-y-4">
-            <h4 className="font-medium">Социальные сети</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="instagram">Instagram</Label>
-                <Input
-                  id="instagram"
-                  placeholder="@username"
-                  {...register('instagram')}
-                />
-              </div>
-              <div>
-                <Label htmlFor="telegram">Telegram</Label>
-                <Input
-                  id="telegram"
-                  placeholder="@username"
-                  {...register('telegram')}
-                />
-              </div>
-              <div>
-                <Label htmlFor="youtube">YouTube</Label>
-                <Input
-                  id="youtube"
-                  placeholder="channel_url"
-                  {...register('youtube')}
-                />
-              </div>
+            <div className="space-y-4">
+              <Label htmlFor="experience" className="text-lg font-medium">Опыт путешествий *</Label>
+              <Textarea
+                id="experience"
+                placeholder="Расскажите о ваших путешествиях, любимых местах и направлениях..."
+                {...register('experience')}
+                className={`min-h-[120px] text-lg rounded-xl border-2 p-4 ${errors.experience ? 'border-red-500' : 'border-gray-200'}`}
+              />
+              {errors.experience && (
+                <p className="text-red-500 text-sm mt-1">{errors.experience.message}</p>
+              )}
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="bio">О себе *</Label>
-            <Textarea
-              id="bio"
-              placeholder="Расскажите о себе, своих интересах и увлечениях..."
-              {...register('bio')}
-              className={`min-h-[100px] ${errors.bio ? 'border-red-500' : ''}`}
-            />
-            {errors.bio && (
-              <p className="text-sm text-red-500">{errors.bio.message}</p>
-            )}
-          </div>
+            <div className="space-y-4">
+              <Label htmlFor="expectations" className="text-lg font-medium">Почему хотите стать креатором? *</Label>
+              <Textarea
+                id="expectations"
+                placeholder="Расскажите о ваших ожиданиях от сотрудничества с TripGen..."
+                {...register('expectations')}
+                className={`min-h-[120px] text-lg rounded-xl border-2 p-4 ${errors.expectations ? 'border-red-500' : 'border-gray-200'}`}
+              />
+              {errors.expectations && (
+                <p className="text-red-500 text-sm mt-1">{errors.expectations.message}</p>
+              )}
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="experience">Опыт путешествий *</Label>
-            <Textarea
-              id="experience"
-              placeholder="Расскажите о ваших путешествиях, любимых местах и направлениях..."
-              {...register('experience')}
-              className={`min-h-[100px] ${errors.experience ? 'border-red-500' : ''}`}
-            />
-            {errors.experience && (
-              <p className="text-sm text-red-500">{errors.experience.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="expectations">Почему хотите стать креатором? *</Label>
-            <Textarea
-              id="expectations"
-              placeholder="Расскажите о ваших ожиданиях от сотрудничества с TripGen..."
-              {...register('expectations')}
-              className={`min-h-[100px] ${errors.expectations ? 'border-red-500' : ''}`}
-            />
-            {errors.expectations && (
-              <p className="text-sm text-red-500">{errors.expectations.message}</p>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-4 pt-4">
-            <Button variant="outline" onClick={onClose} type="button">
-              Отмена
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Отправка...' : 'Отправить заявку'}
-            </Button>
-          </div>
-        </form>
+            <div className="flex justify-end gap-4 pt-6">
+              <Button 
+                variant="outline" 
+                onClick={onClose} 
+                type="button"
+                className="h-12 px-6 text-lg rounded-xl border-2 border-gray-200 hover:bg-gray-50"
+              >
+                Отмена
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="h-12 px-8 text-lg bg-black text-white rounded-xl hover:bg-gray-900 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Отправка...' : 'Отправить заявку'}
+              </Button>
+            </div>
+          </form>
+        </div>
       </DialogContent>
     </Dialog>
   );
