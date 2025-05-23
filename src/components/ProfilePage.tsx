@@ -17,6 +17,8 @@ import {
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { MainNavbar } from './MainNavbar';
+import Footer from './Footer';
 
 interface UserProfile {
   displayName: string;
@@ -174,7 +176,9 @@ const ProfilePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
+    <>
+      <MainNavbar onAuthClick={() => {}} />
+      <div className="min-h-screen bg-gray-50/50 pt-16">
       <div className="max-w-4xl mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
@@ -464,6 +468,8 @@ const ProfilePage = () => {
         )}
       </div>
     </div>
+      <Footer />
+    </>
   );
 };
 

@@ -72,15 +72,15 @@ const TravelQuiz = () => {
             </p>
             
             <div className="flex justify-center lg:justify-start">
-              <motion.button
-                onClick={handleOpenModal}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-gray-900 transition-colors"
-              >
-                Пройти тест
-                <ArrowRight className="w-5 h-5" />
-              </motion.button>
+            <motion.button
+              onClick={handleOpenModal}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-gray-900 transition-colors"
+            >
+              Пройти тест
+              <ArrowRight className="w-5 h-5" />
+            </motion.button>
             </div>
 
             {/* Features */}

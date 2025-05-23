@@ -39,6 +39,7 @@ export function Sidebar({ className }: SidebarProps) {
     { id: 11, name: 'Северное сияние', lastMessage: 'Лапландия или Исландия?', timestamp: '2024-03-05' },
     { id: 12, name: 'Рим на выходные', lastMessage: 'Билеты в Ватиканские музеи', timestamp: '2024-03-04' }
   ]);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActivePath = (path: string) => {
     return location.pathname.startsWith(path);
@@ -50,16 +51,37 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <>
-      <div
-        className={`
-          fixed left-0 top-0 bottom-0 z-20
-          flex flex-col
-          bg-white border-r border-gray-200
-          transition-all duration-300
-          ${isSidebarCollapsed ? 'w-[72px]' : 'w-[280px]'}
-          ${className || ''}
-        `}
+      {/* Мобильная кнопка-гамбургер */}
+      <button
+        className="fixed top-4 left-4 z-40 bg-white rounded-full p-2 shadow-md lg:hidden"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Открыть меню"
       >
+        <svg className="w-7 h-7 text-black" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+
+      {/* Затемнение фона при открытом сайдбаре на мобильных */}
+      {mobileOpen && (
+        <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={() => setMobileOpen(false)} />
+      )}
+
+      <div
+        className={
+          `fixed left-0 top-0 bottom-0 z-40 flex flex-col bg-white border-r border-gray-200 transition-all duration-300
+          ${isSidebarCollapsed ? 'w-[72px]' : 'w-[280px]'}
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0
+          ${className || ''}`
+        }
+      >
+        {/* Кнопка закрытия на мобильных */}
+        <button
+          className="absolute top-4 right-4 z-50 bg-white rounded-full p-2 shadow-md lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-label="Закрыть меню"
+        >
+          <svg className="w-7 h-7 text-black" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
         {/* Logo */}
         <Link to="/" className="flex items-center gap-3 px-4 h-[72px] border-b border-gray-200">
           <img

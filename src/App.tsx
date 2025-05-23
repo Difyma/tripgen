@@ -18,23 +18,23 @@ export function App() {
   return (
     <AuthProvider>
       <SidebarProvider>
-        <Router>
+    <Router>
           <ScrollToTop />
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
             <Route path="/about" element={<AboutPage />} />
-            <Route path="/creator" element={<CreatorPage />} />
+        <Route path="/creator" element={<CreatorPage />} />
             <Route path="/profile" element={<ProfilePage />} />
-            <Route element={<AppLayout />}>
+        <Route element={<AppLayout />}>
                 <Route path="/chat" element={<Chat key={Date.now()} />} />
                 <Route path="/trips" element={<TripsRoute />} />
                 <Route path="/trips/:id" element={<TripDetailsRoute />} />
                 <Route path="/flights" element={<FlightsPage />} />
                 <Route path="/hotels" element={<HotelTestPage />} />
                 <Route path="/flight" element={<FlightTestPage />} />
-            </Route>
-          </Routes>
-        </Router>
+        </Route>
+      </Routes>
+    </Router>
       </SidebarProvider>
     </AuthProvider>
   );

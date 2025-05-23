@@ -587,16 +587,16 @@ const Chat = () => {
       .replace(/(?:🍽️|🍴)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🍽️</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
       .replace(/(?:🏛️|⛪)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🏛️</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
       .replace(/(?:📍)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">📍</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
-      
+
       // Format section headers
       .replace(/^#\s+([^\n]+)/gm, '<h2 class="text-2xl font-bold mt-8 mb-4">$1</h2>')
-      
+
       // Format bullet points
       .replace(/^[•●]\s+([^\n]+)/gm, '<div class="flex items-start gap-2 my-2"><span class="text-gray-400 mt-1">•</span><span class="flex-1">$1</span></div>')
-      
+
       // Format time indicators
       .replace(/(?:⏰|🌞|🌅)\s+([^\n]+)/g, '<div class="flex items-center gap-2 mt-4 mb-2"><span class="text-xl">$1</span></div>')
-      
+
       // Format bold text
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       
@@ -612,13 +612,13 @@ const Chat = () => {
       return (
         <div className="bg-black text-white rounded-[20px] rounded-br-[4px] px-4 py-3">
           <p className="text-[15px] font-medium leading-snug">{message.text}</p>
-      </div>
+        </div>
       );
     }
 
     return (
       <div className="bg-gray-50 rounded-2xl rounded-bl-[4px] p-4">
-        <div
+        <div 
           className="prose prose-sm max-w-none text-gray-900"
           dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
         />
@@ -1449,13 +1449,13 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
 
             {/* TripGen Generate Button (desktop) */}
             <div className="hidden sm:flex items-center gap-2">
-              <button
-                onClick={handleTripGenClick}
+            <button
+              onClick={handleTripGenClick}
                 className="flex-1 min-w-[120px] h-10 flex items-center justify-center gap-2 px-4 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
-              >
-                <img src={AILogo} alt="TripGen" className="w-6 h-6" />
-                TRIPGEN МАРШРУТ
-              </button>
+            >
+              <img src={AILogo} alt="TripGen" className="w-6 h-6" />
+              TRIPGEN МАРШРУТ
+            </button>
             </div>
           </div>
         </div>
@@ -1541,10 +1541,10 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
             <div className="flex justify-center">
               <div className="w-full max-w-xl mx-auto flex items-center gap-2">
                 <div className="relative flex-1">
-                  <input
-                    type="text"
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -1559,14 +1559,14 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                       <div className="w-5 h-5 border-2 border-black/10 border-t-black/40 rounded-full animate-spin"></div>
                     </div>
                   )}
-                </div>
-                <button 
+              </div>
+              <button 
                   onClick={() => handleSendMessage()}
                   disabled={isLoading || !inputText.trim()}
                   className="shrink-0 w-11 h-11 flex items-center justify-center bg-black text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 disabled:hover:bg-black transition-colors"
                 >
                   <Send className="w-5 h-5" />
-                </button>
+              </button>
               </div>
             </div>
           </div>
