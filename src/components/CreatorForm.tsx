@@ -99,22 +99,22 @@ export const CreatorForm = ({ isOpen, onClose }: CreatorFormProps) => {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose} modal>
-      <DialogContent className="fixed inset-0 z-[1000] p-0 bg-transparent border-none">
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm" 
-          onClick={onClose}
-          aria-hidden="true"
-        />
-        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[800px] mx-auto">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 m-4 max-h-[90vh] overflow-y-auto">
-            <DialogHeader className="mb-8">
-              <DialogTitle className="text-4xl font-cal text-center">Стать креатором TripGen</DialogTitle>
-              <DialogDescription className="text-lg text-gray-600 text-center mt-4">
+    <div className="relative z-[1000]">
+      <div 
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm" 
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div className="fixed inset-0 flex items-center justify-center p-4 pointer-events-none">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[800px] max-h-[90vh] overflow-y-auto pointer-events-auto">
+          <div className="p-8">
+            <div className="mb-8">
+              <h2 className="text-4xl font-cal text-center">Стать креатором TripGen</h2>
+              <p className="text-lg text-gray-600 text-center mt-4">
                 Заполните форму, чтобы присоединиться к сообществу креаторов TripGen. 
                 Мы рассмотрим вашу заявку и свяжемся с вами.
-              </DialogDescription>
-            </DialogHeader>
+              </p>
+            </div>
             
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
               <div className="space-y-4">
@@ -251,7 +251,7 @@ export const CreatorForm = ({ isOpen, onClose }: CreatorFormProps) => {
             </form>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }; 
