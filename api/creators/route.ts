@@ -4,6 +4,12 @@ import axios from 'axios';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
 interface TelegramResponse {
   ok: boolean;
   description?: string;
@@ -32,18 +38,31 @@ interface CreatorApplicationData {
   expectations: string;
 }
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const data = await request.json() as CreatorApplicationData;
 
     if (!data || !data.fullName) {
-      return NextResponse.json(
-        { 
+      return new NextResponse(
+        JSON.stringify({ 
           success: false, 
           message: 'Invalid request data',
           error: 'Required fields are missing'
-        },
-        { status: 400 }
+        }),
+        { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        }
       );
     }
 
@@ -74,19 +93,34 @@ export async function POST(request: Request) {
     
     await sendTelegramMessage(`💫 Почему хочет стать креатором:\n${data.expectations}`);
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Application submitted successfully' 
-    });
+    return new NextResponse(
+      JSON.stringify({ 
+        success: true, 
+        message: 'Application submitted successfully' 
+      }),
+      { 
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      }
+    );
   } catch (error: any) {
     console.error('[CreatorApplication] Error:', error);
-    return NextResponse.json(
-      { 
+    return new NextResponse(
+      JSON.stringify({ 
         success: false, 
         message: 'Failed to submit application',
         error: error.message
-      },
-      { status: 500 }
+      }),
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      }
     );
   }
 } 
