@@ -557,16 +557,16 @@ const Chat = () => {
       .replace(/^#\s+([^\n]+)/gm, '<h2 class="text-2xl font-bold mt-8 mb-4">$1</h2>')
       
       // Format bullet points
-      .replace(/^\*\s+([^\n]+)/gm, '<div class="flex items-start gap-2 my-2"><span class="text-gray-400 mt-1">•</span><span class="flex-1">$1</span></div>')
+      .replace(/^[•●]\s+([^\n]+)/gm, '<div class="flex items-start gap-2 my-2"><span class="text-gray-400 mt-1">•</span><span class="flex-1">$1</span></div>')
       
       // Format time indicators
-      .replace(/(?:🌞|🌅)\s+\*\*([^*]+)\*\*:/g, '<div class="flex items-center gap-2 mt-4 mb-2"><span class="text-xl">$1</span><span class="font-semibold text-gray-700">$2:</span></div>')
+      .replace(/(?:⏰|🌞|🌅)\s+([^\n]+)/g, '<div class="flex items-center gap-2 mt-4 mb-2"><span class="text-xl">$1</span></div>')
       
       // Format bold text
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       
-      // Format paragraphs
-      .replace(/([^\n]+)(?:\n|$)/g, '<p class="my-2">$1</p>');
+      // Format paragraphs (excluding already formatted elements)
+      .replace(/(?<!<[^>]*>)([^\n]+)(?![^<]*>)(?:\n|$)/g, '<p class="my-2">$1</p>');
 
     return formattedText;
   };
