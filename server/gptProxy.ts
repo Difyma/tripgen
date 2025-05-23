@@ -43,7 +43,10 @@ interface Message {
 }
 
 interface RequestBody {
-  messages: Message[];
+  messages: Array<{
+    role: string;
+    text: string;
+  }>;
 }
 
 interface YandexGPTResponse {
@@ -115,6 +118,24 @@ router.post('/yandex-gpt', checkEnvVariables, async (req: Request, res: Response
       return;
     }
 
+    // Валидация формата сообщений
+    const isValidMessage = (msg: any): boolean => {
+      return msg && 
+        typeof msg === 'object' && 
+        typeof msg.text === 'string' && 
+        typeof msg.role === 'string' && 
+        ['system', 'user', 'assistant'].includes(msg.role);
+    };
+
+    if (!requestBody.messages.every(isValidMessage)) {
+      console.error('Invalid message format in request');
+      res.status(400).json({
+        error: 'Неверный формат сообщений',
+        details: 'Каждое сообщение должно содержать text и role (system/user/assistant)'
+      });
+      return;
+    }
+
     const apiRequestBody = {
       modelUri: `gpt://${process.env.YANDEX_FOLDER_ID}/yandexgpt-lite`,
       completionOptions: {
@@ -130,11 +151,7 @@ router.post('/yandex-gpt', checkEnvVariables, async (req: Request, res: Response
 
     console.log('Sending request to Yandex GPT API');
     console.log('Request URL:', 'https://llm.api.cloud.yandex.net/foundationModels/v1/completion');
-    console.log('Request headers:', {
-      'Content-Type': 'application/json',
-      'x-folder-id': process.env.YANDEX_FOLDER_ID,
-      'Authorization': 'Api-Key ***'
-    });
+    console.log('Request body:', JSON.stringify(apiRequestBody, null, 2));
 
     const response = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
       method: 'POST',

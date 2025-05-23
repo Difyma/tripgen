@@ -373,14 +373,16 @@ const Chat = () => {
           text: SYSTEM_PROMPT
         },
         ...messages.map(msg => ({
-          role: msg.role,
+          role: msg.role || (msg.isUser ? 'user' : 'assistant'),
           text: msg.text
         })),
         {
           role: 'user',
-          text: messageText + flightData
+          text: messageText + (flightData || '')
         }
       ];
+
+      console.log('Sending messages to GPT:', JSON.stringify(messagesToSend, null, 2));
 
       const response = await fetch('/api/yandex-gpt', {
         method: 'POST',
@@ -390,12 +392,17 @@ const Chat = () => {
         body: JSON.stringify({ messages: messagesToSend }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || data.details?.message || 'Failed to get response from GPT');
+        const data = await response.json();
+        throw new Error(
+          data.error || 
+          data.details?.message || 
+          `Server error: ${response.status} ${response.statusText}`
+        );
       }
 
+      const data = await response.json();
+      
       if (!data.text) {
         throw new Error('Empty response from GPT');
       }
