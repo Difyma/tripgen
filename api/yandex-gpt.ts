@@ -188,8 +188,26 @@ export default async function handler(req: Request) {
       try {
         const parsedResponse = JSON.parse(responseText);
         console.log('Successfully parsed JSON response');
+        
+        if (!parsedResponse.result?.alternatives?.[0]?.message?.text) {
+          console.error('Invalid response structure:', parsedResponse);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Invalid response structure from Yandex GPT API',
+              details: 'The response does not contain the expected text field'
+            }),
+            {
+              status: 500,
+              headers: {
+                'Content-Type': 'application/json',
+                ...corsHeaders
+              }
+            }
+          );
+        }
+
         return new Response(
-          JSON.stringify({ text: parsedResponse.result?.alternatives?.[0]?.message?.text || '' }),
+          JSON.stringify({ text: parsedResponse.result.alternatives[0].message.text }),
           {
             status: 200,
             headers: {
@@ -231,7 +249,6 @@ export default async function handler(req: Request) {
         }
       );
     }
-
   } catch (error) {
     console.error('Server error:', error);
     return new Response(
