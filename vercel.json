@@ -19,8 +19,49 @@
       "dest": "server/index.ts"
     },
     {
+      "src": "^/assets/(.*)\\.css$",
+      "headers": {
+        "content-type": "text/css"
+      },
+      "dest": "/assets/$1.css"
+    },
+    {
+      "src": "^/assets/(.*)\\.js$",
+      "headers": {
+        "content-type": "application/javascript"
+      },
+      "dest": "/assets/$1.js"
+    },
+    {
+      "src": "^/assets/(.*)\\.(.*)$",
+      "dest": "/assets/$1.$2"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/"
+      "dest": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
+      ]
     }
   ]
 } 
