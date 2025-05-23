@@ -1,10 +1,9 @@
 {
   "version": 2,
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
   "builds": [
-    {
-      "src": "pages/api/**/*.ts",
-      "use": "@vercel/node"
-    },
     {
       "src": "package.json",
       "use": "@vercel/static-build",
@@ -16,7 +15,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/pages/api/:path*"
+      "destination": "/app/api/:path*"
     },
     {
       "source": "/(.*)",

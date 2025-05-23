@@ -1,5 +1,7 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { NextResponse } from 'next/server';
 import axios from 'axios';
+
+export const runtime = 'edge';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
@@ -38,32 +40,32 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    return res.status(204).end();
-  }
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
 
-  // Only allow POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+export async function POST(request: Request) {
   try {
-    const data = req.body as CreatorApplicationData;
+    const data = await request.json() as CreatorApplicationData;
 
     if (!data || !data.fullName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid request data',
-        error: 'Required fields are missing'
-      });
+      return new NextResponse(
+        JSON.stringify({
+          success: false,
+          message: 'Invalid request data',
+          error: 'Required fields are missing'
+        }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        }
+      );
     }
 
     if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
@@ -93,27 +95,34 @@ export default async function handler(
     
     await sendTelegramMessage(`💫 Почему хочет стать креатором:\n${data.expectations}`);
 
-    // Set CORS headers
-    Object.entries(corsHeaders).forEach(([key, value]) => {
-      res.setHeader(key, value);
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: 'Application submitted successfully'
-    });
+    return new NextResponse(
+      JSON.stringify({
+        success: true,
+        message: 'Application submitted successfully'
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      }
+    );
   } catch (error: any) {
     console.error('[CreatorApplication] Error:', error);
-
-    // Set CORS headers
-    Object.entries(corsHeaders).forEach(([key, value]) => {
-      res.setHeader(key, value);
-    });
-
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to submit application',
-      error: error.message
-    });
+    return new NextResponse(
+      JSON.stringify({
+        success: false,
+        message: 'Failed to submit application',
+        error: error.message
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      }
+    );
   }
 } 
