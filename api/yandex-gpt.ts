@@ -1,5 +1,6 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import fetch from 'node-fetch';
+export const config = {
+  runtime: 'edge'
+};
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
@@ -31,24 +32,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: Request) {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    return res.status(204).end();
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
   }
 
   // Only allow POST requests
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      {
+        status: 405,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      }
+    );
   }
-
-  // Set CORS headers for all responses
-  Object.entries(corsHeaders).forEach(([key, value]) => {
-    res.setHeader(key, value);
-  });
 
   try {
     console.log('=== Starting GPT request processing ===');
@@ -62,24 +67,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     if (!YANDEX_API_KEY || !YANDEX_FOLDER_ID) {
       console.error('Missing required environment variables');
-      return res.status(500).json({ 
-        error: 'Отсутствуют необходимые переменные окружения',
-        details: {
-          hasApiKey: !!YANDEX_API_KEY,
-          hasFolderId: !!YANDEX_FOLDER_ID
+      return new Response(
+        JSON.stringify({ 
+          error: 'Отсутствуют необходимые переменные окружения',
+          details: {
+            hasApiKey: !!YANDEX_API_KEY,
+            hasFolderId: !!YANDEX_FOLDER_ID
+          }
+        }),
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
         }
-      });
+      );
     }
 
-    const requestBody = req.body;
+    const requestBody = await req.json();
     console.log('Request body:', JSON.stringify(requestBody, null, 2));
 
     if (!requestBody || !requestBody.messages || !Array.isArray(requestBody.messages)) {
       console.error('Invalid request format:', requestBody);
-      return res.status(400).json({ 
-        error: 'Неверный формат запроса',
-        details: 'Ожидается массив сообщений в формате { messages: [...] }' 
-      });
+      return new Response(
+        JSON.stringify({ 
+          error: 'Неверный формат запроса',
+          details: 'Ожидается массив сообщений в формате { messages: [...] }' 
+        }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        }
+      );
     }
 
     // Валидация формата сообщений
@@ -93,10 +116,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!requestBody.messages.every(isValidMessage)) {
       console.error('Invalid message format in request');
-      return res.status(400).json({
-        error: 'Неверный формат сообщений',
-        details: 'Каждое сообщение должно содержать text и role (system/user/assistant)'
-      });
+      return new Response(
+        JSON.stringify({
+          error: 'Неверный формат сообщений',
+          details: 'Каждое сообщение должно содержать text и role (system/user/assistant)'
+        }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        }
+      );
     }
 
     const apiRequestBody = {
@@ -132,10 +164,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log('Raw response:', responseText);
     } catch (error) {
       console.error('Error reading response:', error);
-      return res.status(500).json({ 
-        error: 'Ошибка при чтении ответа от API',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      });
+      return new Response(
+        JSON.stringify({ 
+          error: 'Ошибка при чтении ответа от API',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }),
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        }
+      );
     }
 
     if (!response.ok) {
@@ -144,10 +185,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         statusText: response.statusText,
         response: responseText
       });
-      return res.status(response.status).json({ 
-        error: 'Ошибка при обращении к Yandex GPT API',
-        details: responseText
-      });
+      return new Response(
+        JSON.stringify({ 
+          error: 'Ошибка при обращении к Yandex GPT API',
+          details: responseText
+        }),
+        {
+          status: response.status,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        }
+      );
     }
 
     let data: YandexGPTResponse;
@@ -155,10 +205,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       data = JSON.parse(responseText);
     } catch (error) {
       console.error('Error parsing JSON response:', error);
-      return res.status(500).json({ 
-        error: 'Ошибка при разборе ответа от API',
-        details: 'Invalid JSON response'
-      });
+      return new Response(
+        JSON.stringify({ 
+          error: 'Ошибка при разборе ответа от API',
+          details: 'Invalid JSON response'
+        }),
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        }
+      );
     }
 
     console.log('Yandex GPT response received:', {
@@ -175,20 +234,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         data,
         error: 'No text in response'
       });
-      return res.status(500).json({ 
-        error: 'Пустой ответ от сервера',
-        details: 'Ответ получен, но текст отсутствует'
-      });
+      return new Response(
+        JSON.stringify({ 
+          error: 'Пустой ответ от сервера',
+          details: 'Ответ получен, но текст отсутствует'
+        }),
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        }
+      );
     }
 
     console.log('Successfully processed GPT request');
-    return res.status(200).json({ text });
+    return new Response(
+      JSON.stringify({ text }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      }
+    );
 
   } catch (error) {
     console.error('Server error:', error);
-    return res.status(500).json({ 
-      error: 'Внутренняя ошибка сервера',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    return new Response(
+      JSON.stringify({ 
+        error: 'Внутренняя ошибка сервера',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      }
+    );
   }
 } 

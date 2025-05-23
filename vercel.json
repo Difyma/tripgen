@@ -10,24 +10,22 @@
       "config": {
         "distDir": "dist"
       }
-    },
-    {
-      "src": "api/**/*.ts",
-      "use": "@vercel/node"
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/yandex-gpt",
-      "destination": "/api/yandex-gpt"
+      "src": "/api/yandex-gpt",
+      "methods": ["OPTIONS", "POST"],
+      "dest": "/api/yandex-gpt.ts"
     },
     {
-      "source": "/api/creators",
-      "destination": "/api/creators"
+      "src": "/api/creators",
+      "methods": ["OPTIONS", "POST"],
+      "dest": "/api/creators.ts"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ],
   "headers": [
