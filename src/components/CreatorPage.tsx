@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
+import { useState } from 'react';
 import { Globe, DollarSign, Users, Star, ChevronRight, ArrowRight, Coins, Gift, Share2, Trophy } from 'lucide-react';
 import CreatorNavbar from './CreatorNavbar';
+import { CreatorForm } from './CreatorForm';
 
 const benefits = [
   {
@@ -79,6 +81,8 @@ const inspirationSteps = [
 ];
 
 const CreatorPage = () => {
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
   return (
     <>
       <CreatorNavbar />
@@ -106,6 +110,7 @@ const CreatorPage = () => {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className="group bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-900 transition-all inline-flex items-center gap-2"
+                  onClick={() => setIsFormOpen(true)}
                 >
                   Стать создателем
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -449,6 +454,8 @@ const CreatorPage = () => {
             </div>
           </div>
         </section>
+
+        <CreatorForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} />
       </div>
     </>
   );
