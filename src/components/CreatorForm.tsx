@@ -247,7 +247,7 @@ export const CreatorForm = ({ isOpen, onClose }: CreatorFormProps) => {
                 )}
               </div>
 
-              <div className="flex justify-end gap-4 pt-6">
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end pt-6">
                 <Button 
                   variant="outline" 
                   onClick={onClose} 
