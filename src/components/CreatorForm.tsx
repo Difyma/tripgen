@@ -14,6 +14,7 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
+import { X } from 'lucide-react';
 
 const creatorFormSchema = z.object({
   fullName: z.string().min(2, 'Имя должно содержать минимум 2 символа'),
@@ -45,6 +46,12 @@ export const CreatorForm = ({ isOpen, onClose }: CreatorFormProps) => {
   } = useForm<CreatorFormData>({
     resolver: zodResolver(creatorFormSchema)
   });
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
 
   const onSubmit = async (data: CreatorFormData) => {
     try {
@@ -98,15 +105,24 @@ export const CreatorForm = ({ isOpen, onClose }: CreatorFormProps) => {
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="relative z-[1000]">
       <div 
         className="fixed inset-0 bg-black/50 backdrop-blur-sm" 
-        onClick={onClose}
+        onClick={handleBackdropClick}
         aria-hidden="true"
       />
-      <div className="fixed inset-0 flex items-center justify-center p-4 pointer-events-none">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[800px] max-h-[90vh] overflow-y-auto pointer-events-auto">
+      <div className="fixed inset-0 flex items-center justify-center p-4" onClick={handleBackdropClick}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[800px] max-h-[90vh] overflow-y-auto relative">
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 p-2 rounded-full hover:bg-gray-100 transition-colors"
+            aria-label="Закрыть форму"
+          >
+            <X className="w-6 h-6 text-gray-500" />
+          </button>
           <div className="p-8">
             <div className="mb-8">
               <h2 className="text-4xl font-cal text-center">Стать креатором TripGen</h2>
