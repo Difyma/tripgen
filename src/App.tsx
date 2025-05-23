@@ -9,16 +9,20 @@ import FlightsPage from './components/FlightTestPage';
 import HotelTestPage from './components/HotelTestPage';
 import FlightTestPage from './components/FlightTestPage';
 import ProfilePage from './components/ProfilePage';
+import AboutPage from './components/AboutPage';
 import { AuthProvider } from './contexts/AuthContext';
 import { SidebarProvider } from './contexts/SidebarContext';
+import ScrollToTop from './components/ScrollToTop';
 
 export function App() {
   return (
     <AuthProvider>
       <SidebarProvider>
         <Router>
+          <ScrollToTop />
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/about" element={<AboutPage />} />
             <Route path="/creator" element={<CreatorPage />} />
             <Route element={<AppLayout />}>
                 <Route path="/chat" element={<Chat key={Date.now()} />} />
