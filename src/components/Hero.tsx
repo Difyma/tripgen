@@ -75,7 +75,7 @@ const Hero = () => {
   };
 
   return (
-    <div className="min-h-[85vh] sm:min-h-screen bg-[#FBFBFD]">
+    <div className="min-h-[85vh] sm:min-h-screen bg-[#FBFBFD] w-full">
       {/* Navigation */}
       <MainNavbar onAuthClick={() => setShowAuthModal(true)} />
 
@@ -83,20 +83,20 @@ const Hero = () => {
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
 
       {/* Hero Content */}
-      <div className="min-h-[85vh] sm:min-h-screen pt-20 pb-0 sm:pb-8">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 h-full flex flex-col items-center justify-center py-8 sm:py-12">
+      <div className="min-h-[85vh] sm:min-h-screen pt-20 pb-0 sm:pb-8 w-full">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex flex-col items-center justify-center py-8 sm:py-12">
           {/* Main Heading */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="text-center mb-8 sm:mb-12 relative z-20"
+            className="text-center mb-8 sm:mb-12 relative z-20 w-full"
           >
-            <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl leading-tight font-semibold tracking-[-0.025em] bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 mb-4 sm:mb-4">
-            Ваше Путешествие Начинается Здесь
+            <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl leading-tight font-semibold tracking-[-0.025em] bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 mb-4 sm:mb-4 px-4">
+              Ваше Путешествие Начинается Здесь
             </h1>
-            <p className="text-base xs:text-lg sm:text-xl text-gray-600 max-w-[95vw] sm:max-w-[600px] mx-auto font-light mb-2 sm:mb-0">
-            Посетите самые замечательные места мира с помощью наших тщательно отобранных туристических предложений.
+            <p className="text-base xs:text-lg sm:text-xl text-gray-600 max-w-[600px] mx-auto font-light mb-2 sm:mb-0 px-4">
+              Посетите самые замечательные места мира с помощью наших тщательно отобранных туристических предложений.
             </p>
           </motion.div>
 

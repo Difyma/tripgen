@@ -11,8 +11,8 @@ import TravelQuiz from './TravelQuiz';
 
 export function LandingPage() {
   return (
-    <div className="min-h-screen">
-      <main>
+    <div className="min-h-screen overflow-x-hidden">
+      <main className="w-full">
         <Hero />
         <HowItWorks />
         <ExampleTour />
