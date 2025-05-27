@@ -590,13 +590,8 @@ const Chat = () => {
     return map[lower] || (word[0] ? word[0].toUpperCase() + word.slice(1) : word);
   };
 
-  const handleSendMessage = useCallback(async (textToSend?: string) => {
-    const messageText = textToSend || inputText;
-    if (!messageText.trim()) return;
-    
-    setHasInteracted(true);
-
-    // 1. Автоматически подставлять направление "Куда едем" из текста запроса
+  // Автоматическое заполнение направления по тексту
+  const autoFillLocation = (messageText: string) => {
     const flightInfo = extractFlightInfo(messageText);
     let newLocation = '';
     if (flightInfo.destination) {
@@ -606,34 +601,43 @@ const Chat = () => {
     }
     // Дополнительная эвристика, если не найдено направление
     if (!newLocation) {
-      // Паттерн "по|в|на [Город]" (независимо от регистра)
-      const cityMatch = messageText.match(/\b(по|в|на)\s+([A-Za-zА-Яа-яЁё\-]+)/iu);
+      // Паттерн "по|в|на|о|об [Город]" (независимо от регистра)
+      const cityMatch = messageText.match(/\b(по|в|на|о|об)\s+([A-Za-zА-Яа-яЁё\-]+)/iu);
       if (cityMatch && cityMatch[2]) {
-        // Привести к формату: первая буква заглавная, остальное строчные
         newLocation = cityMatch[2][0].toUpperCase() + cityMatch[2].slice(1).toLowerCase();
       } else {
-        // Найти первое слово с заглавной буквы, не являющееся местоимением
+        // Найти все слова с заглавной буквы, не являющиеся местоимениями
         const words = messageText.split(/\s+/);
         const skipWords = ['Я', 'Мы', 'Ты', 'Вы', 'Он', 'Она', 'Они', 'Это', 'В', 'На', 'Из', 'По', 'С', 'У', 'К', 'О', 'Об', 'Для', 'Про', 'И', 'А', 'Но', 'Да', 'Нет', 'Или', 'Если', 'Что', 'Как', 'Где', 'Когда', 'Почему', 'Зачем', 'Куда', 'Откуда'];
-        let firstCapital = words.find(w => w[0] && w[0] === w[0].toUpperCase() && !skipWords.includes(w));
-        if (!firstCapital) {
+        const capitals = words.filter(w => w[0] && w[0] === w[0].toUpperCase() && !skipWords.includes(w));
+        if (capitals.length > 0) {
+          newLocation = capitals[capitals.length - 1].replace(/[^A-Za-zА-Яа-яЁё\-]/g, '');
+        } else {
           // Если не найдено слово с заглавной, взять последнее слово
           const lastWord = words[words.length - 1].replace(/[^A-Za-zА-Яа-яЁё\-]/g, '');
           if (lastWord.length > 2) {
-            firstCapital = lastWord[0].toUpperCase() + lastWord.slice(1).toLowerCase();
+            newLocation = lastWord[0].toUpperCase() + lastWord.slice(1).toLowerCase();
           }
-        }
-        if (firstCapital) {
-          newLocation = firstCapital.replace(/[^A-Za-zА-Яа-яЁё\-]/g, '');
         }
       }
     }
+    console.log('autoFillLocation:', { messageText, newLocation });
     if (newLocation) {
       setFilters(prev => ({ ...prev, location: normalizeLocation(newLocation) }));
     }
+  };
+
+  const handleSendMessage = useCallback(async (textToSend?: string) => {
+    const messageText = textToSend || inputText;
+    if (!messageText.trim()) return;
+    
+    setHasInteracted(true);
+
+    // 1. Автоматически подставлять направление "Куда едем" из текста запроса
+    autoFillLocation(messageText);
 
     // 2. В фильтре выбрать даты подставлять текущую дату, если пользователь не указал дату в запросе
-    if (!flightInfo.date && dateFilter.type === 'specific') {
+    if (!extractFlightInfo(messageText).date && dateFilter.type === 'specific') {
       const today = new Date();
       setDateFilter({ type: 'specific', startDate: today, endDate: undefined });
     }
