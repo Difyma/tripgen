@@ -1,7 +1,7 @@
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import { trips } from '../data/trips';
-import { MessageSquare, Send } from 'lucide-react';
+import { MessageSquare, Send, Users, Menu } from 'lucide-react';
 import { useSidebar } from '../contexts/SidebarContext';
 
 interface Message {
@@ -35,6 +35,7 @@ export default function TripChatPage() {
   ]);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -69,22 +70,68 @@ export default function TripChatPage() {
       {/* Мобильная версия */}
       <div className="md:hidden flex flex-col min-h-screen bg-white">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b bg-white shadow-sm">
+        <div className="flex items-center px-2 py-3 border-b bg-white shadow-sm">
+          {/* Кнопка меню (гамбургер) */}
           <button
-            onClick={() => navigate(backTo)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 mr-2"
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-white border border-gray-200 text-black hover:bg-gray-100 transition-colors lg:hidden"
+            aria-label="Открыть меню"
+            onClick={() => {
+              // Открытие мобильного сайдбара, если реализовано
+              const evt = new CustomEvent('openMobileSidebar');
+              window.dispatchEvent(evt);
+            }}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-            <span className="hidden sm:inline">Назад</span>
+            <Menu className="w-6 h-6" />
           </button>
-          <MessageSquare className="w-6 h-6 text-primary" />
-          <div className="font-semibold text-lg truncate">Чат путешествия: {trip.title}</div>
-          <div className="ml-auto flex -space-x-2">
-            {trip.participants?.map(u => (
-              <img key={u.id} src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full border-2 border-white" title={u.name} />
-            ))}
+          {/* Группа: назад + название */}
+          <div className="flex items-center gap-2 flex-1 justify-center">
+            <button
+              onClick={() => navigate(backTo)}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+              <span className="sr-only">Назад</span>
+            </button>
+            <div className="font-semibold text-base truncate">{trip.title}</div>
           </div>
+          {/* Кнопка участников */}
+          <button
+            onClick={() => setShowParticipantsModal(true)}
+            className="ml-2 p-2 rounded-full hover:bg-gray-100"
+            aria-label="Участники чата"
+          >
+            <Users className="w-6 h-6 text-primary" />
+          </button>
         </div>
+        {/* Модальное окно участников */}
+        {showParticipantsModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl w-full max-w-xs mx-auto p-4 relative">
+              <button
+                onClick={() => setShowParticipantsModal(false)}
+                className="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100"
+                aria-label="Закрыть"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+              <h3 className="text-lg font-semibold mb-4 text-center">Участники чата</h3>
+              <div className="space-y-3">
+                {trip.participants?.map(u => (
+                  <div key={u.id} className="flex items-center gap-3">
+                    <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full border" />
+                    <span className="font-medium text-gray-800">{u.name}</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowParticipantsModal(false)}
+                className="mt-6 w-full py-2 rounded-xl bg-primary text-white font-semibold hover:bg-primary/90 transition-colors"
+              >
+                Назад
+              </button>
+            </div>
+          </div>
+        )}
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-gray-50">
           {messages.map(msg => {
