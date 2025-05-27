@@ -4,6 +4,7 @@ import { Globe, DollarSign, Users, Star, ChevronRight, ArrowRight, Coins, Gift, 
 import { MainNavbar } from './MainNavbar';
 import Footer from './Footer';
 import { CreatorForm } from './CreatorForm';
+import { AuthModal } from './AuthModal';
 
 const benefits = [
   {
@@ -83,15 +84,16 @@ const inspirationSteps = [
 
 const CreatorPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const handleAuthClick = () => {
-    // Здесь можно добавить логику для авторизации
-    console.log('Auth clicked');
+    setIsAuthModalOpen(true);
   };
 
   return (
     <>
       <MainNavbar onAuthClick={handleAuthClick} />
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       <div className="min-h-screen bg-[#FAFAFA] pt-16">
         {/* Hero Section */}
         <section className="relative overflow-hidden bg-white py-32">
