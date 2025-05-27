@@ -19,7 +19,7 @@ interface Chat {
 
 export function Sidebar({ className }: SidebarProps) {
   const { user } = useAuth();
-  const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebar();
+  const { isSidebarCollapsed, setIsSidebarCollapsed, mobileOpen, setMobileOpen } = useSidebar();
   const navigate = useNavigate();
   const [showChatList, setShowChatList] = useState(false);
   const [isCreateTripModalOpen, setIsCreateTripModalOpen] = useState(false);
@@ -39,7 +39,6 @@ export function Sidebar({ className }: SidebarProps) {
     { id: 11, name: 'Северное сияние', lastMessage: 'Лапландия или Исландия?', timestamp: '2024-03-05' },
     { id: 12, name: 'Рим на выходные', lastMessage: 'Билеты в Ватиканские музеи', timestamp: '2024-03-04' }
   ]);
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActivePath = (path: string) => {
     return location.pathname.startsWith(path);
@@ -67,10 +66,11 @@ export function Sidebar({ className }: SidebarProps) {
 
       <div
         className={
-          `fixed left-0 top-0 bottom-0 z-40 flex flex-col bg-white border-r border-gray-200 transition-all duration-300
-          ${isSidebarCollapsed ? 'w-[72px]' : 'w-[280px]'}
+          `fixed inset-0 z-50 flex flex-col bg-white border-r border-gray-200 transition-all duration-300
+          ${isSidebarCollapsed ? 'w-[72px] max-w-[72px]' : 'w-[280px] max-w-[100vw]'}
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0
+          lg:inset-y-0 lg:left-0 lg:right-auto lg:w-[${isSidebarCollapsed ? '72px' : '280px'}] lg:max-w-none lg:z-40
           ${className || ''}`
         }
       >
@@ -326,7 +326,7 @@ export function Sidebar({ className }: SidebarProps) {
             <button
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               className={`
-                flex items-center gap-3 px-3 h-10 rounded-xl w-full
+                hidden lg:flex items-center gap-3 px-3 h-10 rounded-xl w-full
                 text-gray-600 hover:bg-gray-50 hover:text-gray-900
                 transition-colors duration-200
                 ${isSidebarCollapsed ? 'justify-center' : ''}
