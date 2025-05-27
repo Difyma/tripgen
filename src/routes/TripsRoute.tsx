@@ -4,6 +4,7 @@ import { TripCard } from '../components/TripCard';
 import { trips } from '../data/trips';
 import type { Trip } from '../data/trips';
 import { useSidebar } from '../contexts/SidebarContext';
+import MyTripsMobile from '../components/MyTripsMobile';
 
 export function TripsRoute() {
   const { isSidebarCollapsed } = useSidebar();
@@ -19,31 +20,36 @@ export function TripsRoute() {
   }, []);
 
   return (
-    <div className="flex-1 transition-all duration-300" style={{ marginLeft: isSidebarCollapsed ? '72px' : '280px' }}>
-      <div className="border-b bg-white px-8 py-4">
-        <h1 className="text-2xl font-semibold">Мои путешествия</h1>
+    <>
+      <div className="md:hidden">
+        <MyTripsMobile />
       </div>
-      
-      <div className="px-8 py-6 space-y-8">
-        <section>
-          <h2 className="text-xl font-medium mb-4">Текущее путешествие</h2>
-          <CurrentTrip trip={currentTrip} />
-        </section>
+      <div className="hidden md:block flex-1 transition-all duration-300" style={{ marginLeft: isSidebarCollapsed ? '72px' : '280px' }}>
+        <div className="border-b bg-white px-8 py-4">
+          <h1 className="text-2xl font-semibold">Мои путешествия</h1>
+        </div>
+        
+        <div className="px-8 py-6 space-y-8">
+          <section>
+            <h2 className="text-xl font-medium mb-4">Текущее путешествие</h2>
+            <CurrentTrip trip={currentTrip} />
+          </section>
 
-        <section>
-          <h2 className="text-xl font-medium mb-4">Предстоящие путешествия</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {upcomingTrips.map(trip => (
-              <TripCard key={trip.id} trip={trip} />
-            ))}
-            {upcomingTrips.length === 0 && (
-              <div className="col-span-full text-center text-gray-500 py-8">
-                У вас нет предстоящих путешествий
-              </div>
-            )}
-          </div>
-        </section>
+          <section>
+            <h2 className="text-xl font-medium mb-4">Предстоящие путешествия</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {upcomingTrips.map(trip => (
+                <TripCard key={trip.id} trip={trip} />
+              ))}
+              {upcomingTrips.length === 0 && (
+                <div className="col-span-full text-center text-gray-500 py-8">
+                  У вас нет предстоящих путешествий
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
       </div>
-    </div>
+    </>
   );
 } 
