@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { TripDetailsPage } from '../components/TripDetailsPage';
+import TripDetailsMobile from '../components/TripDetailsMobile';
 import { trips, Trip } from '../data/trips';
 import { ArrowLeft } from 'lucide-react';
 import { useSidebar } from '../contexts/SidebarContext';
@@ -26,11 +27,19 @@ export function TripDetailsRoute() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto transition-all duration-300" style={{ marginLeft: isSidebarCollapsed ? '72px' : '280px' }}>
-      <TripDetailsPage 
-        trip={currentTrip} 
-        onBack={() => navigate('/trips')} 
-      />
-    </div>
+    <>
+      <div className="md:hidden">
+        <TripDetailsMobile
+          trip={currentTrip}
+          onBack={() => navigate('/trips')}
+        />
+      </div>
+      <div className="hidden md:block flex-1 overflow-y-auto transition-all duration-300" style={{ marginLeft: isSidebarCollapsed ? '72px' : '280px' }}>
+        <TripDetailsPage
+          trip={currentTrip}
+          onBack={() => navigate('/trips')}
+        />
+      </div>
+    </>
   );
 } 
