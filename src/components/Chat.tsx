@@ -528,7 +528,7 @@ const Chat = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: 1,
+      id: Date.now() + Math.random(),
       text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
       isUser: false,
       role: 'assistant'
@@ -556,6 +556,9 @@ const Chat = () => {
   const { user } = useAuth();
   const [hasInteracted, setHasInteracted] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const isFirstMount = useRef(true);
+  const hasSentInitial = useRef(false);
+  const lastSentText = useRef<string | null>(null);
 
   // Функция для нормализации направления в именительный падеж
   const normalizeLocation = (word: string) => {
@@ -589,6 +592,39 @@ const Chat = () => {
     const lower = word.toLowerCase();
     return map[lower] || (word[0] ? word[0].toUpperCase() + word.slice(1) : word);
   };
+
+  // Функция для парсинга русской даты в объект Date
+  function parseRussianDateToDate(dateStr: string) {
+    if (!dateStr) return undefined;
+    // Если дата уже в формате YYYY-MM-DD
+    if (dateStr.match(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)) {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    // Если дата в формате DD.MM.YYYY
+    if (dateStr.match(/^[0-9]{1,2}\.[0-9]{1,2}(?:\.[0-9]{4})?$/)) {
+      const [day, month, year = new Date().getFullYear()] = dateStr.split('.').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    const months: Record<string, number> = {
+      'января': 0, 'февраля': 1, 'марта': 2, 'апреля': 3,
+      'мая': 4, 'июня': 5, 'июля': 6, 'августа': 7,
+      'сентября': 8, 'октября': 9, 'ноября': 10, 'декабря': 11,
+      'янв': 0, 'фев': 1, 'мар': 2, 'апр': 3,
+      'май': 4, 'июн': 5, 'июл': 6, 'авг': 7,
+      'сен': 8, 'окт': 9, 'ноя': 10, 'дек': 11
+    };
+    const match = dateStr.toLowerCase().match(/(\d{1,2})\s+([а-я]+)(?:\s+(\d{4}))?/);
+    if (match) {
+      const day = Number(match[1]);
+      const month = months[String(match[2])];
+      const year = match[3] ? Number(match[3]) : new Date().getFullYear();
+      if (month !== undefined) {
+        return new Date(year, month, day);
+      }
+    }
+    return undefined;
+  }
 
   // Автоматическое заполнение направления по тексту
   const autoFillLocation = (messageText: string) => {
@@ -630,7 +666,23 @@ const Chat = () => {
   const handleSendMessage = useCallback(async (textToSend?: string) => {
     const messageText = textToSend || inputText;
     if (!messageText.trim()) return;
-    
+
+    // Не отправлять, если последнее сообщение пользователя такое же
+    const lastUserMessage = messages.filter(m => m.isUser).slice(-1)[0];
+    if (lastUserMessage && lastUserMessage.text === messageText) {
+      return;
+    }
+    // Не отправлять, если последнее сообщение ассистента — приветствие и последнее пользовательское совпадает с messageText
+    if (
+      messages.length >= 2 &&
+      messages[messages.length - 2].role === 'assistant' &&
+      messages[messages.length - 2].text.startsWith('Привет!') &&
+      lastUserMessage &&
+      lastUserMessage.text === messageText
+    ) {
+      return;
+    }
+
     setHasInteracted(true);
 
     // 1. Автоматически подставлять направление "Куда едем" из текста запроса
@@ -642,8 +694,18 @@ const Chat = () => {
       setDateFilter({ type: 'specific', startDate: today, endDate: undefined });
     }
 
+    // 2.1. Если в сообщении есть даты, подставить их в фильтр
+    const flightInfo = extractFlightInfo(messageText);
+    if (flightInfo.date && flightInfo.returnDate) {
+      const startDate = parseRussianDateToDate(flightInfo.date);
+      const endDate = parseRussianDateToDate(flightInfo.returnDate);
+      if (startDate && endDate) {
+        setDateFilter({ type: 'specific', startDate, endDate });
+      }
+    }
+
     const newMessage: Message = {
-      id: messages.length + 1,
+      id: Date.now() + Math.random(),
       text: messageText,
       isUser: true,
       role: 'user'
@@ -763,7 +825,7 @@ const Chat = () => {
       
       // Добавляем ответ от GPT
       const assistantMessage: Message = {
-        id: messages.length + 2,
+        id: Date.now() + Math.random(),
         text: data.text,
         isUser: false,
         role: 'assistant'
@@ -773,7 +835,7 @@ const Chat = () => {
     } catch (error) {
       console.error('Error in chat:', error);
       const errorMessage: Message = {
-        id: messages.length + 2,
+        id: Date.now() + Math.random(),
         text: error instanceof Error 
           ? `Извините, произошла ошибка: ${error.message}. Пожалуйста, попробуйте еще раз.`
           : 'Извините, произошла неизвестная ошибка. Пожалуйста, попробуйте еще раз.',
@@ -788,48 +850,58 @@ const Chat = () => {
 
   // Reset chat state when URL changes
   useEffect(() => {
-    // Сбрасываем состояние чата
-    setMessages([{
-      id: 1,
-      text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
-      isUser: false,
-      role: 'assistant'
-    }]);
-    setInputText('');
-    setShowTripBuilder(false);
-    setFilters({
-      location: '',
-      travelers: 2,
-      children: 0,
-      pets: 0,
-      budget: {
-        min: 0,
-        max: 10000
-      }
-    });
-    setDateFilter({ type: 'specific' });
-    setHasInteracted(false); // Сбрасываем флаг взаимодействия для показа популярных вопросов
-    
-    // Если есть начальный запрос в URL, отправляем его
-    if (initialQuery) {
-      setTimeout(() => {
-        setInputText(decodeURIComponent(initialQuery));
-        handleSendMessage(decodeURIComponent(initialQuery));
-      }, 100);
+    if (isFirstMount.current) {
+      setMessages([{
+        id: Date.now() + Math.random(),
+        text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
+        isUser: false,
+        role: 'assistant'
+      }]);
+      setInputText('');
+      setShowTripBuilder(false);
+      setFilters({
+        location: '',
+        travelers: 2,
+        children: 0,
+        pets: 0,
+        budget: {
+          min: 0,
+          max: 10000
+        }
+      });
+      setDateFilter({ type: 'specific' });
+      setHasInteracted(false);
+      isFirstMount.current = false;
     }
-  }, [location.search]); // Зависимость от location.search для отслеживания изменений URL
+  }, []);
 
-  // Автоматическая отправка сообщения при наличии параметра q
   useEffect(() => {
-    const sendInitialMessage = async () => {
-      if (initialQuery && messages.length === 1) { // Проверяем, что есть только приветственное сообщение
-        setInputText(decodeURIComponent(initialQuery));
-        await handleSendMessage();
+    if (
+      initialQuery &&
+      messages.length === 1 &&
+      lastSentText.current !== decodeURIComponent(initialQuery)
+    ) {
+      const textToSend = decodeURIComponent(initialQuery);
+      
+      // Parse dates from the query string
+      const dateMatch = textToSend.match(/с (\d{2}\.\d{2}\.\d{4}) по (\d{2}\.\d{2}\.\d{4})/);
+      if (dateMatch) {
+        const [_, startDateStr, endDateStr] = dateMatch;
+        const startDate = parseRussianDateToDate(startDateStr);
+        const endDate = parseRussianDateToDate(endDateStr);
+        if (startDate && endDate) {
+          setDateFilter({
+            type: 'specific',
+            startDate,
+            endDate
+          });
+        }
       }
-    };
-    
-    sendInitialMessage();
-  }, [initialQuery, messages.length, handleSendMessage]);
+
+      handleSendMessage(textToSend);
+      lastSentText.current = textToSend;
+    }
+  }, [initialQuery, messages, handleSendMessage]);
 
   // Загрузка истории чатов при входе пользователя
   useEffect(() => {
@@ -963,9 +1035,9 @@ const Chat = () => {
     
     // Поиск города назначения
     const destinationPatterns = [
-      /(?:в|во|до)\s+([A-Za-zА-Яа-я\s-]+)(?:\s+на|$)/i,
-      /прилет\s+в\s+([A-Za-zА-Яа-я\s-]+)/i,
-      /найди.*?(?:в|до)\s+([A-Za-zА-Яа-я\s-]+)/i
+      /(?:в|во|до)\s+([A-Za-zА-Яа-яё-]+)(?=\s|$)/i,
+      /прилет\s+в\s+([A-Za-zА-Яа-яё-]+)/i,
+      /найди.*?(?:в|до)\s+([A-Za-zА-Яа-яё-]+)(?=\s|$)/i
     ];
 
     // Поиск даты
@@ -995,7 +1067,12 @@ const Chat = () => {
 
     // Извлечение данных
     const origin = originPatterns.map(pattern => message.match(pattern)?.[1]?.trim()).find(Boolean);
-    const destination = destinationPatterns.map(pattern => message.match(pattern)?.[1]?.trim()).find(Boolean);
+    const destination = destinationPatterns
+      .map(pattern => {
+        const match = message.match(pattern);
+        return match ? match[1].trim() : null;
+      })
+      .find(Boolean);
     const dateMatch = datePatterns.map(pattern => message.match(pattern)?.[1]).find(Boolean);
     const returnDateMatch = returnDatePatterns.map(pattern => message.match(pattern)?.[1]).find(Boolean);
     
@@ -1029,23 +1106,23 @@ const Chat = () => {
     if (!dateStr) return '';
 
     // Если дата уже в формате YYYY-MM-DD
-    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    if (dateStr.match(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)) {
       return dateStr;
     }
 
     // Если дата в формате DD.MM.YYYY
-    if (dateStr.match(/^\d{1,2}\.\d{1,2}(?:\.\d{4})?$/)) {
+    if (dateStr.match(/^[0-9]{1,2}\.[0-9]{1,2}(?:\.[0-9]{4})?$/)) {
       const [day, month, year = new Date().getFullYear()] = dateStr.split('.');
       return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     }
 
-    const months: { [key: string]: string } = {
-      'января': '01', 'февраля': '02', 'марта': '03', 'апреля': '04',
-      'мая': '05', 'июня': '06', 'июля': '07', 'августа': '08',
-      'сентября': '09', 'октября': '10', 'ноября': '11', 'декабря': '12',
-      'янв': '01', 'фев': '02', 'мар': '03', 'апр': '04',
-      'май': '05', 'июн': '06', 'июл': '07', 'авг': '08',
-      'сен': '09', 'окт': '10', 'ноя': '11', 'дек': '12'
+    const months: Record<string, number> = {
+      'января': 0, 'февраля': 1, 'марта': 2, 'апреля': 3,
+      'мая': 4, 'июня': 5, 'июля': 6, 'августа': 7,
+      'сентября': 8, 'октября': 9, 'ноября': 10, 'декабря': 11,
+      'янв': 0, 'фев': 1, 'мар': 2, 'апр': 3,
+      'май': 4, 'июн': 5, 'июл': 6, 'авг': 7,
+      'сен': 8, 'окт': 9, 'ноя': 10, 'дек': 11
     };
 
     // Парсинг даты в формате "DD месяц YYYY" или "DD месяц"
@@ -1053,7 +1130,7 @@ const Chat = () => {
     if (match) {
       const [_, day, monthStr, year = new Date().getFullYear()] = match;
       const month = months[monthStr];
-      if (!month) {
+      if (month === undefined) {
         console.error('Неверный формат месяца:', monthStr);
         return '';
       }
@@ -1233,6 +1310,35 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
     alert('Маршрут сохранён!');
   };
 
+  // Сброс чата при нажатии 'Новый чат' в сайдбаре
+  useEffect(() => {
+    const newParam = searchParams.get('new');
+    if (newParam) {
+      setMessages([
+        {
+          id: Date.now() + Math.random(),
+          text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
+          isUser: false,
+          role: 'assistant'
+        }
+      ]);
+      setInputText('');
+      setShowTripBuilder(false);
+      setFilters({
+        location: '',
+        travelers: 2,
+        children: 0,
+        pets: 0,
+        budget: {
+          min: 0,
+          max: 10000
+        }
+      });
+      setDateFilter({ type: 'specific' });
+      setHasInteracted(false);
+    }
+  }, [searchParams.get('new')]);
+
   return (
     <div className={`h-full flex flex-col bg-white transition-all duration-300 w-full ${isSidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[280px]'}`}>
       <div className="w-full flex-1 flex flex-col min-h-0">
@@ -1362,8 +1468,8 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                       `}
                     >
                       {renderMessage(message)}
-                      {/* Кнопка 'Сохранить маршрут' только для ассистента и только на десктопе */}
-                      {!message.isUser && message.id !== 1 && (
+                      {/* Кнопка 'Сохранить маршрут' только для ассистента, не для приветственного сообщения и только на десктопе */}
+                      {!message.isUser && message.id !== messages[0].id && (
                         <div className="mt-3 flex md:justify-end justify-center">
                           <button
                             className="hidden md:flex items-center gap-2 px-5 py-2 bg-black text-white rounded-full font-medium hover:bg-gray-900 transition-colors shadow"
