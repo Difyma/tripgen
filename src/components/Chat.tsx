@@ -557,11 +557,86 @@ const Chat = () => {
   const [hasInteracted, setHasInteracted] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
+  // Функция для нормализации направления в именительный падеж
+  const normalizeLocation = (word: string) => {
+    const map: Record<string, string> = {
+      'японии': 'Япония',
+      'италии': 'Италия',
+      'франции': 'Франция',
+      'париже': 'Париж',
+      'россии': 'Россия',
+      'германии': 'Германия',
+      'турции': 'Турция',
+      'таиланде': 'Таиланд',
+      'таиланда': 'Таиланд',
+      'швейцарии': 'Швейцария',
+      'англии': 'Англия',
+      'лондоне': 'Лондон',
+      'риме': 'Рим',
+      'рим': 'Рим',
+      'москве': 'Москва',
+      'москвы': 'Москва',
+      'санкт-петербурге': 'Санкт-Петербург',
+      'санкт-петербурга': 'Санкт-Петербург',
+      'амстердаме': 'Амстердам',
+      'амстердама': 'Амстердам',
+      'сочи': 'Сочи',
+      'казани': 'Казань',
+      'казань': 'Казань',
+      'спб': 'Санкт-Петербург',
+      // ...добавить по необходимости
+    };
+    const lower = word.toLowerCase();
+    return map[lower] || (word[0] ? word[0].toUpperCase() + word.slice(1) : word);
+  };
+
   const handleSendMessage = useCallback(async (textToSend?: string) => {
     const messageText = textToSend || inputText;
     if (!messageText.trim()) return;
     
     setHasInteracted(true);
+
+    // 1. Автоматически подставлять направление "Куда едем" из текста запроса
+    const flightInfo = extractFlightInfo(messageText);
+    let newLocation = '';
+    if (flightInfo.destination) {
+      newLocation = flightInfo.destination;
+    } else if (flightInfo.origin) {
+      newLocation = flightInfo.origin;
+    }
+    // Дополнительная эвристика, если не найдено направление
+    if (!newLocation) {
+      // Паттерн "по|в|на [Город]" (независимо от регистра)
+      const cityMatch = messageText.match(/\b(по|в|на)\s+([A-Za-zА-Яа-яЁё\-]+)/iu);
+      if (cityMatch && cityMatch[2]) {
+        // Привести к формату: первая буква заглавная, остальное строчные
+        newLocation = cityMatch[2][0].toUpperCase() + cityMatch[2].slice(1).toLowerCase();
+      } else {
+        // Найти первое слово с заглавной буквы, не являющееся местоимением
+        const words = messageText.split(/\s+/);
+        const skipWords = ['Я', 'Мы', 'Ты', 'Вы', 'Он', 'Она', 'Они', 'Это', 'В', 'На', 'Из', 'По', 'С', 'У', 'К', 'О', 'Об', 'Для', 'Про', 'И', 'А', 'Но', 'Да', 'Нет', 'Или', 'Если', 'Что', 'Как', 'Где', 'Когда', 'Почему', 'Зачем', 'Куда', 'Откуда'];
+        let firstCapital = words.find(w => w[0] && w[0] === w[0].toUpperCase() && !skipWords.includes(w));
+        if (!firstCapital) {
+          // Если не найдено слово с заглавной, взять последнее слово
+          const lastWord = words[words.length - 1].replace(/[^A-Za-zА-Яа-яЁё\-]/g, '');
+          if (lastWord.length > 2) {
+            firstCapital = lastWord[0].toUpperCase() + lastWord.slice(1).toLowerCase();
+          }
+        }
+        if (firstCapital) {
+          newLocation = firstCapital.replace(/[^A-Za-zА-Яа-яЁё\-]/g, '');
+        }
+      }
+    }
+    if (newLocation) {
+      setFilters(prev => ({ ...prev, location: normalizeLocation(newLocation) }));
+    }
+
+    // 2. В фильтре выбрать даты подставлять текущую дату, если пользователь не указал дату в запросе
+    if (!flightInfo.date && dateFilter.type === 'specific') {
+      const today = new Date();
+      setDateFilter({ type: 'specific', startDate: today, endDate: undefined });
+    }
 
     const newMessage: Message = {
       id: messages.length + 1,
@@ -1046,6 +1121,9 @@ ${Array.from({ length: duration - 2 }, (_, i) => `
       case 'specific':
         if (dateFilter.startDate && dateFilter.endDate) {
           return `${format(dateFilter.startDate, 'dd.MM.yyyy')} - ${format(dateFilter.endDate, 'dd.MM.yyyy')}`;
+        }
+        if (dateFilter.startDate) {
+          return format(dateFilter.startDate, 'dd.MM.yyyy');
         }
         return 'Выберите даты';
       case 'duration':
