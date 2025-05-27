@@ -21,10 +21,10 @@ const HowItWorks = () => {
             </h2>
             <div className="text-xl text-gray-600 space-y-6">
               <p>
-                Планируйте свое идеальное путешествие с помощью простого и интуитивно понятного процесса бронирования. Мы поможем вам создать незабываемые впечатления.
+                Планируйте своё идеальное путешествие с помощью простого и интуитивно понятного сервиса. Мы поможем вам создать незабываемые впечатления и подобрать лучшие маршруты.
               </p>
               <p>
-                Выберите из ряда доступных направлений и активностей, подходящих вашим предпочтениям.
+                Выберите направление, даты и интересующие активности — всё остальное мы сделаем за вас!
               </p>
             </div>
             <div className="mt-8 flex">
@@ -33,7 +33,7 @@ const HowItWorks = () => {
                 className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-base font-medium shadow-lg hover:bg-gray-900 transition-colors"
               >
                 <MessageSquare className="w-5 h-5" />
-                Написать в чат
+                Начать в чате
               </a>
             </div>
           </motion.div>
@@ -42,7 +42,7 @@ const HowItWorks = () => {
           <div className="lg:w-1/2 relative h-[500px]">
             {/* Activity Cards */}
             <motion.div
-              className="absolute left-4 top-4 w-44 h-44"
+              className="absolute left-1/2 -translate-x-1/2 top-4 w-40 h-40 md:w-56 md:h-56"
               initial={{ opacity: 0, scale: 0.8, y: 20 }}
               whileInView={{ opacity: 1, scale: 1, y: 0 }}
               viewport={{ once: true }}
@@ -58,13 +58,13 @@ const HowItWorks = () => {
                 </div>
                 <div className="absolute -bottom-3 left-4 px-4 py-2 bg-white rounded-full flex items-center gap-2 shadow-lg group-hover:scale-105 transition-transform">
                   <MessageSquare className="w-5 h-5" />
-                  <span className="font-medium text-sm">Search</span>
+                  <span className="font-medium text-sm">Общение</span>
                 </div>
               </div>
             </motion.div>
 
             <motion.div
-              className="absolute right-4 top-4 w-44 h-44"
+              className="absolute right-1/2 translate-x-1/2 top-4 w-40 h-40 md:w-56 md:h-56"
               initial={{ opacity: 0, scale: 0.8, y: 20 }}
               whileInView={{ opacity: 1, scale: 1, y: 0 }}
               viewport={{ once: true }}
@@ -80,13 +80,13 @@ const HowItWorks = () => {
                 </div>
                 <div className="absolute -bottom-3 right-4 px-4 py-2 bg-white rounded-full flex items-center gap-2 shadow-lg group-hover:scale-105 transition-transform">
                   <Calendar className="w-5 h-5" />
-                  <span className="font-medium text-sm">Select Dates</span>
+                  <span className="font-medium text-sm">Выбор дат</span>
                 </div>
               </div>
             </motion.div>
 
             <motion.div
-              className="absolute left-8 top-1/2 -translate-y-1/2 w-40 h-40"
+              className="absolute left-1/2 -translate-x-1/2 top-[60%] -translate-y-1/2 w-36 h-36 md:w-52 md:h-52"
               initial={{ opacity: 0, scale: 0.8, y: 20 }}
               whileInView={{ opacity: 1, scale: 1, y: 0 }}
               viewport={{ once: true }}
@@ -102,13 +102,13 @@ const HowItWorks = () => {
                 </div>
                 <div className="absolute -bottom-3 left-4 px-4 py-2 bg-white rounded-full flex items-center gap-2 shadow-lg group-hover:scale-105 transition-transform">
                   <MapPin className="w-5 h-5" />
-                  <span className="font-medium text-sm">Activities</span>
+                  <span className="font-medium text-sm">Активности</span>
                 </div>
               </div>
             </motion.div>
 
             <motion.div
-              className="absolute right-8 top-1/2 -translate-y-1/2 w-40 h-40"
+              className="absolute right-1/2 translate-x-1/2 top-[60%] -translate-y-1/2 w-36 h-36 md:w-52 md:h-52"
               initial={{ opacity: 0, scale: 0.8, y: 20 }}
               whileInView={{ opacity: 1, scale: 1, y: 0 }}
               viewport={{ once: true }}
@@ -124,7 +124,7 @@ const HowItWorks = () => {
                 </div>
                 <div className="absolute -bottom-3 right-4 px-4 py-2 bg-white rounded-full flex items-center gap-2 shadow-lg group-hover:scale-105 transition-transform">
                   <MessageSquare className="w-5 h-5" />
-                  <span className="font-medium text-sm">Start Journey</span>
+                  <span className="font-medium text-sm">Начать путешествие</span>
                 </div>
               </div>
             </motion.div>

@@ -17,7 +17,7 @@ const CTASection = () => {
             <Heart className="w-16 h-16 text-red-500" />
           </div>
           
-          <h2 className="text-5xl md:text-6xl font-semibold mb-6 tracking-tight">
+          <h2 className="text-2xl sm:text-5xl md:text-6xl font-semibold mb-6 tracking-tight break-words px-2">
             Хотите стать путешественником с помощью передовых технологий?
           </h2>
           
