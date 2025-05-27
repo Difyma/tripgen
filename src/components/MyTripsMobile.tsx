@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { trips } from '../data/trips';
 import type { Trip } from '../data/trips';
-import { MapPin, Calendar, Users, ArrowRight } from 'lucide-react';
+import { MapPin, Calendar, Users, ArrowRight, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function MyTripsMobile() {
@@ -44,6 +44,7 @@ export default function MyTripsMobile() {
 }
 
 function TripMobileCard({ trip, onClick }: { trip: Trip, onClick: () => void }) {
+  const navigate = useNavigate();
   return (
     <div
       className="bg-gray-50 rounded-xl p-3 flex items-center gap-3 shadow-sm cursor-pointer active:bg-gray-100 transition"
@@ -65,6 +66,13 @@ function TripMobileCard({ trip, onClick }: { trip: Trip, onClick: () => void }) 
           <span>{trip.details?.travelers || 2} чел.</span>
         </div>
       </div>
+      <button
+        onClick={e => { e.stopPropagation(); navigate(`/chat?q=Путешествие: ${encodeURIComponent(trip.title)}`); }}
+        className="p-2 rounded-full hover:bg-primary/10"
+        title="Открыть чат по путешествию"
+      >
+        <MessageSquare className="w-5 h-5 text-primary" />
+      </button>
       <ArrowRight className="w-5 h-5 text-gray-400" />
     </div>
   );

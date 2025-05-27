@@ -1,4 +1,5 @@
-import { MapPin, Calendar, DollarSign, Users, Plane, Hotel, Car, CalendarDays, Utensils, ArrowLeft, Clock } from 'lucide-react';
+import { MapPin, Calendar, DollarSign, Users, Plane, Hotel, Car, CalendarDays, Utensils, ArrowLeft, Clock, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Trip {
   id: string;
@@ -48,6 +49,7 @@ const formatCurrency = (amount: number) => {
 };
 
 export default function TripDetailsMobile({ trip, onBack }: TripDetailsMobileProps) {
+  const navigate = useNavigate();
   const totalCost = trip.details?.costs ? 
     Object.values(trip.details.costs).reduce((acc, curr) => acc + curr, 0) : 0;
 
@@ -84,6 +86,18 @@ export default function TripDetailsMobile({ trip, onBack }: TripDetailsMobilePro
             <span className="flex items-center gap-1 bg-black/40 rounded px-2 py-1"><Users className="w-4 h-4" />{trip.details?.travelers || 2} чел.</span>
           </div>
         </div>
+      </div>
+
+      {/* Кнопка чата под баннером */}
+      <div className="px-4 mt-4 mb-2">
+        <button
+          onClick={() => navigate(`/chat?q=Путешествие: ${encodeURIComponent(trip.title)}`)}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-white rounded-xl text-base font-semibold shadow hover:bg-primary/90 transition-colors"
+          title="Открыть чат по путешествию"
+        >
+          <MessageSquare className="w-5 h-5" />
+          Чат по путешествию
+        </button>
       </div>
 
       {/* Основные блоки */}

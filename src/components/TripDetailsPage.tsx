@@ -1,4 +1,5 @@
-import { MapPin, Calendar, DollarSign, Users, Plane, Hotel, Car, Clock, CalendarDays, Utensils, CircleDollarSign, ArrowLeft } from 'lucide-react';
+import { MapPin, Calendar, DollarSign, Users, Plane, Hotel, Car, Clock, CalendarDays, Utensils, CircleDollarSign, ArrowLeft, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Trip {
   id: string;
@@ -55,6 +56,7 @@ const formatCurrency = (amount: number) => {
 };
 
 export function TripDetailsPage({ trip, onBack }: TripDetailsPageProps) {
+  const navigate = useNavigate();
   const totalDays = getDaysBetweenDates(trip.startDate, trip.endDate);
   const daysArray = Array.from({ length: totalDays }, (_, i) => {
     const date = new Date(trip.startDate);
@@ -82,6 +84,16 @@ export function TripDetailsPage({ trip, onBack }: TripDetailsPageProps) {
         >
           <ArrowLeft className="w-5 h-5" />
           <span>Назад к путешествиям</span>
+        </button>
+
+        {/* Chat icon */}
+        <button
+          onClick={() => navigate(`/chat?q=Путешествие: ${encodeURIComponent(trip.title)}`)}
+          className="absolute top-6 right-6 flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-lg text-white hover:bg-white/20 transition-colors"
+          title="Открыть чат по путешествию"
+        >
+          <MessageSquare className="w-5 h-5" />
+          <span className="hidden md:inline">Чат</span>
         </button>
 
         {/* Trip info overlay */}

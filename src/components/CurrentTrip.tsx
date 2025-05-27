@@ -1,5 +1,6 @@
-import { Calendar, MapPin } from 'lucide-react';
+import { Calendar, MapPin, MessageSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 interface CurrentTripProps {
   trip?: {
@@ -22,6 +23,7 @@ const formatDate = (dateString: string) => {
 };
 
 export function CurrentTrip({ trip }: CurrentTripProps) {
+  const navigate = useNavigate();
   if (!trip) {
     return (
       <div className="p-4 bg-gray-50 rounded-lg text-center text-gray-500">
@@ -43,12 +45,21 @@ export function CurrentTrip({ trip }: CurrentTripProps) {
           className="w-full h-48 object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        <div className="absolute bottom-4 left-4 right-4 text-white">
-          <h3 className="text-xl font-semibold mb-2">{trip.title}</h3>
-          <div className="flex items-center gap-2 text-sm">
-            <MapPin className="w-4 h-4" />
-            <span>{trip.location}</span>
+        <div className="absolute bottom-4 left-4 right-4 text-white flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-semibold mb-2">{trip.title}</h3>
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="w-4 h-4" />
+              <span>{trip.location}</span>
+            </div>
           </div>
+          <button
+            onClick={() => navigate(`/chat?q=Путешествие: ${encodeURIComponent(trip.title)}`)}
+            className="p-2 rounded-full bg-white/20 hover:bg-white/40 transition-colors"
+            title="Открыть чат по путешествию"
+          >
+            <MessageSquare className="w-6 h-6 text-white" />
+          </button>
         </div>
       </div>
       <div className="p-4">
