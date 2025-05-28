@@ -4,22 +4,22 @@ import { motion } from 'framer-motion';
 
 const photos = [
   {
-    url: '/images/Путешествие по Алтаю.jpg',
+    url: '/images/Traveling_around_Altai.jpg',
     location: 'Горный Алтай',
     category: 'Природа'
   },
   {
-    url: '/images/Путешествие по Байкалу.jpg',
+    url: '/images/Traveling_around_Baikal.jpg',
     location: 'Байкал',
     category: 'Озера'
   },
   {
-    url: '/images/Путешествие по камчатке.jpg',
+    url: '/images/Traveling_around_Kamchatka.jpg',
     location: 'Камчатка',
     category: 'Вулканы'
   },
   {
-    url: '/images/Путешествие по карелии.jpg',
+    url: '/images/Traveling_around_Karelia.jpg',
     location: 'Карелия',
     category: 'Леса'
   }
