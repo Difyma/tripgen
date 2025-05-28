@@ -20,6 +20,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [initialWaitTime, setInitialWaitTime] = useState(0);
   const { signInOrSignUp, loading } = useAuth();
   const { isLimited, limitExpiry, clearRateLimit } = useRateLimitStore();
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
 
   // Handle click outside
   useEffect(() => {
@@ -110,11 +112,15 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setSuccessMessage('');
     
     try {
-      await signInOrSignUp(email, password);
-      
+      const result = await signInOrSignUp(email, password);
+      if (result.needsEmailConfirmation) {
+        setNeedsEmailConfirmation(true);
+        setPendingEmail(email);
+        setErrorMessage('');
+        return;
+      }
       // Показываем сообщение об успехе
       setSuccessMessage('Авторизация успешна!');
-      
       // Закрываем модальное окно через 1.5 секунды
       setTimeout(() => {
         setEmail('');
@@ -123,7 +129,6 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         setSuccessMessage('');
         onClose();
       }, 1500);
-      
     } catch (err: any) {
       console.error('Error during authentication:', err);
       setErrorMessage(err.message);
@@ -250,7 +255,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   </motion.div>
                 )}
 
-                {errorMessage && (
+                {errorMessage && !needsEmailConfirmation && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -263,6 +268,13 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                       </div>
                     )}
                   </motion.div>
+                )}
+
+                {needsEmailConfirmation && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800 text-center mt-4">
+                    Для входа на сайт подтвердите ваш email.<br />
+                    Для этого перейдите в почту: <b>{pendingEmail}</b>
+                  </div>
                 )}
               </div>
             </div>

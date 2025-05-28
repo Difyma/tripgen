@@ -16,6 +16,7 @@ interface AuthResponse {
   session: Session | null;
   error: SupabaseAuthError | null;
   message: string;
+  needsEmailConfirmation: boolean;
 }
 
 // Helper function to ensure profile exists
@@ -28,7 +29,7 @@ const ensureProfileExists = async (userId: string, email: string): Promise<Error
       .eq('id', userId)
       .single();
 
-    if (fetchError && !fetchError.message.includes('No rows found')) {
+    if (fetchError && fetchError.code !== 'PGRST116') {
       console.error('Error fetching profile:', fetchError);
       return new Error('Ошибка при проверке профиля');
     }
@@ -80,7 +81,7 @@ export const auth = {
       if (signInData?.user) {
         // Ensure profile exists even on sign in
         await ensureProfileExists(signInData.user.id, email);
-        return { session: signInData.session, error: null, message: 'Авторизация успешна!' };
+        return { session: signInData.session, error: null, message: 'Авторизация успешна!', needsEmailConfirmation: false };
       }
 
       // If sign in failed, try to sign up
@@ -103,14 +104,19 @@ export const auth = {
         throw new Error('Не удалось создать пользователя');
       }
 
-      // Create profile for new user
+      // Если требуется подтверждение email, session будет null
+      if (!signUpData.session) {
+        return { session: null, error: null, message: 'Требуется подтверждение email', needsEmailConfirmation: true };
+      }
+
+      // Create profile for new user (только если email подтверждён)
       const profileError = await ensureProfileExists(signUpData.user.id, email);
       if (profileError) {
         console.log('Ошибка создания профиля:', profileError);
         throw new Error('Ошибка создания профиля пользователя');
       }
 
-      return { session: signUpData.session, error: null, message: 'Регистрация успешна!' };
+      return { session: signUpData.session, error: null, message: 'Регистрация успешна!', needsEmailConfirmation: false };
     } catch (error: any) {
       console.error('Детали ошибки аутентификации:', {
         message: error.message,
