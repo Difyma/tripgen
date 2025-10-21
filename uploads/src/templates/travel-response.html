@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel Response</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../styles/travel-response.css">
+</head>
+<body>
+    <div class="travel-response">
+        <!-- Заголовок маршрута -->
+        <div class="travel-header">
+            <h1>{{Название маршрута}}</h1>
+            <p>{{Краткое описание}}</p>
+        </div>
+
+        <!-- Обзор маршрута -->
+        <section class="travel-section">
+            <h2>📋 Обзор маршрута</h2>
+            <div class="highlight-box">
+                <h3>Концепция путешествия</h3>
+                <p>{{Описание концепции}}</p>
+            </div>
+            
+            <div class="highlight-box">
+                <h3>Ключевые особенности</h3>
+                <div class="tag">{{Особенность 1}}</div>
+                <div class="tag">{{Особенность 2}}</div>
+                <div class="tag">{{Особенность 3}}</div>
+            </div>
+
+            <div class="highlight-box">
+                <h3>Маршрут</h3>
+                <div class="schedule-grid">
+                    {{Схема перемещений}}
+                </div>
+            </div>
+        </section>
+
+        <!-- Детальный план -->
+        <section class="travel-section">
+            <h2>📅 Детальный план</h2>
+            
+            <!-- День/Блок -->
+            <div class="highlight-box">
+                <h3>{{День/Название блока}}</h3>
+                
+                <!-- Проживание -->
+                <h4>🏨 Проживание</h4>
+                <div class="location-card">
+                    <div class="location-name">{{Название отеля}}</div>
+                    <div class="location-details">
+                        <p>{{Описание и особенности}}</p>
+                        <div class="coordinates">{{Координаты}}</div>
+                    </div>
+                    <div class="time-price">
+                        <span>{{Категория}}</span>
+                        <span class="price-range">{{Ценовой диапазон}}</span>
+                    </div>
+                </div>
+
+                <!-- Активности -->
+                <h4>🏛️ Активности</h4>
+                <div class="location-card">
+                    <div class="location-name">{{Название места}}</div>
+                    <div class="location-details">
+                        <p>{{Описание}}</p>
+                        <div class="coordinates">{{Координаты}}</div>
+                    </div>
+                    <div class="time-price">
+                        <span>{{Время работы}}</span>
+                        <span>{{Стоимость}}</span>
+                    </div>
+                </div>
+
+                <!-- Рестораны -->
+                <h4>🍽️ Питание</h4>
+                <div class="restaurant-card">
+                    <div class="restaurant-info">
+                        <div class="restaurant-name">{{Название ресторана}}</div>
+                        <div class="restaurant-cuisine">{{Тип кухни}}</div>
+                        <p class="location-details">{{Описание и особенности}}</p>
+                        <div class="coordinates">{{Координаты}}</div>
+                    </div>
+                    <div class="price-range">{{Ценовой диапазон}}</div>
+                </div>
+
+                <!-- Советы -->
+                <div class="tip-box">
+                    <h4>💡 Совет дня</h4>
+                    <p>{{Практический совет}}</p>
+                </div>
+
+                <!-- Расписание -->
+                <h4>⏰ Расписание</h4>
+                <div class="schedule-grid">
+                    <div class="time-slot">09:00</div>
+                    <div class="activity-slot">{{Активность}}</div>
+                    <!-- Повторить для каждого временного слота -->
+                </div>
+
+                <!-- Затраты -->
+                <h4>💰 Затраты</h4>
+                <table class="cost-breakdown">
+                    <tr>
+                        <th>Категория</th>
+                        <th>Стоимость</th>
+                    </tr>
+                    <tr>
+                        <td>{{Категория расходов}}</td>
+                        <td>{{Сумма}}</td>
+                    </tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- Дополнительная информация -->
+        <section class="travel-section">
+            <h2>📌 Дополнительная информация</h2>
+            
+            <div class="highlight-box">
+                <h3>Полезные контакты</h3>
+                {{Список контактов}}
+            </div>
+
+            <div class="highlight-box">
+                <h3>Бронирование</h3>
+                {{Рекомендации по бронированию}}
+            </div>
+
+            <div class="warning-box">
+                <h4>⚠️ Важные предупреждения</h4>
+                <p>{{Предупреждения}}</p>
+            </div>
+        </section>
+
+        <!-- Инсайдерские советы -->
+        <section class="travel-section">
+            <h2>💡 Инсайдерские советы</h2>
+            
+            <div class="tip-box">
+                <h4>Секретные места</h4>
+                {{Описание секретных мест}}
+            </div>
+
+            <div class="tip-box">
+                <h4>Как сэкономить</h4>
+                {{Советы по экономии}}
+            </div>
+
+            <div class="tip-box">
+                <h4>Особые рекомендации</h4>
+                {{Уникальные советы}}
+            </div>
+        </section>
+    </div>
+</body>
+</html> 

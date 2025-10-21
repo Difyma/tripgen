@@ -1,0 +1,6 @@
+From: dmitry.igorevich.2@yandex.ru
+To: dmitry.igorevich.2@yandex.ru
+Subject: Test Email
+Content-Type: text/plain; charset="UTF-8"
+
+This is a test email.

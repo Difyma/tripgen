@@ -1,0 +1,25 @@
+# Build outputs
+dist/
+build/
+node_modules/
+
+# Config files
+*.config.js
+*.config.ts
+*.config.d.ts
+.eslintrc.cjs
+tailwind.config.js
+vite.config.js
+vite.config.ts
+
+# Type definitions
+*.d.ts
+
+# API routes (not part of main project)
+api/
+app/
+server.js
+
+# Generated files
+coverage/
+.nyc_output/
