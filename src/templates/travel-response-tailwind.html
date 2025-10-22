@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ru" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel Response</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        mono: ['SF Mono', 'Roboto Mono', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50">
+    <div class="travel-response w-full max-w-full mx-auto p-6 md:p-8 font-sans text-gray-900 bg-white rounded-3xl shadow-sm">
+        <!-- Заголовок маршрута -->
+        <div class="text-center mb-12 mx-auto max-w-4xl">
+            <h1 class="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                {{Название маршрута}}
+            </h1>
+            <p class="text-lg text-gray-600 leading-relaxed">
+                {{Краткое описание}}
+            </p>
+        </div>
+
+        <!-- Обзор маршрута -->
+        <section class="mb-12 p-8 bg-gray-50 rounded-2xl border border-gray-100">
+            <h2 class="text-2xl md:text-3xl font-semibold mb-6 flex items-center gap-3">
+                📋 Обзор маршрута
+            </h2>
+            
+            <div class="bg-white rounded-xl p-6 mb-6 shadow-sm border border-gray-100">
+                <h3 class="text-xl font-semibold mb-4">Концепция путешествия</h3>
+                <p class="text-gray-700 leading-relaxed">
+                    {{Подробное описание концепции}}
+                </p>
+            </div>
+            
+            <div class="bg-white rounded-xl p-6 mb-6 shadow-sm border border-gray-100">
+                <h3 class="text-xl font-semibold mb-4">Ключевые особенности</h3>
+                <div class="flex flex-wrap gap-2">
+                    {{Для каждой особенности:}}
+                    <span class="px-4 py-2 bg-gray-100 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-200 transition-colors">
+                        {{Текст особенности}}
+                    </span>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <h3 class="text-xl font-semibold mb-4">Маршрут</h3>
+                <div class="grid grid-cols-[auto,1fr] gap-4">
+                    {{Последовательность перемещений:}}
+                    <div class="text-gray-600 font-medium">{{День/Дата}}</div>
+                    <div class="text-gray-800">{{Город/Локация}}</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Детальный план -->
+        <section class="mb-12 p-8 bg-gray-50 rounded-2xl border border-gray-100">
+            <h2 class="text-2xl md:text-3xl font-semibold mb-6 flex items-center gap-3">
+                📅 Детальный план
+            </h2>
+            
+            {{Для каждого дня/блока:}}
+            <div class="bg-white rounded-xl p-6 mb-6 shadow-sm border border-gray-100">
+                <h3 class="text-xl font-semibold mb-6">{{День X / Название блока}}</h3>
+                
+                <!-- Проживание -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        🏨 Проживание
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {{Для каждого отеля:}}
+                        <div class="p-6 bg-white rounded-xl border border-gray-100 hover:shadow-md transition-shadow">
+                            <div class="font-semibold text-lg mb-2">{{Название отеля}}</div>
+                            <p class="text-gray-600 mb-3">{{Описание и особенности}}</p>
+                            <div class="font-mono text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-md inline-block">
+                                {{Координаты}}
+                            </div>
+                            <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
+                                <span class="text-gray-600">{{Категория звёзд}}</span>
+                                <span class="text-green-700 font-medium">{{Цена за ночь}}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Активности -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        🏛️ Активности
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {{Для каждой активности:}}
+                        <div class="p-6 bg-white rounded-xl border border-gray-100 hover:shadow-md transition-shadow">
+                            <div class="font-semibold text-lg mb-2">{{Название места}}</div>
+                            <p class="text-gray-600 mb-3">{{Описание}}</p>
+                            <div class="font-mono text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-md inline-block">
+                                {{Координаты}}
+                            </div>
+                            <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
+                                <span class="text-gray-600">{{Время работы}}</span>
+                                <span class="text-green-700 font-medium">{{Стоимость}}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Рестораны -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        🍽️ Питание
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {{Для каждого ресторана:}}
+                        <div class="p-6 bg-white rounded-xl border border-gray-100 hover:shadow-md transition-shadow">
+                            <div class="font-semibold text-lg mb-2">{{Название ресторана}}</div>
+                            <div class="text-gray-500 text-sm mb-3">{{Тип кухни}}</div>
+                            <p class="text-gray-600 mb-3">{{Описание и особенности}}</p>
+                            <div class="font-mono text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-md inline-block">
+                                {{Координаты}}
+                            </div>
+                            <div class="mt-4 pt-4 border-t border-gray-100">
+                                <span class="text-green-700 font-medium">{{Средний чек}}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Советы -->
+                <div class="bg-amber-50 border-l-4 border-amber-400 p-6 rounded-r-xl mb-8">
+                    <h4 class="text-amber-800 font-semibold mb-2 flex items-center gap-2">
+                        💡 Совет дня
+                    </h4>
+                    <p class="text-amber-900">{{Практический совет}}</p>
+                </div>
+
+                <!-- Расписание -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        ⏰ Расписание
+                    </h4>
+                    <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                        {{Для каждого временного слота:}}
+                        <div class="grid grid-cols-[120px,1fr] gap-4 p-4 border-b border-gray-100 last:border-0">
+                            <div class="text-gray-600 font-medium">{{Время}}</div>
+                            <div class="text-gray-800">{{Активность}}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Затраты -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        💰 Затраты
+                    </h4>
+                    <div class="overflow-hidden rounded-xl border border-gray-100">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Категория</th>
+                                    <th class="px-6 py-4 text-right text-sm font-medium text-gray-600">Стоимость</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-100">
+                                {{Для каждой категории расходов:}}
+                                <tr>
+                                    <td class="px-6 py-4 text-sm text-gray-800">{{Название категории}}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-800 text-right">{{Сумма}}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Дополнительная информация -->
+        <section class="mb-12 p-8 bg-gray-50 rounded-2xl border border-gray-100">
+            <h2 class="text-2xl md:text-3xl font-semibold mb-6 flex items-center gap-3">
+                📌 Дополнительная информация
+            </h2>
+            
+            <div class="bg-white rounded-xl p-6 mb-6 shadow-sm border border-gray-100">
+                <h3 class="text-xl font-semibold mb-4">Полезные контакты</h3>
+                <ul class="space-y-2">
+                    {{Список контактов:}}
+                    <li class="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+                        <span class="text-gray-700">{{Название}}</span>
+                        <span class="text-gray-600">{{Контакт}}</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="bg-white rounded-xl p-6 mb-6 shadow-sm border border-gray-100">
+                <h3 class="text-xl font-semibold mb-4">Бронирование</h3>
+                <div class="text-gray-700 space-y-4">
+                    {{Рекомендации по бронированию}}
+                </div>
+            </div>
+
+            <div class="bg-red-50 border-l-4 border-red-400 p-6 rounded-r-xl">
+                <h4 class="text-red-800 font-semibold mb-2 flex items-center gap-2">
+                    ⚠️ Важные предупреждения
+                </h4>
+                <p class="text-red-900">{{Список предупреждений}}</p>
+            </div>
+        </section>
+
+        <!-- Инсайдерские советы -->
+        <section class="p-8 bg-gray-50 rounded-2xl border border-gray-100">
+            <h2 class="text-2xl md:text-3xl font-semibold mb-6 flex items-center gap-3">
+                💡 Инсайдерские советы
+            </h2>
+            
+            <div class="space-y-6">
+                <div class="bg-amber-50 border-l-4 border-amber-400 p-6 rounded-r-xl">
+                    <h4 class="text-amber-800 font-semibold mb-2">Секретные места</h4>
+                    <div class="text-amber-900 space-y-4">
+                        {{Описание минимум 2 секретных мест}}
+                    </div>
+                </div>
+
+                <div class="bg-amber-50 border-l-4 border-amber-400 p-6 rounded-r-xl">
+                    <h4 class="text-amber-800 font-semibold mb-2">Как сэкономить</h4>
+                    <div class="text-amber-900 space-y-4">
+                        {{Минимум 3 конкретных способа экономии}}
+                    </div>
+                </div>
+
+                <div class="bg-amber-50 border-l-4 border-amber-400 p-6 rounded-r-xl">
+                    <h4 class="text-amber-800 font-semibold mb-2">Особые рекомендации</h4>
+                    <div class="text-amber-900 space-y-4">
+                        {{Минимум 2 уникальных совета}}
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</body>
+</html> 
