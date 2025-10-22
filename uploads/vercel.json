@@ -7,8 +7,8 @@
   },
   "rewrites": [
     {
-      "source": "/api/yandex-gpt",
-      "destination": "/api/yandex-gpt.ts"
+      "source": "/api/openai",
+      "destination": "/api/openai.ts"
     },
     {
       "source": "/api/creators",
