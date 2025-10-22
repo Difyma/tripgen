@@ -1,204 +1,491 @@
+import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Globe, DollarSign, Users, Star, ChevronRight, ArrowRight, Coins, Gift, Share2, Trophy } from 'lucide-react';
+import { MainNavbar } from './MainNavbar';
+import Footer from './Footer';
 import CreatorForm from './CreatorForm';
-import { MapPinIcon, StarIcon, InstagramIcon, YoutubeIcon } from 'lucide-react';
+import { AuthModal } from './AuthModal';
 
-interface Creator {
-  id: string;
-  name: string;
-  bio: string;
-  avatar: string;
-  expertise: string[];
-  location: string;
-  followers: number;
-  rating: number;
-  trips: number;
-  socialLinks: {
-    instagram?: string;
-    youtube?: string;
-    tiktok?: string;
-  };
-}
-
-const mockCreators: Creator[] = [
+const benefits = [
   {
-    id: '1',
-    name: 'Sarah Johnson',
-    bio: 'Adventure photographer and travel blogger with 8 years of experience exploring hidden gems around the world.',
-    avatar: '/api/placeholder/100/100',
-    expertise: ['Photography', 'Adventure Travel', 'Solo Travel'],
-    location: 'New York, USA',
-    followers: 125000,
-    rating: 4.9,
-    trips: 47,
-    socialLinks: {
-      instagram: 'https://instagram.com/sarahjohnson',
-      youtube: 'https://youtube.com/@sarahjohnson'
-    }
+    icon: Globe,
+    title: 'Глобальная аудитория',
+    description: 'Делитесь своими путешествиями с людьми со всего мира'
   },
   {
-    id: '2',
-    name: 'Marco Rodriguez',
-    bio: 'Food enthusiast and cultural explorer specializing in authentic local experiences and culinary adventures.',
-    avatar: '/api/placeholder/100/100',
-    expertise: ['Food Tourism', 'Cultural Immersion', 'Local Experiences'],
-    location: 'Barcelona, Spain',
-    followers: 89000,
-    rating: 4.8,
-    trips: 32,
-    socialLinks: {
-      instagram: 'https://instagram.com/marcorodriguez',
-      tiktok: 'https://tiktok.com/@marcorodriguez'
-    }
+    icon: DollarSign,
+    title: 'Монетизация',
+    description: 'Зарабатывайте на своих путешествиях и рекомендациях'
+  },
+  {
+    icon: Users,
+    title: 'Сообщество',
+    description: 'Станьте частью сообщества путешественников и создателей контента'
+  },
+  {
+    icon: Star,
+    title: 'Эксклюзивные возможности',
+    description: 'Получите доступ к специальным предложениям и мероприятиям'
   }
 ];
 
-export default function CreatorPage() {
-  const [showForm, setShowForm] = useState(false);
+const requirements = [
+  'Опыт путешествий и создания контента',
+  'Качественные фото и видеоматериалы',
+  'Умение интересно рассказывать о местах',
+  'Активность в социальных сетях',
+  'Желание делиться опытом'
+];
 
-  const handleFormSubmit = (data: any) => {
-    console.log('Creator application submitted:', data);
-    setShowForm(false);
-    // Here you would typically send the data to your backend
+const earningWays = [
+  {
+    icon: Coins,
+    title: 'Комиссия с бронирований',
+    description: 'Получайте процент от каждого бронирования по вашим рекомендациям отелей, туров и активностей',
+    percentage: '10%'
+  },
+  {
+    icon: Gift,
+    title: 'Эксклюзивные предложения',
+    description: 'Создавайте специальные предложения и промокоды для ваших подписчиков',
+    percentage: '15%'
+  },
+  {
+    icon: Share2,
+    title: 'Партнерские программы',
+    description: 'Зарабатывайте на рекомендациях авиабилетов, страховок и других туристических услуг',
+    percentage: '8%'
+  },
+  {
+    icon: Trophy,
+    title: 'Бонусная программа',
+    description: 'Получайте дополнительные бонусы за активность и качественный контент',
+    percentage: '+5%'
+  }
+];
+
+const inspirationSteps = [
+  {
+    number: '01',
+    title: 'Создавайте маршруты',
+    description: 'Делитесь своими любимыми местами и создавайте уникальные маршруты путешествий'
+  },
+  {
+    number: '02',
+    title: 'Вдохновляйте других',
+    description: 'Ваши истории и рекомендации помогут другим путешественникам открыть новые места'
+  },
+  {
+    number: '03',
+    title: 'Получайте доход',
+    description: 'Зарабатывайте на бронированиях и рекомендациях от благодарных путешественников'
+  }
+];
+
+const CreatorPage = () => {
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  const handleAuthClick = () => {
+    setIsAuthModalOpen(true);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 py-12 px-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Meet Our Travel Creators
+    <>
+      <MainNavbar onAuthClick={handleAuthClick} />
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      <div className="min-h-screen bg-[#FAFAFA] pt-16">
+        {/* Hero Section */}
+        <section className="relative overflow-hidden bg-white py-32">
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-white" />
+          <div className="relative max-w-7xl mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center"
+            >
+              <div>
+                <h1 className="text-5xl md:text-6xl font-bold mb-6 tracking-tight">
+                  Создавайте контент.<br />
+                  Вдохновляйте.<br />
+                  Зарабатывайте.
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-            Connect with experienced travelers and local experts who will guide you to unforgettable experiences
-          </p>
-          <Button 
-            onClick={() => setShowForm(true)}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-          >
-            Become a Creator
-          </Button>
-        </div>
-
-        {/* Creator Application Form Modal */}
-        {showForm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold">Become a Travel Creator</h2>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => setShowForm(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+                  Станьте частью TripGen — платформы для креативных путешественников, которые хотят делиться своим опытом и зарабатывать на этом.
+                </p>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="group bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-900 transition-all inline-flex items-center gap-2"
+                  onClick={() => setIsFormOpen(true)}
                 >
-                  ✕
-                </Button>
+                  Стать создателем
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </motion.button>
               </div>
-              <CreatorForm onSubmit={handleFormSubmit} />
+              <div className="relative">
+                <div className="aspect-square rounded-3xl overflow-hidden">
+                  <img
+                    src="https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=1200&q=80"
+                    alt="Creator background"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="absolute -bottom-6 -left-6 bg-white p-6 rounded-2xl shadow-lg max-w-xs">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-full bg-gray-100" />
+                    <div>
+                      <div className="font-medium">Анна Петрова</div>
+                      <div className="text-sm text-gray-500">Travel Creator</div>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    "TripGen помог мне превратить мою страсть к путешествиям в успешный бизнес"
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Benefits Section */}
+        <section className="py-24">
+          <div className="max-w-7xl mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-4xl font-bold mb-4 tracking-tight">
+                Преимущества для создателей
+              </h2>
+              <p className="text-xl text-gray-600">
+                Откройте для себя новые возможности с TripGen
+              </p>
+            </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {benefits.map((benefit, index) => (
+                <motion.div
+                  key={benefit.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  className="bg-white rounded-2xl p-8 hover:shadow-lg transition-shadow"
+                >
+                  <div className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center mb-6">
+                    <benefit.icon className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-3">{benefit.title}</h3>
+                  <p className="text-gray-600 leading-relaxed">{benefit.description}</p>
+                </motion.div>
+              ))}
             </div>
           </div>
-        )}
+        </section>
 
-        {/* Creators Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {mockCreators.map((creator) => (
-            <Card key={creator.id} className="overflow-hidden hover:shadow-xl transition-shadow duration-300">
-              <CardHeader className="text-center">
-                <Avatar className="w-24 h-24 mx-auto mb-4">
-                  <AvatarImage src={creator.avatar} alt={creator.name} />
-                  <AvatarFallback>{creator.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                </Avatar>
-                <CardTitle className="text-xl">{creator.name}</CardTitle>
-                <CardDescription className="flex items-center justify-center text-sm text-gray-500">
-                  <MapPinIcon className="w-4 h-4 mr-1" />
-                  {creator.location}
-                </CardDescription>
-              </CardHeader>
-              
-              <CardContent className="space-y-4">
-                <p className="text-gray-600 text-sm leading-relaxed">{creator.bio}</p>
-                
-                {/* Expertise Tags */}
-                <div className="flex flex-wrap gap-2">
-                  {creator.expertise.map((skill, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
-                      {skill}
-                    </Badge>
+        {/* Earning Ways Section */}
+        <section className="py-24 bg-white">
+          <div className="max-w-7xl mx-auto px-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-center mb-16"
+            >
+              <h2 className="text-4xl font-bold mb-4 tracking-tight">
+                Как зарабатывать на TripGen
+              </h2>
+              <p className="text-xl text-gray-600">
+                Множество способов монетизации вашего контента
+              </p>
+            </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {earningWays.map((way, index) => (
+                <motion.div
+                  key={way.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  className="bg-white rounded-2xl p-8 border border-gray-100 hover:border-gray-200 transition-all group"
+                >
+                  <div className="flex items-start gap-6">
+                    <div className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                      <way.icon className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-xl font-semibold">{way.title}</h3>
+                        <span className="text-2xl font-bold text-green-500">{way.percentage}</span>
+                      </div>
+                      <p className="text-gray-600 leading-relaxed">{way.description}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+        </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="mt-12 bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 text-white"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl font-bold mb-2">Станьте VIP-создателем</h3>
+                  <p className="text-gray-300">Получите доступ к повышенным комиссиям и эксклюзивным возможностям</p>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="bg-white text-black px-6 py-3 rounded-xl font-medium hover:bg-gray-100 transition-all inline-flex items-center gap-2"
+                >
+                  Подробнее
+                  <ArrowRight className="w-4 h-4" />
+                </motion.button>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Stats Section */}
+        <section className="py-24 bg-white">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+              {[
+                { number: '150+', label: 'Активных создателей' },
+                { number: '₽50K+', label: 'Средний месячный доход' },
+                { number: '1.2M', label: 'Просмотров в месяц' }
+              ].map((stat, index) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  className="text-center group cursor-default"
+                >
+                  <div className="text-6xl font-bold mb-3 group-hover:text-gray-800 transition-colors">
+                    {stat.number}
+                  </div>
+                  <p className="text-gray-600 text-lg">{stat.label}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Requirements Section */}
+        <section className="py-24">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+              >
+                <h2 className="text-4xl font-bold mb-8 tracking-tight">
+                  Что нужно для начала
+                </h2>
+                <ul className="space-y-6">
+                  {requirements.map((req, index) => (
+                    <motion.li
+                      key={req}
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex items-center gap-4 group"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                        <ChevronRight className="w-5 h-5" />
+                      </div>
+                      <span className="text-lg text-gray-600">{req}</span>
+                    </motion.li>
+                  ))}
+                </ul>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className="relative"
+              >
+                <div className="aspect-[4/3] rounded-3xl overflow-hidden">
+                  <img
+                    src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80"
+                    alt="Creator working"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="absolute -bottom-6 right-6 bg-white p-6 rounded-2xl shadow-lg">
+                  <div className="flex items-center gap-3 text-lg font-medium">
+                    <Star className="w-6 h-6 text-yellow-400" />
+                    <span>4.9/5 рейтинг создателей</span>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </section>
+
+        {/* Inspiration to Action Section */}
+        <section className="py-24 bg-white">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+              >
+                <h2 className="text-4xl font-bold mb-4 tracking-tight">
+                  Превратите вдохновение<br />в действие
+                </h2>
+                <p className="text-xl text-gray-600 mb-12 leading-relaxed">
+                  Станьте частью сообщества креативных путешественников и начните делиться своими историями уже сегодня
+                </p>
+
+                <div className="space-y-12">
+                  {inspirationSteps.map((step, index) => (
+                    <motion.div
+                      key={step.number}
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex gap-8 group"
+                    >
+                      <div className="relative">
+                        <div className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center font-bold text-lg group-hover:scale-110 transition-transform">
+                          {step.number}
+                        </div>
+                        {index < inspirationSteps.length - 1 && (
+                          <div className="absolute top-12 left-1/2 w-px h-12 bg-gray-200 transform -translate-x-1/2" />
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
+                        <p className="text-gray-600 leading-relaxed">{step.description}</p>
+                      </div>
+                    </motion.div>
                   ))}
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-4 text-center py-4 border-t border-gray-100">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  className="mt-12"
+                >
+                  <button className="group bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-900 transition-all inline-flex items-center gap-2">
+                    Начать создавать
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </motion.div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className="relative"
+              >
+                <div className="aspect-[4/3] rounded-3xl overflow-hidden">
+                  <img
+                    src="https://images.unsplash.com/photo-1527631746610-bca00a040d60?w=800&q=80"
+                    alt="Creator inspiration"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="absolute -bottom-6 -right-6 bg-white p-6 rounded-2xl shadow-lg max-w-xs">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-gray-100" />
                   <div>
-                    <div className="font-semibold text-lg">{creator.followers.toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Followers</div>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-lg flex items-center justify-center">
-                      <StarIcon className="w-4 h-4 text-yellow-500 mr-1" />
-                      {creator.rating}
+                      <div className="font-medium">Михаил Смирнов</div>
+                      <div className="text-sm text-gray-500">1.2M подписчиков</div>
                     </div>
-                    <div className="text-xs text-gray-500">Rating</div>
                   </div>
-                  <div>
-                    <div className="font-semibold text-lg">{creator.trips}</div>
-                    <div className="text-xs text-gray-500">Trips</div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <div className="text-sm text-gray-600 mb-1">Доход за месяц</div>
+                      <div className="text-xl font-bold">₽127,500</div>
+                    </div>
+                    <div className="w-12 h-12 bg-green-50 text-green-500 rounded-full flex items-center justify-center">
+                      <ArrowRight className="w-6 h-6" />
+                  </div>
                   </div>
                 </div>
+              </motion.div>
+            </div>
+          </div>
+        </section>
 
-                {/* Social Links */}
-                <div className="flex justify-center space-x-4 pt-2">
-                  {creator.socialLinks.instagram && (
-                    <a 
-                      href={creator.socialLinks.instagram} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-pink-600 hover:text-pink-700"
-                    >
-                      <InstagramIcon className="w-5 h-5" />
-                    </a>
-                  )}
-                  {creator.socialLinks.youtube && (
-                    <a 
-                      href={creator.socialLinks.youtube} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <YoutubeIcon className="w-5 h-5" />
-                    </a>
-                  )}
+        {/* CTA Section */}
+        <section className="py-24 bg-black text-white">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="max-w-3xl mx-auto text-center">
+              <motion.h2
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="text-4xl font-bold mb-6 tracking-tight"
+              >
+                Готовы начать свое путешествие?
+              </motion.h2>
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 }}
+                className="text-xl text-gray-300 mb-8"
+              >
+                Присоединяйтесь к сообществу креативных путешественников уже сегодня
+              </motion.p>
+              <motion.button
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="group bg-white text-black px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-100 transition-all inline-flex items-center gap-2"
+              >
+                Подать заявку
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </motion.button>
                 </div>
-
-                <Button className="w-full mt-4">
-                  View Profile
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
         </div>
+        </section>
 
-        {/* Call to Action */}
-        <div className="text-center mt-16 p-8 bg-white rounded-2xl shadow-lg">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Ready to Share Your Travel Expertise?
-          </h2>
-          <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-            Join our community of travel creators and help others discover amazing destinations while earning from your passion for travel.
-          </p>
-          <Button 
-            onClick={() => setShowForm(true)}
-            size="lg"
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-          >
-            Start Your Creator Journey
-          </Button>
-        </div>
+        {isFormOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold">Стать создателем</h2>
+                <button 
+                  onClick={() => setIsFormOpen(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              <CreatorForm onSubmit={(data) => {
+                console.log('Creator application submitted:', data);
+                setIsFormOpen(false);
+              }} />
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+      <Footer />
+    </>
   );
-}
+};
+
+export default CreatorPage;

@@ -1,25 +1,26 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { images } from '../assets/images';
 
 const photos = [
   {
-    url: '/images/Traveling_around_Altai.jpg',
+    url: images.travelingAltai,
     location: 'Горный Алтай',
     category: 'Природа'
   },
   {
-    url: '/images/Traveling_around_Baikal.jpg',
+    url: images.travelingBaikal,
     location: 'Байкал',
     category: 'Озера'
   },
   {
-    url: '/images/Traveling_around_Kamchatka.jpg',
+    url: images.travelingKamchatka,
     location: 'Камчатка',
     category: 'Вулканы'
   },
   {
-    url: '/images/Traveling_around_Karelia.jpg',
+    url: images.travelingKarelia,
     location: 'Карелия',
     category: 'Леса'
   }

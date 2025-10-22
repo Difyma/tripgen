@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { MessageSquare, MapPin, Calendar } from 'lucide-react';
+import { images } from '../assets/images';
 
 const HowItWorks = () => {
   return (
@@ -136,7 +137,7 @@ const HowItWorks = () => {
             {/* Chat Screenshot (реальный скриншот) */}
             <div className="absolute left-1/2 bottom-4 -translate-x-1/2 w-[90%] sm:w-[70%] max-w-md shadow-xl rounded-2xl overflow-hidden border border-gray-100 bg-white">
               <img
-                src="/images/chat-screenshot.png"
+                src={images.chatScreenshot}
                 alt="Chat Screenshot"
                 className="w-full h-auto object-cover"
                 style={{ minHeight: 80 }}

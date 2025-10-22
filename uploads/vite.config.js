@@ -20,6 +20,7 @@ export default defineConfig({
     build: {
         outDir: 'dist',
         assetsDir: 'assets',
+        copyPublicDir: true,
         rollupOptions: {
             output: {
                 manualChunks: undefined,
@@ -29,4 +30,5 @@ export default defineConfig({
             },
         },
     },
+    publicDir: 'public',
 });
