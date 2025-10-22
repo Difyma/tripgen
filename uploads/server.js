@@ -3,7 +3,7 @@ import cors from 'cors';
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -260,6 +260,29 @@ app.get('/api/health', (req, res) => {
       ostrovokApiUrl: OSTROVOK_API_URL
     }
   });
+});
+
+// Environment variables endpoint for debugging
+app.get('/api/env', (req, res) => {
+  res.json({
+    supabaseUrl: process.env.VITE_SUPABASE_URL,
+    supabaseKey: process.env.VITE_SUPABASE_ANON_KEY ? 'configured' : 'missing',
+    telegramToken: process.env.TELEGRAM_BOT_TOKEN ? 'configured' : 'missing',
+    telegramChatId: process.env.TELEGRAM_CHAT_ID ? 'configured' : 'missing'
+  });
+});
+
+// Serve static files from dist directory
+app.use(express.static('dist'));
+
+// Serve index.html for all non-API routes (SPA routing)
+app.use((req, res, next) => {
+  // Skip API routes
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
+  // Serve index.html for all other routes
+  res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(port, () => {

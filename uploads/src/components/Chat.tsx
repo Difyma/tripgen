@@ -21,6 +21,7 @@ import TripBuilder from './TripBuilder';
 import { useFlightInfo } from '../hooks/useFlightInfo';
 import { loadChatHistory, saveChatHistory } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import GoogleMap from './GoogleMap';
 
 interface Message {
   id: number;
@@ -28,6 +29,13 @@ interface Message {
   isUser: boolean;
   role?: 'system' | 'user' | 'assistant';
   showCreateRoute?: boolean;
+}
+
+interface Place {
+  name: string;
+  lat: number;
+  lng: number;
+  type: 'hotel' | 'restaurant' | 'attraction' | 'airport' | 'museum' | 'cafe' | 'park';
 }
 
 interface FilterState {
@@ -500,6 +508,8 @@ const Chat = () => {
   const { user } = useAuth();
   const [hasInteracted, setHasInteracted] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [mapPlaces, setMapPlaces] = useState<Place[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<string>('');
   const isFirstMount = useRef(true);
   const lastSentText = useRef<string | null>(null);
 
@@ -799,10 +809,25 @@ const Chat = () => {
         id: Date.now() + Math.random(),
         text: data.text,
         isUser: false,
-        role: 'assistant'
+        role: 'assistant',
+        showCreateRoute: isItineraryMessage(data.text)
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
+      // Извлекаем места из ответа и обновляем карту
+      const extractedPlaces = extractPlacesFromMessage(data.text);
+      console.log('Extracted places:', extractedPlaces);
+      console.log('Text contains Шанхай:', data.text.toLowerCase().includes('шанхай'));
+      console.log('Text contains shanghai:', data.text.toLowerCase().includes('shanghai'));
+      
+      if (extractedPlaces.length > 0) {
+        setMapPlaces(extractedPlaces);
+        // Устанавливаем текущее местоположение из фильтров
+        if (filters.location) {
+          setCurrentLocation(filters.location);
+        }
+      }
     } catch (error) {
       console.error('Error in chat:', error);
       const errorMessage: Message = {
@@ -947,32 +972,216 @@ const Chat = () => {
     if (!text) return '';
 
     let formattedText = text
-      // Format headers with emojis
-      .replace(/^(Day \d+:.*)/gm, '<h3 class="text-xl font-bold mt-6 mb-3">$1</h3>')
+      // Format route headers with trip details style
+      .replace(/^#\s*📅\s*Маршрут\s*по\s*([^\n]+)/gim, 
+        '<div class="bg-white rounded-2xl border p-6 my-6">' +
+        '<div class="flex items-center gap-3 mb-6">' +
+        '<div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">' +
+        '<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>' +
+        '</div>' +
+        '<h2 class="text-2xl font-semibold">Маршрут по $1</h2>' +
+        '</div>')
       
-      // Format location names with icons and verification badges
-      .replace(/(?:✈️|🛫)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">✈️</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
-      .replace(/(?:🏨|🏰)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🏨</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
-      .replace(/(?:🍽️|🍴)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🍽️</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
-      .replace(/(?:🏛️|⛪)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🏛️</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
-      .replace(/(?:📍)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">📍</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
-
+      // Format day sections with trip details style
+      .replace(/^#\s*📅\s*День\s*(\d+):\s*([^\n]+)/gim, 
+        '<div class="bg-gray-50 rounded-xl p-6 my-4">' +
+        '<div class="flex items-center justify-between mb-4">' +
+        '<div class="flex items-center gap-4">' +
+        '<div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium">$1</div>' +
+        '<div><div class="font-medium">День $1: $2</div></div>' +
+        '</div>' +
+        '</div>')
+      
+      // Format time sections (Утро, День, Вечер)
+      .replace(/^##\s*(⏰|🌞|🌅)\s*(Утро|День|Вечер)\s*\(([^)]+)\)/gim, 
+        '<div class="mt-4 mb-4">' +
+        '<div class="flex items-center gap-2 mb-3">' +
+        '<span class="text-xl">$1</span>' +
+        '<h3 class="text-lg font-semibold">$2 ($3)</h3>' +
+        '</div>')
+      
+      // Format activity items with trip details style
+      .replace(/^•\s*(\d{1,2}:\d{2}-\d{1,2}:\d{2})\s*([🏨🍽️🎯🏛️✈️📍])\s*([^—]+)—\s*([^\n]+)/gm, 
+        '<div class="flex items-start gap-3 p-4 bg-white rounded-lg border border-gray-100 my-2">' +
+        '<div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">' +
+        '<span class="text-xl">$2</span>' +
+        '</div>' +
+        '<div class="flex-1">' +
+        '<div class="text-sm font-medium mb-1">$3</div>' +
+        '<div class="text-gray-600">$4</div>' +
+        '<div class="text-xs text-gray-500 mt-1">$1</div>' +
+        '</div>' +
+        '</div>')
+      
+      // Format simple bullet points
+      .replace(/^•\s*([^\n]+)/gm, 
+        '<div class="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-100 my-1">' +
+        '<div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">' +
+        '<div class="w-2 h-2 rounded-full bg-blue-600"></div>' +
+        '</div>' +
+        '<div class="flex-1 text-gray-700">$1</div>' +
+        '</div>')
+      
       // Format section headers
       .replace(/^#\s+([^\n]+)/gm, '<h2 class="text-2xl font-bold mt-8 mb-4">$1</h2>')
-
-      // Format bullet points
-      .replace(/^[•●]\s+([^\n]+)/gm, '<div class="flex items-start gap-2 my-2"><span class="text-gray-400 mt-1">•</span><span class="flex-1">$1</span></div>')
-
-      // Format time indicators
-      .replace(/(?:⏰|🌞|🌅)\s+([^\n]+)/g, '<div class="flex items-center gap-2 mt-4 mb-2"><span class="text-xl">$1</span></div>')
+      
+      // Format subheaders
+      .replace(/^##\s+([^\n]+)/gm, '<h3 class="text-lg font-semibold mt-6 mb-3">$1</h3>')
 
       // Format bold text
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold">$1</strong>')
       
       // Format paragraphs (excluding already formatted elements)
-      .replace(/(?<!<[^>]*>)([^\n]+)(?![^<]*>)(?:\n|$)/g, '<p class="my-2">$1</p>');
+      .replace(/(?<!<[^>]*>)([^\n]+)(?![^<]*>)(?:\n|$)/g, '<p class="my-2 text-gray-700">$1</p>');
+
+    // Close any open route sections
+    if (formattedText.includes('<div class="bg-white rounded-2xl border p-6 my-6">')) {
+      formattedText += '</div>';
+    }
 
     return formattedText;
+  };
+
+  // Heuristic to detect if assistant message contains an actual itinerary/route
+  const isItineraryMessage = (text: string): boolean => {
+    if (!text) return false;
+    const patterns = [
+      /#\s*📅\s*Маршрут/i,
+      /^День\s*\d+\s*:/im,
+      /\b(Утро|День|Вечер)\b/i,
+      /\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}/,
+      /🏨|🍽️|🎯|🏛️|✈️/
+    ];
+    return patterns.some((re) => re.test(text));
+  };
+
+  // Функция для извлечения мест из текста сообщения
+  const extractPlacesFromMessage = (text: string): Place[] => {
+    const places: Place[] = [];
+    
+    // Паттерны для поиска мест с эмодзи и типами
+    const placePatterns = [
+      // Паттерн: 🏨 Название отеля(hotel) — описание
+      {
+        regex: /🏨\s*([^(]+)\(hotel\)/g,
+        type: 'hotel' as const
+      },
+      // Паттерн: 🍽️ Название ресторана(restaurant) — описание
+      {
+        regex: /🍽️\s*([^(]+)\(restaurant\)/g,
+        type: 'restaurant' as const
+      },
+      // Паттерн: 🎯 Название достопримечательности(attraction) — описание
+      {
+        regex: /🎯\s*([^(]+)\(attraction\)/g,
+        type: 'attraction' as const
+      },
+      // Паттерн: ✈️ Аэропорт(airport) — описание
+      {
+        regex: /✈️\s*([^(]+)\(airport\)/g,
+        type: 'airport' as const
+      },
+      // Паттерн: 🏛️ Название музея(museum) — описание
+      {
+        regex: /🏛️\s*([^(]+)\(museum\)/g,
+        type: 'museum' as const
+      },
+      // Паттерн: ☕ Название кафе(cafe) — описание
+      {
+        regex: /☕\s*([^(]+)\(cafe\)/g,
+        type: 'cafe' as const
+      },
+      // Паттерн: 🌳 Название парка(park) — описание
+      {
+        regex: /🌳\s*([^(]+)\(park\)/g,
+        type: 'park' as const
+      }
+    ];
+
+    placePatterns.forEach(({ regex, type }) => {
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        const name = match[1].trim();
+        if (name) {
+          // Для демонстрации используем случайные координаты в пределах города
+          // В реальном приложении здесь должен быть геокодинг
+          const baseLat = 55.7558; // Москва
+          const baseLng = 37.6176;
+          const offsetLat = (Math.random() - 0.5) * 0.1;
+          const offsetLng = (Math.random() - 0.5) * 0.1;
+          
+          places.push({
+            name,
+            lat: baseLat + offsetLat,
+            lng: baseLng + offsetLng,
+            type
+          });
+        }
+      }
+    });
+
+    // Если не найдено мест по паттернам, попробуем найти упоминания городов/мест
+    if (places.length === 0) {
+      const cityPatterns = [
+        { name: 'Пекин', lat: 39.9042, lng: 116.4074, type: 'attraction' as const },
+        { name: 'Шанхай', lat: 31.2304, lng: 121.4737, type: 'attraction' as const },
+        { name: 'Гуанчжоу', lat: 23.1291, lng: 113.2644, type: 'attraction' as const },
+        { name: 'Шэньчжэнь', lat: 22.5431, lng: 114.0579, type: 'attraction' as const },
+        { name: 'Чэнду', lat: 30.5728, lng: 104.0668, type: 'attraction' as const },
+        { name: 'Сиань', lat: 34.3416, lng: 108.9398, type: 'attraction' as const },
+        { name: 'Ханчжоу', lat: 30.2741, lng: 120.1551, type: 'attraction' as const },
+        { name: 'Нанкин', lat: 32.0603, lng: 118.7969, type: 'attraction' as const }
+      ];
+
+      cityPatterns.forEach(city => {
+        if (text.toLowerCase().includes(city.name.toLowerCase())) {
+          places.push(city);
+        }
+      });
+    }
+
+    // Если все еще нет мест, создаем демо-места для Китая
+    if (places.length === 0 && (text.toLowerCase().includes('китай') || text.toLowerCase().includes('china'))) {
+      places.push(
+        { name: 'Запретный город', lat: 39.9163, lng: 116.3972, type: 'attraction' },
+        { name: 'Великая Китайская стена', lat: 40.4319, lng: 116.5704, type: 'attraction' },
+        { name: 'Храм Неба', lat: 39.8823, lng: 116.4066, type: 'attraction' },
+        { name: 'Летний дворец', lat: 39.9999, lng: 116.2755, type: 'attraction' }
+      );
+    }
+
+    // Если все еще нет мест, но есть упоминания Шанхая или Гуанчжоу, создаем места для этих городов
+    if (places.length === 0) {
+      if (text.toLowerCase().includes('шанхай') || text.toLowerCase().includes('shanghai')) {
+        places.push(
+          { name: 'Набережная Вайтань', lat: 31.2397, lng: 121.4998, type: 'attraction' },
+          { name: 'Шанхайский музей', lat: 31.2277, lng: 121.4750, type: 'museum' },
+          { name: 'Юй Юань', lat: 31.2269, lng: 121.4920, type: 'attraction' },
+          { name: 'Шанхайская башня', lat: 31.2336, lng: 121.5050, type: 'attraction' }
+        );
+      }
+      
+      if (text.toLowerCase().includes('гуанчжоу') || text.toLowerCase().includes('guangzhou') || text.toLowerCase().includes('ганчжоу')) {
+        places.push(
+          { name: 'Башня Кантон', lat: 23.1090, lng: 113.3245, type: 'attraction' },
+          { name: 'Храм Шести Баньянов', lat: 23.1300, lng: 113.2500, type: 'attraction' },
+          { name: 'Парк Юэсю', lat: 23.1400, lng: 113.2700, type: 'park' },
+          { name: 'Остров Шамянь', lat: 23.1100, lng: 113.2300, type: 'attraction' }
+        );
+      }
+    }
+
+    // Если все еще нет мест, но есть упоминания маршрута, создаем общие места для Китая
+    if (places.length === 0 && (text.includes('День') || text.includes('маршрут') || text.includes('путешествие'))) {
+      places.push(
+        { name: 'Запретный город', lat: 39.9163, lng: 116.3972, type: 'attraction' },
+        { name: 'Великая Китайская стена', lat: 40.4319, lng: 116.5704, type: 'attraction' },
+        { name: 'Храм Неба', lat: 39.8823, lng: 116.4066, type: 'attraction' },
+        { name: 'Летний дворец', lat: 39.9999, lng: 116.2755, type: 'attraction' }
+      );
+    }
+
+    return places;
   };
 
   // Update the message rendering in the Chat component
@@ -1316,7 +1525,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
         <div className="w-full flex-1 flex flex-col min-h-0">
           {/* Top Navigation */}
           <div className={`fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 md:sticky md:z-10 ${mobileOpen ? 'hidden' : ''} w-full`}>
-            <div className="max-w-3xl md:max-w-4xl md:ml-12 md:mr-auto px-4 py-3">
+            <div className={`px-4 py-3 ${mapPlaces.length > 0 ? 'max-w-2xl md:max-w-3xl md:ml-12 md:mr-4' : 'max-w-3xl md:max-w-4xl md:ml-12 md:mr-auto'}`}>
               <div className="flex items-center justify-between gap-4">
                 {/* Mobile Navigation */}
                 <div className="flex items-center gap-2 md:hidden">
@@ -1372,9 +1581,11 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
           </div>
 
           {/* Chat Area */}
-          <div className="flex-1 flex flex-col min-h-0 pt-[56px] pb-0 md:pt-0 md:pb-0 w-full">
-            <div className="flex-1 p-6 overflow-y-auto pb-32 md:pb-24 w-full">
-              <div className="max-w-3xl md:max-w-4xl md:ml-12 md:mr-auto space-y-6">
+          <div className={`flex-1 flex flex-col min-h-0 pt-[56px] pb-0 md:pt-0 md:pb-0 ${mapPlaces.length > 0 ? 'lg:w-[calc(100%-384px)]' : 'w-full'}`}>
+            <div className="flex-1 flex overflow-hidden w-full">
+              {/* Messages Area */}
+              <div className="flex-1 p-6 overflow-y-auto pb-32 md:pb-24">
+                <div className={`space-y-6 ${mapPlaces.length > 0 ? 'max-w-2xl md:max-w-3xl md:ml-12 md:mr-4' : 'max-w-3xl md:max-w-4xl md:ml-12 md:mr-auto'}`}>
                 {/* Показываем приветственное сообщение и подсказки до взаимодействия */}
                 {!hasInteracted && (
                   <>
@@ -1438,8 +1649,8 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                       `}
                     >
                       {renderMessage(message)}
-                      {/* Кнопка 'Сохранить маршрут' только для ассистента, не для приветственного сообщения и только на десктопе */}
-                      {!message.isUser && message.id !== messages[0].id && (
+                      {/* Кнопка 'Сохранить маршрут' показывается только если в ответе есть маршрут */}
+                      {!message.isUser && message.id !== messages[0].id && message.showCreateRoute && (
                         <div className="mt-3 flex md:justify-end justify-center">
                           <button
                             className="hidden md:flex items-center gap-2 px-5 py-2 bg-black text-white rounded-full font-medium hover:bg-gray-900 transition-colors shadow"
@@ -1454,13 +1665,30 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                   </motion.div>
                 ))}
                 <div ref={messagesEndRef} />
+                </div>
               </div>
+              
+              {/* Map Area - показываем только на десктопе и если есть места */}
+              {mapPlaces.length > 0 && (
+                <div className="hidden lg:block w-96 border-l border-gray-200 bg-gray-50">
+                  <div className="p-4">
+                    <h3 className="text-lg font-semibold mb-4 text-gray-900">
+                      Места на карте
+                    </h3>
+                    <GoogleMap 
+                      location={currentLocation}
+                      places={mapPlaces}
+                      className="h-[calc(100vh-200px)]"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           
           {/* Chat Input (fixed on mobile, static on desktop) */}
-          <div className="sticky bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 p-4">
-            <div className="max-w-3xl md:max-w-4xl md:ml-12 md:mr-auto">
+          <div className={`sticky bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 p-4 ${mapPlaces.length > 0 ? 'lg:w-[calc(100%-384px)]' : 'w-full'}`}>
+            <div className={`${mapPlaces.length > 0 ? 'max-w-2xl md:max-w-3xl md:ml-12 md:mr-4' : 'max-w-3xl md:max-w-4xl md:ml-12 md:mr-auto'}`}>
               <div className="w-full flex items-center gap-2">
                 <div className="relative flex-1">
                   <input
