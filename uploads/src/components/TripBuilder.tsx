@@ -39,23 +39,23 @@ const getActivityIcon = (type: string) => activityIcons[type] || activityIcons.d
 const getActivityImage = (type: string) => {
   const images: Record<string, string[]> = {
     hotel: [
-      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&q=80',
-      'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800&q=80',
+      '/images/Traveling_around_Altai.jpg',
+      '/images/Traveling_around_Baikal.jpg',
     ],
     restaurant: [
-      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80',
-      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80',
+      '/images/Traveling_around_Kamchatka.jpg',
+      '/images/Traveling_around_Karelia.jpg',
     ],
     cafe: [
-      'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800&q=80',
-      'https://images.unsplash.com/photo-1559925393-8be0ec4767c8?w=800&q=80',
+      '/images/Traveling_around_Altai.jpg',
+      '/images/Traveling_around_Baikal.jpg',
     ],
     attraction: [
-      'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&q=80',
-      'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80',
+      '/images/Traveling_around_Kamchatka.jpg',
+      '/images/Traveling_around_Karelia.jpg',
     ],
     default: [
-      'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80',
+      '/images/Traveling_around_Altai.jpg',
     ],
   };
   return (images[type] || images.default)[Math.floor(Math.random() * (images[type]?.length || 1))];

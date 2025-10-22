@@ -3,6 +3,8 @@
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { images } from '../assets/images';
+import ImageFallback from './ImageFallback';
 
 const CreatorSection = () => {
   return (
@@ -90,10 +92,11 @@ const CreatorSection = () => {
                   transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
                   className="relative h-full rounded-3xl overflow-hidden shadow-xl"
                 >
-                  <img
-                    src="https://images.unsplash.com/photo-1527631746610-bca00a040d60?w=800&q=80"
+                  <ImageFallback
+                    src={images.creatorImage}
                     alt="Travel creator"
                     className="w-full h-full object-cover"
+                    fallbackSrc="https://images.unsplash.com/photo-1527631746610-bca00a040d60?w=800&q=80"
                   />
                 </motion.div>
 
@@ -105,10 +108,11 @@ const CreatorSection = () => {
                   transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
                   className="absolute -top-8 -left-8 w-40 h-40 rounded-2xl overflow-hidden shadow-lg"
                 >
-                  <img
-                    src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400&q=80"
+                  <ImageFallback
+                    src={images.travelImage1}
                     alt="Travel moment"
                     className="w-full h-full object-cover"
+                    fallbackSrc="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400&q=80"
                   />
                 </motion.div>
 
@@ -119,10 +123,11 @@ const CreatorSection = () => {
                   transition={{ duration: 0.8, delay: 0.7, ease: "easeOut" }}
                   className="absolute -bottom-8 -right-8 w-48 h-36 rounded-2xl overflow-hidden shadow-lg"
                 >
-                  <img
-                    src="https://images.unsplash.com/photo-1488085061387-422e29b40080?w=400&q=80"
+                  <ImageFallback
+                    src={images.travelImage2}
                     alt="Travel experience"
                     className="w-full h-full object-cover"
+                    fallbackSrc="https://images.unsplash.com/photo-1488085061387-422e29b40080?w=400&q=80"
                   />
                 </motion.div>
 

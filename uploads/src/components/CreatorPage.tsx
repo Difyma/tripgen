@@ -5,6 +5,8 @@ import { MainNavbar } from './MainNavbar';
 import Footer from './Footer';
 import CreatorForm from './CreatorForm';
 import { AuthModal } from './AuthModal';
+import { images } from '../assets/images';
+import ImageFallback from './ImageFallback';
 
 const benefits = [
   {
@@ -126,10 +128,11 @@ const CreatorPage = () => {
               </div>
               <div className="relative">
                 <div className="aspect-square rounded-3xl overflow-hidden">
-                  <img
-                    src="https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=1200&q=80"
+                  <ImageFallback
+                    src={images.creatorImage}
                     alt="Creator background"
                     className="w-full h-full object-cover"
+                    fallbackSrc="https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=1200&q=80"
                   />
                 </div>
                 <div className="absolute -bottom-6 -left-6 bg-white p-6 rounded-2xl shadow-lg max-w-xs">
@@ -318,10 +321,11 @@ const CreatorPage = () => {
                 className="relative"
               >
                 <div className="aspect-[4/3] rounded-3xl overflow-hidden">
-                  <img
-                    src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80"
+                  <ImageFallback
+                    src={images.travelImage1}
                     alt="Creator working"
                     className="w-full h-full object-cover"
+                    fallbackSrc="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80"
                   />
                 </div>
                 <div className="absolute -bottom-6 right-6 bg-white p-6 rounded-2xl shadow-lg">
@@ -397,10 +401,11 @@ const CreatorPage = () => {
                 className="relative"
               >
                 <div className="aspect-[4/3] rounded-3xl overflow-hidden">
-                  <img
-                    src="https://images.unsplash.com/photo-1527631746610-bca00a040d60?w=800&q=80"
+                  <ImageFallback
+                    src={images.travelImage2}
                     alt="Creator inspiration"
                     className="w-full h-full object-cover"
+                    fallbackSrc="https://images.unsplash.com/photo-1527631746610-bca00a040d60?w=800&q=80"
                   />
                 </div>
                 <div className="absolute -bottom-6 -right-6 bg-white p-6 rounded-2xl shadow-lg max-w-xs">

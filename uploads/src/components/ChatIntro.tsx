@@ -2,24 +2,29 @@
 
 import { motion } from 'framer-motion';
 import { MessageCircle, Sparkles, Map } from 'lucide-react';
+import { images } from '../assets/images';
+import ImageFallback from './ImageFallback';
 
 const steps = [
   {
     title: 'Опишите свои интересы',
     description: 'Расскажите нам о своих предпочтениях в путешествиях, бюджете и желаемых впечатлениях',
-    image: 'https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=1200&q=80',
+    image: images.travelImage1,
+    fallbackImage: 'https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=1200&q=80',
     icon: MessageCircle
   },
   {
     title: 'AI создаст маршрут',
     description: 'Искусственный интеллект проанализирует ваши пожелания и создаст идеальный маршрут',
-    image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80',
+    image: images.travelImage2,
+    fallbackImage: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1200&q=80',
     icon: Sparkles
   },
   {
     title: 'Отправляйтесь в путь',
     description: 'Получите детальный план путешествия с описанием мест, отелей и активностей',
-    image: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&q=80',
+    image: images.travelImage3,
+    fallbackImage: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&q=80',
     icon: Map
   }
 ];
@@ -72,10 +77,11 @@ const ChatIntro = () => {
                   whileHover={{ scale: 1.02 }}
                   transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
                 >
-                  <img
+                  <ImageFallback
                     src={step.image}
                     alt={step.title}
                     className="w-full h-full object-cover"
+                    fallbackSrc={step.fallbackImage}
                   />
                   <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent opacity-60" />
                 </motion.div>
