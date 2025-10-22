@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Search, Calendar, Users, AlertCircle, X } from 'lucide-react';
 import { useState } from 'react';
+import { images } from '../assets/images';
 import { 
   Popover,
   PopoverContent,
@@ -110,7 +111,7 @@ const Hero = () => {
             >
               <div className="w-full h-full rounded-2xl overflow-hidden">
                 <img
-                  src="https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=2400&q=80"
+                  src={images.heroImage}
                   alt="Scenic landscape"
                   className="w-full h-full object-cover"
                 />

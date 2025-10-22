@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import TravelQuizModal from './TravelQuizModal';
+import { images } from '../assets/images';
 
 interface QuizResults {
   travelStyle: string;
@@ -44,7 +45,7 @@ const TravelQuiz = () => {
           >
             <div className="absolute inset-4 right-4 left-0 rounded-r-3xl overflow-hidden">
               <img
-                src="https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=1200&q=80"
+                src={images.quizImage}
                 alt="Luxury travel experience"
                 className="w-full h-full object-cover"
               />

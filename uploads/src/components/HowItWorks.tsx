@@ -52,7 +52,7 @@ const HowItWorks = () => {
               <div className="relative group">
                 <div className="rounded-3xl overflow-hidden shadow-lg">
                   <img
-                    src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=80"
+                    src={images.travelImage1}
                     alt="Search"
                     className="w-full h-full object-cover"
                   />
@@ -74,7 +74,7 @@ const HowItWorks = () => {
               <div className="relative group">
                 <div className="rounded-3xl overflow-hidden shadow-lg">
                   <img
-                    src="https://images.unsplash.com/photo-1580674285054-bed31e145f59?w=800&q=80"
+                    src={images.travelImage2}
                     alt="Calendar"
                     className="w-full h-full object-cover"
                   />
@@ -96,7 +96,7 @@ const HowItWorks = () => {
               <div className="relative group">
                 <div className="rounded-3xl overflow-hidden shadow-lg">
                   <img
-                    src="https://images.unsplash.com/photo-1533130061792-64b345e4a833?w=800&q=80"
+                    src={images.travelImage3}
                     alt="Activities"
                     className="w-full h-full object-cover"
                   />
@@ -118,7 +118,7 @@ const HowItWorks = () => {
               <div className="relative group">
                 <div className="rounded-3xl overflow-hidden shadow-lg">
                   <img
-                    src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800&q=80"
+                    src={images.travelingAltai}
                     alt="Journey"
                     className="w-full h-full object-cover"
                   />

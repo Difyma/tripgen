@@ -10,4 +10,13 @@ export const images = {
   userWomen: '/images/user_women.png',
   user: '/images/user.png',
   webBrowser: '/images/web-brower.png',
+  // Заглушки для внешних изображений
+  heroImage: '/images/Traveling_around_Altai.jpg',
+  travelImage1: '/images/Traveling_around_Baikal.jpg',
+  travelImage2: '/images/Traveling_around_Kamchatka.jpg',
+  travelImage3: '/images/Traveling_around_Karelia.jpg',
+  creatorImage: '/images/Traveling_around_Altai.jpg',
+  quizImage: '/images/Traveling_around_Baikal.jpg',
+  collectiveImage: '/images/Traveling_around_Kamchatka.jpg',
+  exampleImage: '/images/Traveling_around_Karelia.jpg',
 } as const;

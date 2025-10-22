@@ -1,5 +1,6 @@
 import { MapPin, Calendar, Users2, Clock, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { images } from '../assets/images';
 
 interface TourStop {
   id: number;
@@ -17,7 +18,7 @@ const ExampleTour = () => {
       time: "09:00",
       title: "Красная площадь",
       description: "Начните день с посещения главной площади страны. Осмотрите Собор Василия Блаженного, ГУМ и Кремль.",
-      image: "https://images.unsplash.com/photo-1513326738677-b964603b136d?w=800",
+      image: images.travelingAltai,
       duration: "2 часа"
     },
     {
@@ -25,7 +26,7 @@ const ExampleTour = () => {
       time: "11:30",
       title: "Парк Зарядье",
       description: "Современный парк с уникальной архитектурой и потрясающим видом на город. Посетите Парящий мост.",
-      image: "https://images.unsplash.com/photo-1541447271487-09612b3f3555?w=800",
+      image: images.travelingBaikal,
       duration: "1.5 часа"
     },
     {
@@ -33,7 +34,7 @@ const ExampleTour = () => {
       time: "13:30",
       title: "Обед в Кафе Пушкинъ",
       description: "Насладитесь традиционной русской кухней в одном из самых известных ресторанов Москвы.",
-      image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800",
+      image: images.travelingKamchatka,
       duration: "1.5 часа"
     }
   ];
@@ -167,7 +168,7 @@ const ExampleTour = () => {
             <div className="sticky top-8 h-[700px] sm:h-full rounded-3xl overflow-hidden shadow-lg">
               <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent z-10" />
               <img 
-                src="https://images.unsplash.com/photo-1547448415-e9f5b28e570d?w=1200"
+                src={images.travelingKarelia}
                 alt="Москва с высоты"
                 className="w-full h-full object-cover"
               />

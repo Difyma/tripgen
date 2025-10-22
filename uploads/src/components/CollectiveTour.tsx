@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Users, MessageSquare, Link2, Calendar, MapPin, Share2 } from 'lucide-react';
 import { FC } from 'react';
+import { images } from '../assets/images';
 
 const CollectiveTour: FC = () => {
   const handleCopyLink = () => {
@@ -117,7 +118,7 @@ const CollectiveTour: FC = () => {
             className="relative rounded-2xl overflow-hidden"
           >
             <img 
-              src="https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=1200&q=80"
+              src={images.collectiveImage}
               alt="Ocean view"
               className="w-full h-[400px] object-cover"
             />
