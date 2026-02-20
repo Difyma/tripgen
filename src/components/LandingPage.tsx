@@ -9,6 +9,7 @@ import TravelGallery from './TravelGallery';
 import CTASection from './CTASection';
 import TravelQuiz from './TravelQuiz';
 import ScrollToTopButton from './ScrollToTopButton';
+import { ReadyTours } from './ReadyTours';
 
 export function LandingPage() {
   return (
@@ -16,6 +17,7 @@ export function LandingPage() {
       <main className="w-full">
         <Hero />
         <HowItWorks />
+        <ReadyTours />
         <ExampleTour />
         <Services />
         <TravelQuiz />
