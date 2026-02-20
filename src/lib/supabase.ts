@@ -1,9 +1,48 @@
-import { createClient, Session, AuthError as SupabaseAuthError } from '@supabase/supabase-js';
+import { createClient, Session, AuthError as SupabaseAuthError, type SupabaseClient } from '@supabase/supabase-js';
 
+// Read from Vite env
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const createMockSupabase = (): SupabaseClient => {
+  console.warn(
+    'Supabase environment variables are missing. Falling back to a mock client so the UI can render.'
+  );
+
+  const mockResponse = {
+    select: () => mockResponse,
+    eq: () => mockResponse,
+    single: async () => ({ data: null, error: null }),
+    insert: async () => ({ data: null, error: null }),
+    update: async () => ({ data: null, error: null }),
+    upsert: async () => ({ data: null, error: null })
+  };
+
+  return {
+    auth: {
+      signInWithPassword: async () => ({
+        data: { user: null, session: null },
+        error: new Error('Supabase is not configured')
+      }),
+      signUp: async () => ({
+        data: { user: null, session: null },
+        error: new Error('Supabase is not configured')
+      }),
+      signOut: async () => ({ error: null }),
+      getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: async () => ({ data: { user: null }, error: null }),
+      onAuthStateChange: (_callback: (event: any, session: any) => void) => ({
+        data: { subscription: { unsubscribe: () => undefined } }
+      })
+    },
+    from: () => mockResponse
+  } as unknown as SupabaseClient;
+};
+
+export const supabase: SupabaseClient = hasSupabaseConfig
+  ? createClient(supabaseUrl!, supabaseAnonKey!)
+  : createMockSupabase();
 
 export interface User {
   id: string;

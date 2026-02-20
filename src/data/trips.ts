@@ -8,6 +8,12 @@ export interface Trip {
   image: string;
   status: 'upcoming' | 'past' | 'ongoing';
   route: string[];
+  participants?: Array<{
+    id: string;
+    name: string;
+    email?: string;
+    avatar?: string;
+  }>;
   details?: {
     travelers: number;
     transportation: string[];

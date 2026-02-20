@@ -31,4 +31,13 @@ export default [
       // ваши правила
     },
   },
+  {
+    files: ['server/**/*.{js,ts}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
 ];

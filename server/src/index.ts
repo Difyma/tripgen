@@ -1,16 +1,12 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import gptRouter from './src/gptProxy.js';
+import gptRouter from './gptProxy.js';
 import flightsRouter from './routes/flights.js';
 import creatorRouter from './routes/creatorApplication.js';
-import hotelsRouter from './routes/hotels-full.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const rootDir = path.resolve(__dirname, '..');
+const rootDir = path.resolve(__dirname, '../../');
 
 // Load environment variables from root directory
 dotenv.config({ path: path.join(rootDir, '.env') });
@@ -18,7 +14,8 @@ dotenv.config({ path: path.join(rootDir, '.env') });
 // Log environment status
 console.log('Environment loaded from:', path.join(rootDir, '.env'));
 console.log('Environment variables status:', {
-  OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
+  YANDEX_API_KEY: !!process.env.YANDEX_API_KEY,
+  YANDEX_FOLDER_ID: !!process.env.YANDEX_FOLDER_ID,
   TELEGRAM_BOT_TOKEN: !!process.env.TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID: !!process.env.TELEGRAM_CHAT_ID
 });
@@ -43,7 +40,7 @@ app.use(cors({
 console.log('CORS middleware configured');
 
 // Middleware для логирования запросов
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`${req.method} ${req.url}`, {
     body: req.body,
     query: req.query,
@@ -53,7 +50,7 @@ app.use((req, res, next) => {
 });
 
 // Test endpoint
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
@@ -61,17 +58,15 @@ app.get('/', (req, res) => {
 app.use('/api', gptRouter);
 app.use('/api/flights', flightsRouter);
 app.use('/api/creators', creatorRouter);
-app.use('/api/hotels', hotelsRouter);
 
 console.log('Routes configured:', {
   gpt: '/api',
   flights: '/api/flights',
-  creators: '/api/creators',
-  hotels: '/api/hotels'
+  creators: '/api/creators'
 });
 
 // Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Global error handler:', err);
   res.status(500).json({
     error: 'Что-то пошло не так!',
@@ -84,23 +79,19 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running at http://localhost:${PORT}`);
   console.log('Available routes:');
   console.log('- GET  /         -> Server status');
-  console.log('- POST /api/openai -> OpenAI GPT endpoint');
+  console.log('- POST /api/yandex-gpt -> GPT endpoint');
   console.log('- POST /api/flights/search -> Flight search endpoint');
   console.log('- POST /api/creators/creator-application -> Creator application endpoint');
-  console.log('- POST /api/hotels/search -> Hotel search endpoint');
-  console.log('- POST /api/hotels/hotelpage -> Hotel details endpoint');
-  console.log('- POST /api/hotels/content -> Hotel static content endpoint');
-  console.log('- GET  /api/hotels/suggest -> Hotel/region autocomplete');
 });
 
-server.on('error', (error) => {
+server.on('error', (error: Error) => {
   console.error('Server error:', error);
 });
 
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', (error: Error) => {
   console.error('Uncaught exception:', error);
 });
 
-process.on('unhandledRejection', (error) => {
+process.on('unhandledRejection', (error: Error) => {
   console.error('Unhandled rejection:', error);
 }); 

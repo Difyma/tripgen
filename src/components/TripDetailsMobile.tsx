@@ -1,4 +1,4 @@
-import { MapPin, Calendar, DollarSign, Users, Plane, Hotel, Car, CalendarDays, Utensils, ArrowLeft, Clock, MessageSquare } from 'lucide-react';
+import { MapPin, Calendar, DollarSign, Users, Plane, Hotel, CalendarDays, ArrowLeft, Clock, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Trip {

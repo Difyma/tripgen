@@ -35,14 +35,13 @@ const Hero = () => {
     pets: 0
   });
 
-  const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // Определяем, мобильное ли устройство (Tailwind breakpoint sm)
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+  // const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
 
   const handleSearch = () => {
     // Проверяем заполнение обязательных полей

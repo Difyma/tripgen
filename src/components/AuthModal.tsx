@@ -113,7 +113,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     
     try {
       const result = await signInOrSignUp(email, password);
-      if (result.needsEmailConfirmation) {
+      if ((result as any).needsEmailConfirmation) {
         setNeedsEmailConfirmation(true);
         setPendingEmail(email);
         setErrorMessage('');

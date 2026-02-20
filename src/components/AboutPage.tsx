@@ -1,6 +1,5 @@
-import React from "react";
 import { motion } from "framer-motion";
-import { Sparkles, UserCheck, Brain, LayoutGrid, CheckCircle } from "lucide-react";
+import { UserCheck, Brain, LayoutGrid, CheckCircle } from "lucide-react";
 import { MainNavbar } from "./MainNavbar";
 import Footer from "./Footer";
 

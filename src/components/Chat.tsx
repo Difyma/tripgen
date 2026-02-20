@@ -276,7 +276,7 @@ const SuggestedQuestions = ({ onSelectQuestion }: { onSelectQuestion: (text: str
 // 1. Вынести JSX фильтров в отдельный компонент ChatFilters
 function ChatFilters({
   filters,
-  setFilters,
+  setFilters: _setFilters,
   dateFilter,
   setDateFilter,
   handleLocationChange,
@@ -557,40 +557,107 @@ const Chat = () => {
   const [hasInteracted, setHasInteracted] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const isFirstMount = useRef(true);
-  const hasSentInitial = useRef(false);
   const lastSentText = useRef<string | null>(null);
 
   // Функция для нормализации направления в именительный падеж
   const normalizeLocation = (word: string) => {
     const map: Record<string, string> = {
+      // Страны
       'японии': 'Япония',
+      'япония': 'Япония',
       'италии': 'Италия',
+      'италия': 'Италия',
       'франции': 'Франция',
-      'париже': 'Париж',
+      'франция': 'Франция',
       'россии': 'Россия',
+      'россия': 'Россия',
       'германии': 'Германия',
+      'германия': 'Германия',
       'турции': 'Турция',
+      'турция': 'Турция',
       'таиланде': 'Таиланд',
       'таиланда': 'Таиланд',
+      'таиланд': 'Таиланд',
       'швейцарии': 'Швейцария',
+      'швейцария': 'Швейцария',
       'англии': 'Англия',
+      'англия': 'Англия',
+      'испании': 'Испания',
+      'испания': 'Испания',
+      'португалии': 'Португалия',
+      'португалия': 'Португалия',
+      'греции': 'Греция',
+      'греция': 'Греция',
+      // Города
+      'париже': 'Париж',
+      'парижа': 'Париж',
+      'парижу': 'Париж',
+      'париж': 'Париж',
       'лондоне': 'Лондон',
+      'лондона': 'Лондон',
+      'лондону': 'Лондон',
+      'лондон': 'Лондон',
       'риме': 'Рим',
+      'рима': 'Рим',
+      'риму': 'Рим',
       'рим': 'Рим',
       'москве': 'Москва',
       'москвы': 'Москва',
+      'москву': 'Москва',
+      'москва': 'Москва',
       'санкт-петербурге': 'Санкт-Петербург',
       'санкт-петербурга': 'Санкт-Петербург',
+      'санкт-петербургу': 'Санкт-Петербург',
+      'петербурге': 'Санкт-Петербург',
+      'петербурга': 'Санкт-Петербург',
       'амстердаме': 'Амстердам',
       'амстердама': 'Амстердам',
+      'амстердаму': 'Амстердам',
+      'амстердам': 'Амстердам',
+      'берлине': 'Берлин',
+      'берлина': 'Берлин',
+      'берлину': 'Берлин',
+      'берлин': 'Берлин',
+      'барселоне': 'Барселона',
+      'барселоны': 'Барселона',
+      'барселону': 'Барселона',
+      'барселона': 'Барселона',
+      'мадриде': 'Мадрид',
+      'мадрида': 'Мадрид',
+      'мадриду': 'Мадрид',
+      'мадрид': 'Мадрид',
+      'вене': 'Вена',
+      'вены': 'Вена',
+      'вену': 'Вена',
+      'вена': 'Вена',
+      'праге': 'Прага',
+      'праги': 'Прага',
+      'прагу': 'Прага',
+      'прага': 'Прага',
+      'венеции': 'Венеция',
+      'венецию': 'Венеция',
+      'венеция': 'Венеция',
+      'флоренции': 'Флоренция',
+      'флоренцию': 'Флоренция',
+      'флоренция': 'Флоренция',
+      'милане': 'Милан',
+      'милана': 'Милан',
+      'милану': 'Милан',
+      'милан': 'Милан',
+      'неаполе': 'Неаполь',
+      'неаполя': 'Неаполь',
+      'неаполю': 'Неаполь',
+      'неаполь': 'Неаполь',
       'сочи': 'Сочи',
       'казани': 'Казань',
       'казань': 'Казань',
       'спб': 'Санкт-Петербург',
+      'питер': 'Санкт-Петербург',
+      'питере': 'Санкт-Петербург',
       // ...добавить по необходимости
     };
-    const lower = word.toLowerCase();
-    return map[lower] || (word[0] ? word[0].toUpperCase() + word.slice(1) : word);
+    const lower = word.toLowerCase().trim();
+    return map[lower] || (word[0] ? word[0].toUpperCase() + word.slice(1).toLowerCase() : word);
   };
 
   // Функция для парсинга русской даты в объект Date
@@ -627,7 +694,8 @@ const Chat = () => {
   }
 
   // Автоматическое заполнение направления по тексту
-  const autoFillLocation = (messageText: string) => {
+  // Возвращает найденную локацию для использования в запросе
+  const extractLocationFromText = (messageText: string): string => {
     const flightInfo = extractFlightInfo(messageText);
     let newLocation = '';
     if (flightInfo.destination) {
@@ -637,29 +705,92 @@ const Chat = () => {
     }
     // Дополнительная эвристика, если не найдено направление
     if (!newLocation) {
-      // Паттерн "по|в|на|о|об [Город]" (независимо от регистра)
-      const cityMatch = messageText.match(/\b(по|в|на|о|об)\s+([A-Za-zА-Яа-яЁё\-]+)/iu);
-      if (cityMatch && cityMatch[2]) {
-        newLocation = cityMatch[2][0].toUpperCase() + cityMatch[2].slice(1).toLowerCase();
+      // Улучшенные паттерны для поиска городов в разных падежах
+      // Паттерн "в/во/на/по/о/об [Город]" - ищет в любом месте текста
+      const cityMatch = messageText.match(/(?:в|во|на|по|о|об|про)\s+([A-Za-zА-Яа-яЁё\-ьъ]+(?:е|а|у|ом|ой|и|ы)?)(?=\s|$|[.,!?])/iu);
+      if (cityMatch && cityMatch[1]) {
+        newLocation = cityMatch[1].trim();
       } else {
-        // Найти все слова с заглавной буквы, не являющиеся местоимениями
-        const words = messageText.split(/\s+/);
-        const skipWords = ['Я', 'Мы', 'Ты', 'Вы', 'Он', 'Она', 'Они', 'Это', 'В', 'На', 'Из', 'По', 'С', 'У', 'К', 'О', 'Об', 'Для', 'Про', 'И', 'А', 'Но', 'Да', 'Нет', 'Или', 'Если', 'Что', 'Как', 'Где', 'Когда', 'Почему', 'Зачем', 'Куда', 'Откуда'];
-        const capitals = words.filter(w => w[0] && w[0] === w[0].toUpperCase() && !skipWords.includes(w));
-        if (capitals.length > 0) {
-          newLocation = capitals[capitals.length - 1].replace(/[^A-Za-zА-Яа-яЁё\-]/g, '');
+        // Паттерн для фраз типа "где остановиться в [Город]" или "лучше остановиться в [Город]"
+        const whereMatch = messageText.match(/(?:где|куда|лучше|остановиться|отель|отели|гостиница|гостиницы).*?(?:в|во|на|по)\s+([A-ZА-Я][a-zа-яё\-]+(?:е|а|у|ом|ой|и|ы)?)(?=\s|$|[.,!?])/iu);
+        if (whereMatch && whereMatch[1]) {
+          newLocation = whereMatch[1].trim();
         } else {
-          // Если не найдено слово с заглавной, взять последнее слово
-          const lastWord = words[words.length - 1].replace(/[^A-Za-zА-Яа-яЁё\-]/g, '');
-          if (lastWord.length > 2) {
-            newLocation = lastWord[0].toUpperCase() + lastWord.slice(1).toLowerCase();
+          // Специальная обработка для "по [стране/региону]"
+          const countryMatch = messageText.match(/(?:^|\s|🏨|✈️|🎯|🍽️|🏛️)(?:по|в|во|на)\s+([A-Za-zА-Яа-яЁё\-ьъ]+)/iu);
+          if (countryMatch && countryMatch[1]) {
+            newLocation = countryMatch[1].trim();
+          } else {
+            // Поиск известных городов в тексте (даже в разных падежах)
+            const knownCities = [
+              'Париж', 'Париже', 'Парижа', 'Парижу',
+              'Москва', 'Москве', 'Москвы', 'Москву',
+              'Лондон', 'Лондоне', 'Лондона', 'Лондону',
+              'Рим', 'Риме', 'Рима', 'Риму',
+              'Берлин', 'Берлине', 'Берлина', 'Берлину',
+              'Амстердам', 'Амстердаме', 'Амстердама', 'Амстердаму',
+              'Барселона', 'Барселоне', 'Барселоны', 'Барселону',
+              'Мадрид', 'Мадриде', 'Мадрида', 'Мадриду',
+              'Вена', 'Вене', 'Вены', 'Вену',
+              'Прага', 'Праге', 'Праги', 'Прагу',
+              'Венеция', 'Венеции', 'Венецию',
+              'Флоренция', 'Флоренции', 'Флоренцию',
+              'Милан', 'Милане', 'Милана', 'Милану',
+              'Неаполь', 'Неаполе', 'Неаполя', 'Неаполю',
+              'Санкт-Петербург', 'Санкт-Петербурге', 'Санкт-Петербурга', 'Санкт-Петербургу',
+              'Сочи', 'Сочи', 'Сочи',
+              'Казань', 'Казани', 'Казани', 'Казань'
+            ];
+            
+            const lowerText = messageText.toLowerCase();
+            for (const city of knownCities) {
+              if (lowerText.includes(city.toLowerCase())) {
+                newLocation = city;
+                break;
+              }
+            }
+            
+            // Если не нашли известный город, ищем слова с заглавной буквы
+            if (!newLocation) {
+              const words = messageText.split(/\s+/);
+              const skipWords = ['Я', 'Мы', 'Ты', 'Вы', 'Он', 'Она', 'Они', 'Это', 'В', 'На', 'Из', 'По', 'С', 'У', 'К', 'О', 'Об', 'Для', 'Про', 'И', 'А', 'Но', 'Да', 'Нет', 'Или', 'Если', 'Что', 'Как', 'Где', 'Когда', 'Почему', 'Зачем', 'Куда', 'Откуда', 'Где', 'Лучше', 'Остановиться', 'Отель', 'Отели'];
+              const capitals = words.filter(w => {
+                const cleanWord = w.replace(/[^A-Za-zА-Яа-яЁё\-]/g, '');
+                return cleanWord.length > 2 && 
+                       cleanWord[0] === cleanWord[0].toUpperCase() && 
+                       !skipWords.includes(cleanWord) &&
+                       !cleanWord.match(/^\d+$/);
+              });
+              if (capitals.length > 0) {
+                // Берем последнее слово с заглавной буквы (скорее всего это город)
+                newLocation = capitals[capitals.length - 1].replace(/[^A-Za-zА-Яа-яЁё\-]/g, '');
+              } else {
+                // Если не найдено слово с заглавной, взять последнее значимое слово
+                const lastWord = words[words.length - 1].replace(/[^A-Za-zА-Яа-яЁё\-]/g, '');
+                if (lastWord.length > 2 && !skipWords.includes(lastWord)) {
+                  newLocation = lastWord[0].toUpperCase() + lastWord.slice(1).toLowerCase();
+                }
+              }
+            }
           }
         }
       }
     }
-    console.log('autoFillLocation:', { messageText, newLocation });
+    console.log('extractLocationFromText:', { messageText, newLocation, flightInfo });
     if (newLocation) {
-      setFilters(prev => ({ ...prev, location: normalizeLocation(newLocation) }));
+      return normalizeLocation(newLocation);
+    }
+    return '';
+  };
+
+  // Автоматическое заполнение направления по тексту (для обновления фильтров)
+  const autoFillLocation = (messageText: string) => {
+    const extractedLocation = extractLocationFromText(messageText);
+    if (extractedLocation) {
+      console.log('Setting location filter to:', extractedLocation);
+      setFilters((prev: FilterState) => ({ ...prev, location: extractedLocation }));
+    } else {
+      console.log('No location found in message text');
     }
   };
 
@@ -772,14 +903,40 @@ const Chat = () => {
         }
       ];
 
-      console.log('Sending messages to GPT:', JSON.stringify(messagesToSend, null, 2));
+      // Извлекаем локацию из текста напрямую, чтобы использовать актуальное значение
+      const extractedLocation = extractLocationFromText(messageText);
+      const destinationLocation = extractedLocation || filters.location || '';
 
-      const response = await fetch('/api/yandex-gpt', {
+      console.log('Sending messages to GPT:', JSON.stringify(messagesToSend, null, 2));
+      console.log('Current filters:', JSON.stringify(filters, null, 2));
+      console.log('Current dateFilter:', JSON.stringify(dateFilter, null, 2));
+      console.log('Extracted location from text:', extractedLocation);
+      console.log('Using destination:', destinationLocation);
+
+      const response = await fetch('/api/openai', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messages: messagesToSend }),
+        body: JSON.stringify({ 
+          messages: messagesToSend,
+          filters: {
+            destination: destinationLocation,
+            dates: {
+              start: dateFilter.type === 'specific' && dateFilter.startDate 
+                ? dateFilter.startDate.toISOString().split('T')[0]
+                : new Date().toISOString().split('T')[0],
+              end: dateFilter.type === 'specific' && dateFilter.endDate 
+                ? dateFilter.endDate.toISOString().split('T')[0]
+                : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            },
+            budget: {
+              min: filters.budget.min,
+              max: filters.budget.max
+            },
+            preferences: []
+          }
+        }),
       });
 
       console.log('API Response status:', response.status);
@@ -938,32 +1095,32 @@ const Chat = () => {
 
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newLocation = e.target.value;
-    setFilters(prev => ({ ...prev, location: newLocation }));
+    setFilters((prev: FilterState) => ({ ...prev, location: newLocation }));
   };
 
   const handleTravelersChange = (increment: boolean) => {
-    setFilters(prev => ({
+    setFilters((prev: FilterState) => ({
       ...prev,
       travelers: increment ? prev.travelers + 1 : Math.max(1, prev.travelers - 1)
     }));
   };
 
   const handleChildrenChange = (increment: boolean) => {
-    setFilters(prev => ({
+    setFilters((prev: FilterState) => ({
       ...prev,
       children: increment ? prev.children + 1 : Math.max(0, prev.children - 1)
     }));
   };
 
   const handlePetsChange = (increment: boolean) => {
-    setFilters(prev => ({
+    setFilters((prev: FilterState) => ({
       ...prev,
       pets: increment ? prev.pets + 1 : Math.max(0, prev.pets - 1)
     }));
   };
 
   const handleBudgetChange = (type: 'min' | 'max', value: number) => {
-    setFilters(prev => ({
+    setFilters((prev: FilterState) => ({
       ...prev,
       budget: {
         ...prev.budget,
@@ -972,34 +1129,187 @@ const Chat = () => {
     }));
   };
 
+  // Fix broken booking URLs by adding missing parameters
+  const fixBookingUrl = (url: string): string => {
+    console.log('[fixBookingUrl] Input URL:', url);
+    
+    if (!url || !url.includes('ostrovok.ru/hotel/')) {
+      console.log('[fixBookingUrl] Not an ostrovok URL, returning as is');
+      return url;
+    }
+    
+    // If URL already has all params, return as is
+    if (url.includes('partner_id=') && url.includes('check_in=') && url.includes('check_out=')) {
+      console.log('[fixBookingUrl] URL already has all params, returning as is');
+      return url;
+    }
+    
+    // Extract hotel ID
+    const match = url.match(/hotel\/(\d+)/);
+    if (!match) {
+      console.log('[fixBookingUrl] Could not extract hotel ID');
+      return url;
+    }
+    
+    const hotelId = match[1];
+    const partnerId = '270392.affiliate.a0bd';
+    const today = new Date();
+    const checkIn = today.toISOString().split('T')[0];
+    const checkOut = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    // Build correct URL
+    const fixedUrl = `https://ostrovok.ru/hotel/${hotelId}/?partner_id=${encodeURIComponent(partnerId)}&check_in=${checkIn}&check_out=${checkOut}&guests=2`;
+    console.log('[fixBookingUrl] Fixed URL:', fixedUrl);
+    return fixedUrl;
+  };
+
+  // Check if URL is for a test hotel
+  const isTestHotelUrl = (url: string): boolean => {
+    return url.includes('hotel/1/') || url.includes('hotel/2/');
+  };
+
   const formatMessage = (text: string): string => {
     if (!text) return '';
+    
+    // Debug: log the raw text
+    console.log('[formatMessage] Raw text:', text.substring(0, 500));
 
-    let formattedText = text
+    // First, fix any broken booking URLs in the raw text
+    let fixedText = text.replace(
+      /\[([^\]]*🛎️[^\]]*)\]\((https?:\/\/ostrovok\.ru\/hotel\/[^)]+)\)/g,
+      (_, label, url) => {
+        console.log('[formatMessage] Found booking link:', { label, url });
+        const fixedUrl = fixBookingUrl(url);
+        console.log('[formatMessage] Fixed link:', fixedUrl);
+        return `[${label}](${fixedUrl})`;
+      }
+    );
+    
+    console.log('[formatMessage] Fixed text:', fixedText.substring(0, 500));
+
+    // Process hotels into cards
+    let processedText = fixedText;
+    
+    // Find hotel blocks - supports multiple formats:
+    // Format 1: ### X. Hotel Name ⭐ (from API structured data)
+    // Format 2: ## 🏨 Hotel "Name" ⭐⭐⭐ (from GPT generated content)
+    const hotelBlockPattern = /((?:###\s*\d+\.\s*[^\n]+|##\s*🏨\s*[^\n]+)⭐[^\n]*\n[\s\S]*?(?=(?:###\s*\d+\.|##\s*🏨|##\s*Где остановиться|##\s*📅|---\s*\n|⚠️ \*\*ВАЖНО|$)))/g;
+    
+    processedText = processedText.replace(hotelBlockPattern, (blockMatch) => {
+      const match = blockMatch; // Use match for processing
+      // Process individual hotel block
+      let hotelHtml = match
+        // Format hotel image
+        .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<div class="hotel-image"><img src="$2" alt="$1" loading="lazy" /></div>')
+        // Format hotel name header - support both formats
+        .replace(/###\s*(\d+)\.\s*([^\n]+)/g, '<div class="hotel-header"><span class="hotel-number">$1</span><h4 class="hotel-name">$2</h4></div>')
+        .replace(/##\s*🏨\s*([^\n]+)/g, (_, name) => {
+          const cleanName = name.replace(/[""]/g, '').trim();
+          return `<div class="hotel-header"><span class="hotel-number">🏨</span><h4 class="hotel-name">${cleanName}</h4></div>`;
+        })
+        // Format address, rating, price
+        .replace(/-\s+\*\*Адрес:\*\*\s*([^\n]+)/g, '<div class="hotel-info"><span class="info-label">📍</span><span>$1</span></div>')
+        .replace(/-\s+\*\*Рейтинг:\*\*\s*([^\n]+)/g, '<div class="hotel-info"><span class="info-label">⭐</span><span>$1</span></div>')
+        .replace(/-\s+\*\*Цена:\*\*\s*([^\n]+)/g, '<div class="hotel-info price"><span class="info-label">💰</span><span>$1</span></div>')
+        .replace(/-\s+\*\*До центра:\*\*\s*([^\n]+)/g, '<div class="hotel-info"><span class="info-label">🎯</span><span>$1</span></div>')
+        // Format booking button
+        .replace(/\[\s*🛎️\s*([^\]]+?)\s*\]\(\s*(https?:\/\/[^)]+)\)/g, (_, label, url) => {
+          const fixedUrl = fixBookingUrl(url.trim());
+          return `<a href="${fixedUrl}" target="_blank" rel="noopener noreferrer" class="hotel-book-btn">🛎️ ${label.trim()}</a>`;
+        })
+        // Format description
+        .replace(/-\s+\*\*Описание:\*\*\s*([^\n]+)/g, '<p class="hotel-desc">$1</p>')
+        // Remove remaining markdown
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/---+/g, '');
+      
+      return `<div class="hotel-card">${hotelHtml}</div>`;
+    });
+
+    // Simple approach: find all hotel cards and wrap them together
+    // Extract all hotel cards
+    const hotelCardMatches = processedText.match(/<div class="hotel-card">[\s\S]*?<\/div>/g);
+    
+    let formattedText = processedText;
+    
+    if (hotelCardMatches && hotelCardMatches.length > 0) {
+      // Remove all individual hotel cards from text
+      formattedText = processedText.replace(/<div class="hotel-card">[\s\S]*?<\/div>/g, '');
+      
+      // Create grid with all cards
+      const hotelGrid = `<div class="hotels-grid">${hotelCardMatches.join('')}</div>`;
+      
+      // Find a good place to insert: after "Где остановиться" header or at the end before warnings
+      if (formattedText.includes('🏨 Где остановиться') || formattedText.includes('## 🏨') || formattedText.includes('## Где')) {
+        // Insert after the first occurrence of hotel section header
+        formattedText = formattedText.replace(
+          /(<h[123][^>]*>(?:🏨\s*)?Где остановиться[^<]*<\/h[123]>|<h[123][^>]*>🏨[^<]*<\/h[123]>)/,
+          '$1' + hotelGrid
+        );
+      } else {
+        // Insert before warning or at the very end
+        formattedText = formattedText.replace(
+          /(⚠️ \*\*ВАЖНО|$)/,
+          hotelGrid + '$1'
+        );
+      }
+    }
+    
+    // Continue formatting
+    formattedText = formattedText
+      // Format images (non-hotel photos)
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<div class="my-4"><img src="$2" alt="$1" class="w-full max-w-md rounded-xl shadow-lg object-cover aspect-video" loading="lazy" /></div>')
+      
+      // Format markdown links [text](url) - must be before other replacements
+      // Handle booking button with emoji - capture full URL including & and =
+      .replace(/\[\s*🛎️\s*([^\]]+?)\s*\]\(\s*(https?:\/\/[^)]+)\)/g, (_, label, url) => {
+        console.log('[formatMessage] Processing button:', { label: label.trim(), url: url.trim() });
+        const fixedUrl = fixBookingUrl(url.trim());
+        console.log('[formatMessage] Button href:', fixedUrl);
+        return `<div class="my-3"><a href="${fixedUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-colors shadow-lg"><span>🛎️</span><span>${label.trim()}</span></a></div>`;
+      })
+      
+      // Handle other markdown links
+      .replace(/\[([^\]]+?)\]\(\s*(https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline font-medium">$1</a>')
+      
       // Format headers with emojis
       .replace(/^(Day \d+:.*)/gm, '<h3 class="text-xl font-bold mt-6 mb-3">$1</h3>')
       
-      // Format location names with icons and verification badges
-      .replace(/(?:✈️|🛫)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">✈️</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
+      // Format hotel names with stars and verification badges (for non-card hotels)
       .replace(/(?:🏨|🏰)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🏨</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
-      .replace(/(?:🍽️|🍴)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🍽️</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
-      .replace(/(?:🏛️|⛪)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🏛️</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
-      .replace(/(?:📍)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">📍</span><span class="font-medium">$1</span><span class="inline-flex items-center justify-center w-4 h-4 bg-blue-500 rounded-full ml-1"><svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></span></div>')
+      
+      // Format location names with icons
+      .replace(/(?:✈️|🛫)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">✈️</span><span class="font-medium">$1</span></div>')
+      .replace(/(?:🍽️|🍴)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🍽️</span><span class="font-medium">$1</span></div>')
+      .replace(/(?:🏛️|⛪)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">🏛️</span><span class="font-medium">$1</span></div>')
+      .replace(/(?:📍)\s+([^,\n]+)/g, '<div class="flex items-center gap-2 my-2"><span class="text-xl">📍</span><span class="font-medium">$1</span></div>')
 
-      // Format section headers
-      .replace(/^#\s+([^\n]+)/gm, '<h2 class="text-2xl font-bold mt-8 mb-4">$1</h2>')
+      // Format section headers (## and ###)
+      // Remove processed hotel headers (both formats)
+      .replace(/^###\s*\d+\.\s*[^\n]+⭐[^\n]*/gm, '')
+      .replace(/^##\s*🏨\s*[^\n]+⭐[^\n]*/gm, '')
+      .replace(/^###\s+([^\n]+)/gm, '<h3 class="text-lg font-bold mt-6 mb-3 text-gray-900">$1</h3>')
+      .replace(/^##\s+([^\n]+)/gm, '<h2 class="text-xl font-bold mt-8 mb-4 text-gray-900">$1</h2>')
+      .replace(/^#\s+([^\n]+)/gm, '<h1 class="text-2xl font-bold mt-8 mb-4 text-gray-900">$1</h1>')
 
-      // Format bullet points
-      .replace(/^[•●]\s+([^\n]+)/gm, '<div class="flex items-start gap-2 my-2"><span class="text-gray-400 mt-1">•</span><span class="flex-1">$1</span></div>')
+      // Format horizontal rules
+      .replace(/^---$/gm, '<hr class="my-4 border-gray-200" />')
+
+      // Format bullet points with specific emojis
+      .replace(/^-\s+\*\*([^:]+):\*\*\s*(.+)$/gm, '<div class="flex items-start gap-2 my-1"><span class="text-gray-400 mt-1">•</span><div class="flex-1"><strong>$1:</strong> $2</div></div>')
+      .replace(/^[•●-]\s+([^\n]+)/gm, '<div class="flex items-start gap-2 my-1"><span class="text-gray-400 mt-1">•</span><span class="flex-1">$1</span></div>')
 
       // Format time indicators
       .replace(/(?:⏰|🌞|🌅)\s+([^\n]+)/g, '<div class="flex items-center gap-2 mt-4 mb-2"><span class="text-xl">$1</span></div>')
 
       // Format bold text
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
       
-      // Format paragraphs (excluding already formatted elements)
-      .replace(/(?<!<[^>]*>)([^\n]+)(?![^<]*>)(?:\n|$)/g, '<p class="my-2">$1</p>');
+      // Format italic text
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+      
+      // Format paragraphs (simple version)
+      .replace(/([^\n]+)/g, '<p class="my-2 leading-relaxed">$1</p>');
 
     return formattedText;
   };
@@ -1014,8 +1324,166 @@ const Chat = () => {
       );
     }
 
+    // Handle link clicks to fix broken booking URLs
+    const handleMessageClick = (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const link = target.closest('a');
+      if (link && link.href.includes('ostrovok.ru/hotel/')) {
+        console.log('[handleMessageClick] Link clicked:', link.href);
+        
+        // Check if it's a test hotel
+        if (isTestHotelUrl(link.href)) {
+          e.preventDefault();
+          e.stopPropagation();
+          alert('⚠️ Это тестовый отель (test_hotel / test_hotel_do_not_book).\n\nОн доступен только для API тестирования и не существует в публичной базе Ostrovok.\n\nДля реальных бронирований используйте реальные отели.\n\nСсылка: ' + link.href);
+          return false;
+        }
+        
+        const fixedUrl = fixBookingUrl(link.href);
+        console.log('[handleMessageClick] Fixed URL:', fixedUrl);
+        
+        // Always prevent default and open fixed URL
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Add timestamp to bypass cache
+        const urlWithCache = fixedUrl + '&_t=' + Date.now();
+        console.log('[handleMessageClick] Opening URL:', urlWithCache);
+        
+        // Try different methods to open the link
+        try {
+          const newWindow = window.open(urlWithCache, '_blank', 'noopener,noreferrer');
+          if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+            // Popup blocked, try location.assign
+            console.log('[handleMessageClick] Popup blocked, using location.assign');
+            window.location.assign(urlWithCache);
+          }
+        } catch (err) {
+          console.error('[handleMessageClick] Error opening link:', err);
+          // Fallback: create a temporary link and click it
+          const tempLink = document.createElement('a');
+          tempLink.href = urlWithCache;
+          tempLink.target = '_blank';
+          tempLink.rel = 'noopener noreferrer';
+          document.body.appendChild(tempLink);
+          tempLink.click();
+          document.body.removeChild(tempLink);
+        }
+        
+        return false;
+      }
+    };
+
     return (
-      <div className="bg-gray-50 rounded-2xl rounded-bl-[4px] p-4">
+      <div className="bg-gray-50 rounded-2xl rounded-bl-[4px] p-4" onClick={handleMessageClick}>
+        <style>{`
+          .hotels-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            margin: 16px 0;
+          }
+          @media (min-width: 1024px) {
+            .hotels-grid {
+              grid-template-columns: repeat(3, 1fr);
+            }
+          }
+          @media (min-width: 1280px) {
+            .hotels-grid {
+              grid-template-columns: repeat(4, 1fr);
+            }
+          }
+          .hotel-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          }
+          .hotel-card .hotel-image {
+            width: 100%;
+            height: 160px;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 8px;
+          }
+          .hotel-card .hotel-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+          .hotel-card .hotel-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 4px;
+          }
+          .hotel-card .hotel-number {
+            background: #000;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            flex-shrink: 0;
+          }
+          .hotel-card .hotel-name {
+            font-size: 16px;
+            font-weight: 600;
+            line-height: 1.3;
+            margin: 0;
+            color: #111;
+          }
+          .hotel-card .hotel-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #4b5563;
+          }
+          .hotel-card .hotel-info.price {
+            color: #059669;
+            font-weight: 600;
+          }
+          .hotel-card .info-label {
+            font-size: 16px;
+          }
+          .hotel-card .hotel-desc {
+            font-size: 13px;
+            color: #6b7280;
+            line-height: 1.4;
+            margin: 0;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+          }
+          .hotel-card .hotel-book-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 16px;
+            background: #000;
+            color: white;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            margin-top: auto;
+            transition: background 0.2s;
+          }
+          .hotel-card .hotel-book-btn:hover {
+            background: #374151;
+          }
+        `}</style>
         <div 
           className="prose prose-sm max-w-none text-gray-900"
           dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
@@ -1033,11 +1501,13 @@ const Chat = () => {
       /найди.*?(?:из|от)\s+([A-Za-zА-Яа-я\s-]+)/i
     ];
     
-    // Поиск города назначения
+    // Поиск города назначения (улучшенные паттерны с учетом падежей)
     const destinationPatterns = [
-      /(?:в|во|до)\s+([A-Za-zА-Яа-яё-]+)(?=\s|$)/i,
-      /прилет\s+в\s+([A-Za-zА-Яа-яё-]+)/i,
-      /найди.*?(?:в|до)\s+([A-Za-zА-Яа-яё-]+)(?=\s|$)/i
+      /(?:в|во|до|на|по)\s+([A-Za-zА-Яа-яё\-]+(?:е|а|у|ом|ой|и|ы)?)(?=\s|$|[.,!?])/i,
+      /прилет\s+в\s+([A-Za-zА-Яа-яё\-]+(?:е|а|у|ом|ой|и|ы)?)/i,
+      /найди.*?(?:в|до|на|по)\s+([A-Za-zА-Яа-яё\-]+(?:е|а|у|ом|ой|и|ы)?)(?=\s|$|[.,!?])/i,
+      /(?:где|куда|остановиться|отель|отели|гостиница|гостиницы)\s+(?:в|во|на|по|в)\s+([A-Za-zА-Яа-яё\-]+(?:е|а|у|ом|ой|и|ы)?)/i,
+      /(?:🏨|✈️|🎯|🍽️|🏛️).*?(?:в|во|на|по)\s+([A-Za-zА-Яа-яё\-]+(?:е|а|у|ом|ой|и|ы)?)/i
     ];
 
     // Поиск даты
@@ -1305,7 +1775,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
   };
 
   // Заглушка для сохранения маршрута
-  const handleSaveRoute = (message: Message) => {
+  const handleSaveRoute = (_message: Message) => {
     // TODO: Реализовать сохранение маршрута
     alert('Маршрут сохранён!');
   };
@@ -1574,4 +2044,4 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
   );
 };
 
-export default Chat; 
+export default Chat;

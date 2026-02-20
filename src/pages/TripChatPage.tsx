@@ -116,7 +116,7 @@ export default function TripChatPage() {
               </button>
               <h3 className="text-lg font-semibold mb-4 text-center">Участники чата</h3>
               <div className="space-y-3">
-                {trip.participants?.map(u => (
+                {trip.participants?.map((u: any) => (
                   <div key={u.id} className="flex items-center gap-3">
                     <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full border" />
                     <span className="font-medium text-gray-800">{u.name}</span>
@@ -188,7 +188,7 @@ export default function TripChatPage() {
               <MessageSquare className="w-6 h-6 text-primary" />
               <div className="font-semibold text-lg truncate">Чат путешествия: {trip.title}</div>
               <div className="ml-auto flex -space-x-2">
-                {trip.participants?.map(u => (
+                {trip.participants?.map((u: any) => (
                   <img key={u.id} src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full border-2 border-white" title={u.name} />
                 ))}
               </div>
