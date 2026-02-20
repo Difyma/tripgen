@@ -44,6 +44,7 @@ export interface ReadyTour {
     rating: number;
     count: number;
   };
+  spotsLeft: number;
 }
 
 export const readyTours: ReadyTour[] = [
@@ -169,6 +170,7 @@ export const readyTours: ReadyTour[] = [
       rating: 4.9,
       count: 127,
     },
+    spotsLeft: 8,
   },
   {
     id: '2',
@@ -270,6 +272,7 @@ export const readyTours: ReadyTour[] = [
       rating: 4.8,
       count: 203,
     },
+    spotsLeft: 5,
   },
   {
     id: '3',
@@ -358,6 +361,7 @@ export const readyTours: ReadyTour[] = [
       rating: 4.7,
       count: 89,
     },
+    spotsLeft: 8,
   },
   // Активный отдых
   {
@@ -485,6 +489,7 @@ export const readyTours: ReadyTour[] = [
       rating: 5.0,
       count: 45,
     },
+    spotsLeft: 8,
   },
   {
     id: '5',
@@ -568,6 +573,7 @@ export const readyTours: ReadyTour[] = [
       rating: 4.9,
       count: 156,
     },
+    spotsLeft: 9,
   },
   {
     id: '6',
@@ -670,6 +676,7 @@ export const readyTours: ReadyTour[] = [
       rating: 4.8,
       count: 67,
     },
+    spotsLeft: 3,
   },
   // Пляжный отдых
   {
@@ -761,6 +768,7 @@ export const readyTours: ReadyTour[] = [
       rating: 4.6,
       count: 234,
     },
+    spotsLeft: 4,
   },
   {
     id: '8',
@@ -854,6 +862,7 @@ export const readyTours: ReadyTour[] = [
       rating: 4.8,
       count: 78,
     },
+    spotsLeft: 8,
   },
   // Горы
   {
@@ -968,6 +977,7 @@ export const readyTours: ReadyTour[] = [
       rating: 4.9,
       count: 54,
     },
+    spotsLeft: 4,
   },
   {
     id: '10',
@@ -1086,6 +1096,7 @@ export const readyTours: ReadyTour[] = [
       rating: 5.0,
       count: 32,
     },
+    spotsLeft: 6,
   },
   // Культура
   {
@@ -1186,6 +1197,7 @@ export const readyTours: ReadyTour[] = [
       rating: 4.9,
       count: 43,
     },
+    spotsLeft: 5,
   },
   {
     id: '12',
@@ -1278,6 +1290,7 @@ export const readyTours: ReadyTour[] = [
       rating: 4.7,
       count: 38,
     },
+    spotsLeft: 7,
   },
   // Гастрономия
   {
@@ -1384,6 +1397,7 @@ export const readyTours: ReadyTour[] = [
       rating: 4.9,
       count: 67,
     },
+    spotsLeft: 4,
   },
   {
     id: '14',
@@ -1471,6 +1485,7 @@ export const readyTours: ReadyTour[] = [
       rating: 4.8,
       count: 45,
     },
+    spotsLeft: 6,
   },
 ];
 

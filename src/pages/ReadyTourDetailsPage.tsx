@@ -15,7 +15,8 @@ import {
   Info,
   MessageSquare,
   Share2,
-  Heart
+  Heart,
+  Ticket
 } from 'lucide-react';
 import { getTourById } from '../data/readyTours';
 import { MainNavbar } from '../components/MainNavbar';
@@ -130,6 +131,17 @@ export function ReadyTourDetailsPage() {
                     <span className="text-sm opacity-80">({tour.reviews.count} отзывов)</span>
                   </div>
                 )}
+                {tour.spotsLeft <= 3 ? (
+                  <div className="flex items-center gap-1 px-3 py-1 bg-red-500 rounded-full text-white">
+                    <Ticket className="w-4 h-4" />
+                    <span className="text-sm font-medium">Осталось {tour.spotsLeft} {tour.spotsLeft === 1 ? 'место' : 'места'}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 px-3 py-1 bg-green-500 rounded-full text-white">
+                    <Ticket className="w-4 h-4" />
+                    <span className="text-sm font-medium">{tour.spotsLeft} мест</span>
+                  </div>
+                )}
               </div>
               <h1 className="text-3xl md:text-5xl font-bold text-white mb-2">
                 {tour.title}
@@ -153,7 +165,7 @@ export function ReadyTourDetailsPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
+              className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8"
             >
               <div className="bg-white rounded-xl p-4 shadow-sm">
                 <Clock className="w-5 h-5 text-gray-400 mb-2" />
@@ -174,6 +186,13 @@ export function ReadyTourDetailsPage() {
                 <Mountain className="w-5 h-5 text-gray-400 mb-2" />
                 <p className="text-sm text-gray-500">Регион</p>
                 <p className="font-semibold text-gray-900">{tour.region}</p>
+              </div>
+              <div className={`rounded-xl p-4 shadow-sm ${tour.spotsLeft <= 3 ? 'bg-red-50' : 'bg-green-50'}`}>
+                <Ticket className={`w-5 h-5 mb-2 ${tour.spotsLeft <= 3 ? 'text-red-500' : 'text-green-500'}`} />
+                <p className="text-sm text-gray-500">Осталось мест</p>
+                <p className={`font-semibold ${tour.spotsLeft <= 3 ? 'text-red-600' : 'text-green-600'}`}>
+                  {tour.spotsLeft} {tour.spotsLeft === 1 ? 'место' : tour.spotsLeft <= 4 ? 'места' : 'мест'}
+                </p>
               </div>
             </motion.div>
 
@@ -371,6 +390,19 @@ export function ReadyTourDetailsPage() {
                   <p className="text-sm text-gray-500 mb-1">Стоимость тура</p>
                   <p className="text-3xl font-bold text-gray-900">{tour.price}</p>
                   <p className="text-sm text-gray-500">за человека</p>
+                </div>
+
+                {/* Spots Left */}
+                <div className={`mb-4 p-3 rounded-xl ${tour.spotsLeft <= 3 ? 'bg-red-50 border border-red-100' : 'bg-green-50 border border-green-100'}`}>
+                  <div className="flex items-center gap-2">
+                    <Ticket className={`w-5 h-5 ${tour.spotsLeft <= 3 ? 'text-red-500' : 'text-green-500'}`} />
+                    <span className={`font-medium ${tour.spotsLeft <= 3 ? 'text-red-700' : 'text-green-700'}`}>
+                      {tour.spotsLeft <= 3 ? 'Осталось' : 'Доступно'}: {tour.spotsLeft} {tour.spotsLeft === 1 ? 'место' : tour.spotsLeft <= 4 ? 'места' : 'мест'}
+                    </span>
+                  </div>
+                  {tour.spotsLeft <= 3 && (
+                    <p className="text-xs text-red-600 mt-1">Спешите! Места заканчиваются</p>
+                  )}
                 </div>
 
                 <div className="space-y-3">

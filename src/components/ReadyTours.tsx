@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Calendar, Users, ArrowRight, Mountain, Trees, Umbrella, Bike, Palette, Wine, Camera } from 'lucide-react';
+import { MapPin, Calendar, Users, ArrowRight, Mountain, Trees, Umbrella, Bike, Palette, Wine, Camera, Ticket } from 'lucide-react';
 import { readyTours } from '../data/readyTours';
 
 const categories = [
@@ -100,6 +100,19 @@ export function ReadyTours() {
                   <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-full">
                     <span className="text-sm font-semibold text-gray-900">{tour.price}</span>
                   </div>
+
+                  {/* Spots Left Badge */}
+                  {tour.spotsLeft <= 3 ? (
+                    <div className="absolute top-4 left-4 bg-red-500 text-white px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                      <Ticket className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium">Осталось {tour.spotsLeft} {tour.spotsLeft === 1 ? 'место' : tour.spotsLeft <= 4 ? 'места' : 'мест'}</span>
+                    </div>
+                  ) : (
+                    <div className="absolute top-4 left-4 bg-green-500 text-white px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                      <Ticket className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium">{tour.spotsLeft} мест</span>
+                    </div>
+                  )}
 
                   {/* Location */}
                   <div className="absolute bottom-4 left-4 flex items-center gap-1.5 text-white">
