@@ -1,8 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import OpenAI from 'openai';
 
+// Log environment status for debugging
+console.log('API Key exists:', !!process.env.OPENAI_API_KEY);
+console.log('API Key length:', process.env.OPENAI_API_KEY?.length || 0);
+
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 const SYSTEM_PROMPT = `Ты — TripGen AI, эксперт по путешествиям по России. Твоя задача — помогать пользователям планировать идеальные поездки.
@@ -40,6 +44,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Check if API key is configured
+  if (!process.env.OPENAI_API_KEY) {
+    console.error('OPENAI_API_KEY is not set');
+    return res.status(500).json({
+      error: 'OpenAI API key is not configured',
+      details: 'Please set OPENAI_API_KEY environment variable in Vercel dashboard',
+    });
+  }
+
   try {
     const { messages, filters } = req.body;
 
@@ -48,6 +61,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    
+    console.log('Using model:', model);
+    console.log('Messages count:', messages.length);
 
     const completion = await openai.chat.completions.create({
       model,
@@ -70,6 +86,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error: any) {
     console.error('OpenAI API Error:', error);
     
+    // Handle specific OpenAI errors
+    if (error.status === 401) {
+      return res.status(500).json({
+        error: 'Authentication failed',
+        details: 'Invalid OpenAI API key. Please check your OPENAI_API_KEY environment variable.',
+      });
+    }
+    
+    if (error.status === 429) {
+      return res.status(500).json({
+        error: 'Rate limit exceeded',
+        details: 'Too many requests. Please try again later.',
+      });
+    }
+
     return res.status(500).json({
       error: 'Failed to get response from AI',
       details: error.message,
