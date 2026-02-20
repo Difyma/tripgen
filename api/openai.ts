@@ -1,13 +1,19 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import OpenAI from 'openai';
 
-// Log environment status for debugging
-console.log('API Key exists:', !!process.env.OPENAI_API_KEY);
-console.log('API Key length:', process.env.OPENAI_API_KEY?.length || 0);
+// Check which API to use
+const useOpenRouter = process.env.USE_OPENROUTER === 'true' || !!process.env.OPENROUTER_API_KEY;
 
+// Configure OpenAI client
+// If using OpenRouter, we need to change the baseURL
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: useOpenRouter ? process.env.OPENROUTER_API_KEY : process.env.OPENAI_API_KEY,
+  baseURL: useOpenRouter ? 'https://openrouter.ai/api/v1' : undefined,
 });
+
+// Log environment status for debugging
+console.log('Using OpenRouter:', useOpenRouter);
+console.log('API Key exists:', useOpenRouter ? !!process.env.OPENROUTER_API_KEY : !!process.env.OPENAI_API_KEY);
 
 const SYSTEM_PROMPT = `Ты — TripGen AI, эксперт по путешествиям по России. Твоя задача — помогать пользователям планировать идеальные поездки.
 
@@ -45,11 +51,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Check if API key is configured
-  if (!process.env.OPENAI_API_KEY) {
-    console.error('OPENAI_API_KEY is not set');
+  const apiKey = useOpenRouter ? process.env.OPENROUTER_API_KEY : process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    const keyName = useOpenRouter ? 'OPENROUTER_API_KEY' : 'OPENAI_API_KEY';
+    console.error(`${keyName} is not set`);
     return res.status(500).json({
-      error: 'OpenAI API key is not configured',
-      details: 'Please set OPENAI_API_KEY environment variable in Vercel dashboard',
+      error: 'API key is not configured',
+      details: `Please set ${keyName} environment variable in Vercel dashboard`,
     });
   }
 
@@ -60,8 +68,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Messages array is required' });
     }
 
-    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    // Use different model names for OpenRouter
+    let model: string;
+    if (useOpenRouter) {
+      // OpenRouter uses different model identifiers
+      const modelMap: Record<string, string> = {
+        'gpt-4o-mini': 'openai/gpt-4o-mini',
+        'gpt-4o': 'openai/gpt-4o',
+        'gpt-4': 'openai/gpt-4',
+        'gpt-3.5-turbo': 'openai/gpt-3.5-turbo',
+      };
+      model = modelMap[process.env.OPENAI_MODEL || ''] || 'openai/gpt-4o-mini';
+    } else {
+      model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    }
     
+    console.log('Using provider:', useOpenRouter ? 'OpenRouter' : 'OpenAI');
     console.log('Using model:', model);
     console.log('Messages count:', messages.length);
 
@@ -73,6 +95,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ],
       temperature: 0.7,
       max_tokens: 2000,
+      // OpenRouter specific headers
+      ...(useOpenRouter && {
+        headers: {
+          'HTTP-Referer': 'https://tripgen.ru',
+          'X-Title': 'TripGen',
+        },
+      }),
     });
 
     const responseMessage = completion.choices[0]?.message?.content || 'Извините, не удалось получить ответ.';
@@ -84,13 +113,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
   } catch (error: any) {
-    console.error('OpenAI API Error:', error);
+    console.error('API Error:', error);
     
-    // Handle specific OpenAI errors
+    // Handle specific errors
     if (error.status === 401) {
       return res.status(500).json({
         error: 'Authentication failed',
-        details: 'Invalid OpenAI API key. Please check your OPENAI_API_KEY environment variable.',
+        details: `Invalid ${useOpenRouter ? 'OpenRouter' : 'OpenAI'} API key. Please check your environment variable.`,
       });
     }
     
