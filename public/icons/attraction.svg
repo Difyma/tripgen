@@ -1,3 +1,4 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:ef3e18df07f1761a18fcde5ffbb3a455a6d0fb0ebdd340467d1a42a3c5a95b39
-size 329
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="40" height="40" rx="8" fill="#E5E7EB"/>
+  <path d="M20 12L23 18L29 19L24.5 24L25.5 30L20 27L14.5 30L15.5 24L11 19L17 18L20 12Z" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg> 
