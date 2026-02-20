@@ -1132,22 +1132,15 @@ const Chat = () => {
   };
 
   // Fix booking URLs - handle both numeric IDs and slugs like 'le_marais'
-  // Note: Using ETG Affiliate API deeplink format
-  // Docs: https://docs.emergingtravel.com/docs/affiliate-api/
+  // Simple format: direct hotel page with partner_id
   const fixBookingUrl = (url: string, checkInDate?: string, checkOutDate?: string): string => {
-    console.log('[fixBookingUrl] Input:', url);
-    
     if (!url || !url.includes('ostrovok.ru/hotel/')) {
-      console.log('[fixBookingUrl] Not ostrovok URL');
       return url;
     }
     
     // Extract hotel path - can be: 12345 or le_marais or russia/altai/name
     const match = url.match(/hotel\/([\w\-\/]+)/);
-    console.log('[fixBookingUrl] Match:', match);
-    
     if (!match) {
-      console.log('[fixBookingUrl] No match found');
       return url;
     }
     
@@ -1158,14 +1151,8 @@ const Chat = () => {
     const checkIn = checkInDate || new Date().toISOString().split('T')[0];
     const checkOut = checkOutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    // Try ETG affiliate deeplink format
-    // Format: https://ostrovok.ru/click/?pid=PARTNER_ID&url=ENCODED_HOTEL_URL
-    const hotelUrl = `https://ostrovok.ru/hotel/${hotelPath}/?check_in=${checkIn}&check_out=${checkOut}&guests=2`;
-    const encodedUrl = encodeURIComponent(hotelUrl);
-    const finalUrl = `https://ostrovok.ru/click/?pid=${partnerId}&url=${encodedUrl}`;
-    
-    console.log('[fixBookingUrl] Output:', finalUrl);
-    return finalUrl;
+    // Simple direct link format
+    return `https://ostrovok.ru/hotel/${hotelPath}/?partner_id=${partnerId}&check_in=${checkIn}&check_out=${checkOut}&guests=2`;
   };
 
   // Check if URL is for a test hotel
