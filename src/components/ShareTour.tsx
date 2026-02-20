@@ -29,6 +29,9 @@ const ShareTour = () => {
             className="text-4xl font-medium mb-4"
           >
             Планируйте маршрут с друзьями
+            <span className="ml-3 inline-flex items-center px-3 py-1 bg-amber-100 text-amber-800 text-sm font-medium rounded-full">
+              СКОРО
+            </span>
           </motion.h2>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}

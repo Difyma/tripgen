@@ -24,15 +24,15 @@ const CreatorSection = () => {
               >
                 <div className="max-w-xl">
                   <h2 className="text-4xl lg:text-5xl font-semibold tracking-tight leading-tight mb-6">
-                    Создавайте.
-                    Вдохновляйте.<br />
+                    Размещайте свои туры.<br />
+                    Получайте клиентов.<br />
                     Зарабатывайте.
                   </h2>
                   <p className="text-xl text-gray-700 mb-4">
-                    Любите путешествовать и делиться рекомендациями?
+                    Организуете туры или являетесь гидом?
                   </p>
                   <p className="text-xl text-gray-700 mb-6">
-                    Станьте создателем контента для TripGen и получайте вознаграждение за любимое дело!
+                    Разместите свои туры на TripGen и получайте прямых клиентов без комиссии!
                   </p>
                   
                   <motion.div
@@ -47,7 +47,7 @@ const CreatorSection = () => {
                       to="/creator"
                     className="inline-flex items-center gap-2 bg-black text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-gray-900 transition-colors"
                   >
-                    Стать создателем
+                    Разместить туры
                     <ArrowRight className="w-5 h-5" />
                     </Link>
                   </motion.div>
@@ -55,9 +55,9 @@ const CreatorSection = () => {
                   {/* Stats */}
                   <div className="mt-8 grid grid-cols-3 gap-6">
                     {[
-                      { value: "150+", label: "Активных создателей" },
-                      { value: "1.2M", label: "Просмотров в месяц" },
-                      { value: "₽50K", label: "Средний доход" }
+                      { value: "200+", label: "Гидов и туроператоров" },
+                      { value: "15K+", label: "Бронирований в месяц" },
+                      { value: "0%", label: "Комиссии платформы" }
                     ].map((stat, index) => (
                       <motion.div
                         key={stat.label}
