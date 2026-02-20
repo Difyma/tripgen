@@ -3,6 +3,7 @@ import { AppLayout } from './components/AppLayout';
 import { LandingPage } from './components/LandingPage';
 import { TripsRoute } from './routes/TripsRoute';
 import { TripDetailsRoute } from './routes/TripDetailsRoute';
+import { ReadyTourDetailsPage } from './pages/ReadyTourDetailsPage';
 import Chat from './components/Chat';
 import CreatorPage from './components/CreatorPage';
 import FlightsPage from './components/FlightTestPage';
@@ -25,6 +26,7 @@ export function App() {
             <Route path="/about" element={<AboutPage />} />
         <Route path="/creator" element={<CreatorPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/ready-tours/:id" element={<ReadyTourDetailsPage />} />
         <Route element={<AppLayout />}>
                 <Route path="/chat" element={<Chat key={Date.now()} />} />
                 <Route path="/trips" element={<TripsRoute />} />

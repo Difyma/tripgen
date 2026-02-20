@@ -1,19 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Calendar, Users, ArrowRight, Mountain, Trees, Umbrella, Bike, Palette, Wine, Camera } from 'lucide-react';
-
-interface Tour {
-  id: string;
-  title: string;
-  location: string;
-  image: string;
-  duration: string;
-  groupSize: string;
-  price: string;
-  category: string;
-}
+import { readyTours } from '../data/readyTours';
 
 const categories = [
   { id: 'all', name: 'Все туры', icon: Camera },
@@ -25,164 +16,15 @@ const categories = [
   { id: 'gastronomy', name: 'Гастрономия', icon: Wine },
 ];
 
-const tours: Tour[] = [
-  // Природа
-  {
-    id: '1',
-    title: 'Тайга и водопады Алтая',
-    location: 'Горный Алтай',
-    image: '/images/Traveling_around_Altai.jpg',
-    duration: '7 дней',
-    groupSize: 'до 12 человек',
-    price: '85 000 ₽',
-    category: 'nature',
-  },
-  {
-    id: '2',
-    title: 'Байкал: Остров Ольхон',
-    location: 'Иркутская область',
-    image: '/images/Traveling_around_Baikal.jpg',
-    duration: '5 дней',
-    groupSize: 'до 10 человек',
-    price: '65 000 ₽',
-    category: 'nature',
-  },
-  {
-    id: '3',
-    title: 'Карельские шхеры',
-    location: 'Республика Карелия',
-    image: '/images/Traveling_around_Karelia.jpg',
-    duration: '4 дня',
-    groupSize: 'до 8 человек',
-    price: '55 000 ₽',
-    category: 'nature',
-  },
-  // Активный отдых
-  {
-    id: '4',
-    title: 'Восхождение на вулканы',
-    location: 'Камчатка',
-    image: '/images/Traveling_around_Kamchatka.jpg',
-    duration: '10 дней',
-    groupSize: 'до 8 человек',
-    price: '145 000 ₽',
-    category: 'sport',
-  },
-  {
-    id: '5',
-    title: 'Рафтинг по Катуни',
-    location: 'Горный Алтай',
-    image: '/images/Traveling_around_Altai.jpg',
-    duration: '3 дня',
-    groupSize: 'до 16 человек',
-    price: '35 000 ₽',
-    category: 'sport',
-  },
-  {
-    id: '6',
-    title: 'Треккинг к Телецкому озеру',
-    location: 'Горный Алтай',
-    image: '/images/Traveling_around_Altai.jpg',
-    duration: '6 дней',
-    groupSize: 'до 10 человек',
-    price: '72 000 ₽',
-    category: 'sport',
-  },
-  // Пляжный отдых
-  {
-    id: '7',
-    title: 'Озёрный отдых на Селигере',
-    location: 'Тверская область',
-    image: '/images/Traveling_around_Karelia.jpg',
-    duration: '4 дня',
-    groupSize: 'до 20 человек',
-    price: '28 000 ₽',
-    category: 'relax',
-  },
-  {
-    id: '8',
-    title: 'Горячие источники Камчатки',
-    location: 'Камчатка',
-    image: '/images/Traveling_around_Kamchatka.jpg',
-    duration: '5 дней',
-    groupSize: 'до 12 человек',
-    price: '95 000 ₽',
-    category: 'relax',
-  },
-  // Горы
-  {
-    id: '9',
-    title: 'Белуха: Подножие священной горы',
-    location: 'Горный Алтай',
-    image: '/images/Traveling_around_Altai.jpg',
-    duration: '8 дней',
-    groupSize: 'до 10 человек',
-    price: '88 000 ₽',
-    category: 'mountain',
-  },
-  {
-    id: '10',
-    title: 'Снежные вулканы Камчатки',
-    location: 'Камчатка',
-    image: '/images/Traveling_around_Kamchatka.jpg',
-    duration: '9 дней',
-    groupSize: 'до 8 человек',
-    price: '135 000 ₽',
-    category: 'mountain',
-  },
-  // Культура
-  {
-    id: '11',
-    title: 'Староверы Байкала',
-    location: 'Иркутская область',
-    image: '/images/Traveling_around_Baikal.jpg',
-    duration: '6 дней',
-    groupSize: 'до 12 человек',
-    price: '68 000 ₽',
-    category: 'culture',
-  },
-  {
-    id: '12',
-    title: 'Рунские письмена Карелии',
-    location: 'Республика Карелия',
-    image: '/images/Traveling_around_Karelia.jpg',
-    duration: '5 дней',
-    groupSize: 'до 10 человек',
-    price: '52 000 ₽',
-    category: 'culture',
-  },
-  // Гастрономия
-  {
-    id: '13',
-    title: 'Дикая кухня Камчатки',
-    location: 'Камчатка',
-    image: '/images/Traveling_around_Kamchatka.jpg',
-    duration: '7 дней',
-    groupSize: 'до 8 человек',
-    price: '115 000 ₽',
-    category: 'gastronomy',
-  },
-  {
-    id: '14',
-    title: 'Алтайский мёд и травы',
-    location: 'Горный Алтай',
-    image: '/images/Traveling_around_Altai.jpg',
-    duration: '4 дня',
-    groupSize: 'до 12 человек',
-    price: '42 000 ₽',
-    category: 'gastronomy',
-  },
-];
-
 export function ReadyTours() {
   const [activeCategory, setActiveCategory] = useState('all');
 
   const filteredTours = activeCategory === 'all' 
-    ? tours 
-    : tours.filter(tour => tour.category === activeCategory);
+    ? readyTours 
+    : readyTours.filter(tour => tour.category === activeCategory);
 
   return (
-    <section className="py-20 bg-[#FBFBFD]">
+    <section id="tours" className="py-20 bg-[#FBFBFD]">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <motion.div
@@ -283,10 +125,13 @@ export function ReadyTours() {
                     </div>
                   </div>
 
-                  <button className="w-full flex items-center justify-center gap-2 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors group/btn">
+                  <Link
+                    to={`/ready-tours/${tour.id}`}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors group/btn"
+                  >
                     Подробнее
                     <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
-                  </button>
+                  </Link>
                 </div>
               </motion.div>
             ))}
