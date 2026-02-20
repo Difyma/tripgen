@@ -776,7 +776,7 @@ const Chat = () => {
         }
       }
     }
-    console.log('extractLocationFromText:', { messageText, newLocation, flightInfo });
+    // Location extraction debug removed
     if (newLocation) {
       return normalizeLocation(newLocation);
     }
@@ -787,7 +787,7 @@ const Chat = () => {
   const autoFillLocation = (messageText: string) => {
     const extractedLocation = extractLocationFromText(messageText);
     if (extractedLocation) {
-      console.log('Setting location filter to:', extractedLocation);
+      // Location filter updated
       setFilters((prev: FilterState) => ({ ...prev, location: extractedLocation }));
     } else {
       console.log('No location found in message text');
@@ -1172,22 +1172,15 @@ const Chat = () => {
 
   const formatMessage = (text: string): string => {
     if (!text) return '';
-    
-    // Debug: log the raw text
-    console.log('[formatMessage] Raw text:', text.substring(0, 500));
 
     // First, fix any broken booking URLs in the raw text
     let fixedText = text.replace(
       /\[([^\]]*🛎️[^\]]*)\]\((https?:\/\/ostrovok\.ru\/hotel\/[^)]+)\)/g,
       (_, label, url) => {
-        console.log('[formatMessage] Found booking link:', { label, url });
         const fixedUrl = fixBookingUrl(url);
-        console.log('[formatMessage] Fixed link:', fixedUrl);
         return `[${label}](${fixedUrl})`;
       }
     );
-    
-    console.log('[formatMessage] Fixed text:', fixedText.substring(0, 500));
 
     // Process hotels into cards
     let processedText = fixedText;
@@ -1265,9 +1258,7 @@ const Chat = () => {
       // Format markdown links [text](url) - must be before other replacements
       // Handle booking button with emoji - capture full URL including & and =
       .replace(/\[\s*🛎️\s*([^\]]+?)\s*\]\(\s*(https?:\/\/[^)]+)\)/g, (_, label, url) => {
-        console.log('[formatMessage] Processing button:', { label: label.trim(), url: url.trim() });
         const fixedUrl = fixBookingUrl(url.trim());
-        console.log('[formatMessage] Button href:', fixedUrl);
         return `<div class="my-3"><a href="${fixedUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-colors shadow-lg"><span>🛎️</span><span>${label.trim()}</span></a></div>`;
       })
       
