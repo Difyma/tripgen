@@ -1131,38 +1131,30 @@ const Chat = () => {
     }));
   };
 
-  // Fix broken booking URLs by adding missing parameters
+  // Fix booking URLs - handle both numeric IDs and slugs like 'le_marais'
   const fixBookingUrl = (url: string): string => {
-    console.log('[fixBookingUrl] Input URL:', url);
-    
     if (!url || !url.includes('ostrovok.ru/hotel/')) {
-      console.log('[fixBookingUrl] Not an ostrovok URL, returning as is');
       return url;
     }
     
-    // If URL already has all params, return as is
-    if (url.includes('partner_id=') && url.includes('check_in=') && url.includes('check_out=')) {
-      console.log('[fixBookingUrl] URL already has all params, returning as is');
-      return url;
+    // If URL already has partner params, clean up tracking params and return
+    if (url.includes('partner_id=')) {
+      return url.split('&_t=')[0].split('?_t=')[0];
     }
     
-    // Extract hotel ID
-    const match = url.match(/hotel\/(\d+)/);
+    // Extract hotel path - can be: 12345 or le_marais or russia/altai/name
+    const match = url.match(/hotel\/([\w\-\/]+)/);
     if (!match) {
-      console.log('[fixBookingUrl] Could not extract hotel ID');
       return url;
     }
     
-    const hotelId = match[1];
+    const hotelPath = match[1].replace(/\/$/, '');
     const partnerId = '270392.affiliate.a0bd';
     const today = new Date();
     const checkIn = today.toISOString().split('T')[0];
     const checkOut = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    // Build correct URL
-    const fixedUrl = `https://ostrovok.ru/hotel/${hotelId}/?partner_id=${encodeURIComponent(partnerId)}&check_in=${checkIn}&check_out=${checkOut}&guests=2`;
-    console.log('[fixBookingUrl] Fixed URL:', fixedUrl);
-    return fixedUrl;
+    return `https://ostrovok.ru/hotel/${hotelPath}/?partner_id=${partnerId}&check_in=${checkIn}&check_out=${checkOut}&guests=2`;
   };
 
   // Check if URL is for a test hotel
