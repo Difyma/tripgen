@@ -16,9 +16,12 @@ const CollectiveTour: FC = () => {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-4xl font-medium mb-6"
+            className="text-4xl font-medium mb-6 flex items-center justify-center gap-3 flex-wrap"
           >
             Делитесь с друзьями и семьей
+            <span className="inline-flex items-center px-3 py-1 bg-amber-100 text-amber-800 text-sm font-medium rounded-full">
+              СКОРО
+            </span>
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
