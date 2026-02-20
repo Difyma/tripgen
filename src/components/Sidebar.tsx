@@ -221,39 +221,7 @@ export function Sidebar({ className }: SidebarProps) {
               </span>
             </Link>
 
-            <Link
-              to="/flights"
-              className={`
-                flex items-center gap-3 px-3 h-10 rounded-xl
-                transition-colors duration-200
-                ${isActivePath('/flights')
-                  ? 'bg-gray-100 text-gray-900'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }
-              `}
-            >
-              <Send className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'} rotate-45`} />
-              <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-                Авиабилеты
-              </span>
-            </Link>
 
-            <Link
-              to="/hotels"
-              className={`
-                flex items-center gap-3 px-3 h-10 rounded-xl
-                transition-colors duration-200
-                ${isActivePath('/hotels')
-                  ? 'bg-gray-100 text-gray-900'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }
-              `}
-            >
-              <Bell className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
-              <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-                Отели
-              </span>
-            </Link>
           </nav>
         </div>
 
