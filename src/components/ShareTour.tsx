@@ -47,10 +47,10 @@ const ShareTour = () => {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-4xl font-medium mb-4"
+            className="text-4xl font-medium mb-4 flex items-center justify-center gap-3 flex-wrap"
           >
             Планируйте маршрут с друзьями
-            <span className="ml-3 inline-flex items-center px-3 py-1 bg-amber-100 text-amber-800 text-sm font-medium rounded-full">
+            <span className="inline-flex items-center px-3 py-1 bg-amber-100 text-amber-800 text-sm font-medium rounded-full">
               СКОРО
             </span>
           </motion.h2>
