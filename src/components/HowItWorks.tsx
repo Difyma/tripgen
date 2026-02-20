@@ -133,15 +133,7 @@ const HowItWorks = () => {
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[450px] h-[450px] rounded-full border-2 border-gray-100/30 -z-10"></div>
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] rounded-full border-2 border-gray-100/50 -z-10"></div>
 
-            {/* Chat Screenshot (реальный скриншот) */}
-            <div className="absolute left-1/2 bottom-4 -translate-x-1/2 w-[90%] sm:w-[70%] max-w-md shadow-xl rounded-2xl overflow-hidden border border-gray-100 bg-white">
-              <img
-                src="/images/chat-screenshot.png"
-                alt="Chat Screenshot"
-                className="w-full h-auto object-cover"
-                style={{ minHeight: 80 }}
-              />
-            </div>
+
           </div>
         </div>
       </div>
