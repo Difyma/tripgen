@@ -975,7 +975,9 @@ const Chat = () => {
         throw new Error(errorMessage);
       }
       
-      if (!data.text) {
+      // Get response from data.response (API format) or data.text (legacy)
+      const responseText = data.response || data.text;
+      if (!responseText) {
         console.error('Empty response data:', data);
         throw new Error('Empty response from GPT');
       }
@@ -983,7 +985,7 @@ const Chat = () => {
       // Добавляем ответ от GPT
       const assistantMessage: Message = {
         id: Date.now() + Math.random(),
-        text: data.text,
+        text: responseText,
         isUser: false,
         role: 'assistant'
       };
