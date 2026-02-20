@@ -45,6 +45,8 @@ export interface ReadyTour {
     count: number;
   };
   spotsLeft: number;
+  startDate: string;
+  endDate: string;
 }
 
 export const readyTours: ReadyTour[] = [
@@ -171,6 +173,8 @@ export const readyTours: ReadyTour[] = [
       count: 127,
     },
     spotsLeft: 8,
+    startDate: '2026-06-15',
+    endDate: '2026-06-21',
   },
   {
     id: '2',
@@ -273,6 +277,8 @@ export const readyTours: ReadyTour[] = [
       count: 203,
     },
     spotsLeft: 5,
+    startDate: '2026-07-10',
+    endDate: '2026-07-14',
   },
   {
     id: '3',
@@ -362,6 +368,8 @@ export const readyTours: ReadyTour[] = [
       count: 89,
     },
     spotsLeft: 8,
+    startDate: '2026-06-20',
+    endDate: '2026-06-23',
   },
   // Активный отдых
   {
@@ -490,6 +498,8 @@ export const readyTours: ReadyTour[] = [
       count: 45,
     },
     spotsLeft: 8,
+    startDate: '2026-08-05',
+    endDate: '2026-08-14',
   },
   {
     id: '5',
@@ -574,6 +584,8 @@ export const readyTours: ReadyTour[] = [
       count: 156,
     },
     spotsLeft: 9,
+    startDate: '2026-06-25',
+    endDate: '2026-06-27',
   },
   {
     id: '6',
@@ -677,6 +689,8 @@ export const readyTours: ReadyTour[] = [
       count: 67,
     },
     spotsLeft: 3,
+    startDate: '2026-07-15',
+    endDate: '2026-07-20',
   },
   // Пляжный отдых
   {
@@ -769,6 +783,8 @@ export const readyTours: ReadyTour[] = [
       count: 234,
     },
     spotsLeft: 4,
+    startDate: '2026-07-01',
+    endDate: '2026-07-04',
   },
   {
     id: '8',
@@ -863,6 +879,8 @@ export const readyTours: ReadyTour[] = [
       count: 78,
     },
     spotsLeft: 8,
+    startDate: '2026-09-10',
+    endDate: '2026-09-14',
   },
   // Горы
   {
@@ -978,6 +996,8 @@ export const readyTours: ReadyTour[] = [
       count: 54,
     },
     spotsLeft: 4,
+    startDate: '2026-08-01',
+    endDate: '2026-08-08',
   },
   {
     id: '10',
@@ -1097,6 +1117,8 @@ export const readyTours: ReadyTour[] = [
       count: 32,
     },
     spotsLeft: 6,
+    startDate: '2026-04-10',
+    endDate: '2026-04-18',
   },
   // Культура
   {
@@ -1198,6 +1220,8 @@ export const readyTours: ReadyTour[] = [
       count: 43,
     },
     spotsLeft: 5,
+    startDate: '2026-08-20',
+    endDate: '2026-08-25',
   },
   {
     id: '12',
@@ -1291,6 +1315,8 @@ export const readyTours: ReadyTour[] = [
       count: 38,
     },
     spotsLeft: 7,
+    startDate: '2026-07-25',
+    endDate: '2026-07-29',
   },
   // Гастрономия
   {
@@ -1398,6 +1424,8 @@ export const readyTours: ReadyTour[] = [
       count: 67,
     },
     spotsLeft: 4,
+    startDate: '2026-09-05',
+    endDate: '2026-09-11',
   },
   {
     id: '14',
@@ -1486,6 +1514,8 @@ export const readyTours: ReadyTour[] = [
       count: 45,
     },
     spotsLeft: 6,
+    startDate: '2026-08-15',
+    endDate: '2026-08-18',
   },
 ];
 

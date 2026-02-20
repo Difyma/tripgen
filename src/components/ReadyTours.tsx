@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Calendar, Users, ArrowRight, Mountain, Trees, Umbrella, Bike, Palette, Wine, Camera, Ticket } from 'lucide-react';
+import { MapPin, Calendar, Users, ArrowRight, Mountain, Trees, Umbrella, Bike, Palette, Wine, Camera, Ticket, Clock } from 'lucide-react';
 import { readyTours } from '../data/readyTours';
 
 const categories = [
@@ -123,13 +123,21 @@ export function ReadyTours() {
 
                 {/* Content */}
                 <div className="p-5">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3 group-hover:text-gray-700 transition-colors">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-gray-700 transition-colors">
                     {tour.title}
                   </h3>
 
+                  {/* Tour Dates */}
+                  <div className="mb-3">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {new Date(tour.startDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} — {new Date(tour.endDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </span>
+                  </div>
+
                   <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
                     <div className="flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4" />
+                      <Clock className="w-4 h-4" />
                       <span>{tour.duration}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
