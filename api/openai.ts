@@ -103,6 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('OpenRouter key exists:', !!openRouterKey);
     console.log('OpenAI key exists:', !!openAIKey);
     console.log('Using:', useOpenRouter ? 'OpenRouter' : 'OpenAI');
+    console.log('Raw messages:', JSON.stringify(messages));
 
     // Check if any API key is configured
     if (!openRouterKey && !openAIKey) {
@@ -112,10 +113,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Prepare messages
+    // Prepare messages - convert 'text' field to 'content' and filter out invalid messages
+    const formattedMessages = messages
+      .filter((msg: any) => msg && (msg.content || msg.text)) // Filter out messages without content
+      .map((msg: any) => ({
+        role: msg.role || 'user',
+        content: msg.content || msg.text || '' // Use 'content' or 'text', never null
+      }));
+
     const fullMessages = [
       { role: 'system', content: SYSTEM_PROMPT },
-      ...messages
+      ...formattedMessages
     ];
 
     // Model selection
