@@ -291,4 +291,148 @@ export const loadChatHistory = async (): Promise<ChatMessage[]> => {
     console.error('Error loading chat history:', error);
     throw error;
   }
+};
+
+// ============================================
+// НОВЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С НЕСКОЛЬКИМИ ЧАТАМИ
+// ============================================
+
+export interface Chat {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessageDB {
+  id: string;
+  chat_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  created_at: string;
+}
+
+// Получить список чатов пользователя
+export const getUserChats = async (): Promise<Chat[]> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    console.log('User not authenticated');
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('chats')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching chats:', error);
+    return [];
+  }
+
+  return data || [];
+};
+
+// Создать новый чат
+export const createChat = async (title: string = 'Новый чат'): Promise<Chat | null> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    console.log('User not authenticated');
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('chats')
+    .insert([{ user_id: user.id, title }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating chat:', error);
+    return null;
+  }
+
+  return data;
+};
+
+// Получить сообщения чата
+export const getChatMessages = async (chatId: string): Promise<ChatMessageDB[]> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    console.log('User not authenticated');
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .eq('chat_id', chatId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching chat messages:', error);
+    return [];
+  }
+
+  return data || [];
+};
+
+// Добавить сообщение в чат
+export const addChatMessage = async (
+  chatId: string, 
+  role: 'user' | 'assistant' | 'system', 
+  content: string
+): Promise<void> => {
+  const { error } = await supabase
+    .from('chat_messages')
+    .insert([{ chat_id: chatId, role, content }]);
+
+  if (error) {
+    console.error('Error adding chat message:', error);
+    throw error;
+  }
+
+  // Обновляем updated_at у чата
+  await supabase
+    .from('chats')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', chatId);
+};
+
+// Удалить чат
+export const deleteChat = async (chatId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('chats')
+    .delete()
+    .eq('id', chatId);
+
+  if (error) {
+    console.error('Error deleting chat:', error);
+    throw error;
+  }
+};
+
+// Обновить название чата
+export const updateChatTitle = async (chatId: string, title: string): Promise<void> => {
+  const { error } = await supabase
+    .from('chats')
+    .update({ title })
+    .eq('id', chatId);
+
+  if (error) {
+    console.error('Error updating chat title:', error);
+    throw error;
+  }
+};
+
+// Генерация названия чата на основе первого сообщения
+export const generateChatTitle = (message: string): string => {
+  // Берём первые 30 символов сообщения
+  const title = message.slice(0, 30).trim();
+  return title.length < message.length ? title + '...' : title;
 }; 

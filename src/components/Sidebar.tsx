@@ -1,20 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Plus, MessageSquare, Compass, Heart, Bell, Settings, ChevronRight, ChevronLeft, Users, Send } from 'lucide-react';
+import { Plus, MessageSquare, Compass, Heart, Settings, ChevronLeft, ChevronRight, Users, Trash2 } from 'lucide-react';
 import { CreateTripModal } from './CreateTripModal';
 import { AuthModal } from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useSidebar } from '../contexts/SidebarContext';
+import { getUserChats, deleteChat, type Chat } from '../lib/supabase';
 
 interface SidebarProps {
   className?: string;
-}
-
-interface Chat {
-  id: string | number;
-  name: string;
-  lastMessage?: string;
-  timestamp?: string;
 }
 
 export function Sidebar({ className }: SidebarProps) {
@@ -25,20 +19,51 @@ export function Sidebar({ className }: SidebarProps) {
   const [isCreateTripModalOpen, setIsCreateTripModalOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const location = useLocation();
-  const [userChats] = useState<Chat[]>([
-    { id: 1, name: 'Путешествие в Париж', lastMessage: 'Давайте спланируем маршрут по основным достопримечательностям', timestamp: '2024-03-15' },
-    { id: 2, name: 'Отдых на Бали', lastMessage: 'Лучшие пляжи для серфинга в Улувату', timestamp: '2024-03-14' },
-    { id: 3, name: 'Тур по Японии', lastMessage: 'Сезон цветения сакуры в Киото', timestamp: '2024-03-13' },
-    { id: 4, name: 'Горнолыжный курорт', lastMessage: 'Шамони или Куршевель?', timestamp: '2024-03-12' },
-    { id: 5, name: 'Греческие острова', lastMessage: 'Паром из Афин до Санторини', timestamp: '2024-03-11' },
-    { id: 6, name: 'Выходные в Стамбуле', lastMessage: 'Рекомендации по отелям в районе Султанахмет', timestamp: '2024-03-10' },
-    { id: 7, name: 'Сафари в Кении', lastMessage: 'Национальный парк Масаи-Мара', timestamp: '2024-03-09' },
-    { id: 8, name: 'Круиз по Карибам', lastMessage: 'Лучшее время для посещения Багамских островов', timestamp: '2024-03-08' },
-    { id: 9, name: 'Поход в Непале', lastMessage: 'Маршрут до базового лагеря Эвереста', timestamp: '2024-03-07' },
-    { id: 10, name: 'Винный тур Тоскана', lastMessage: 'Дегустации в регионе Кьянти', timestamp: '2024-03-06' },
-    { id: 11, name: 'Северное сияние', lastMessage: 'Лапландия или Исландия?', timestamp: '2024-03-05' },
-    { id: 12, name: 'Рим на выходные', lastMessage: 'Билеты в Ватиканские музеи', timestamp: '2024-03-04' }
-  ]);
+  const [userChats, setUserChats] = useState<Chat[]>([]);
+  const [isLoadingChats, setIsLoadingChats] = useState(false);
+
+  // Загрузка чатов при входе пользователя
+  useEffect(() => {
+    const loadChats = async () => {
+      if (!user) {
+        setUserChats([]);
+        return;
+      }
+      
+      setIsLoadingChats(true);
+      try {
+        const chats = await getUserChats();
+        setUserChats(chats);
+      } catch (error) {
+        console.error('Error loading chats:', error);
+      } finally {
+        setIsLoadingChats(false);
+      }
+    };
+
+    loadChats();
+  }, [user]);
+
+  // Обновляем список чатов при открытии списка
+  useEffect(() => {
+    if (showChatList && user) {
+      getUserChats().then(setUserChats).catch(console.error);
+    }
+  }, [showChatList, user]);
+
+  const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!confirm('Удалить этот чат?')) return;
+    
+    try {
+      await deleteChat(chatId);
+      setUserChats(prev => prev.filter(c => c.id !== chatId));
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+    }
+  };
 
   const isActivePath = (path: string) => {
     return location.pathname.startsWith(path);
@@ -143,44 +168,61 @@ export function Sidebar({ className }: SidebarProps) {
 
               {/* Список чатов */}
               {showChatList && !isSidebarCollapsed && (
-                <div className="mt-2 space-y-1">
+                <div className="mt-2 space-y-1 max-h-[300px] overflow-y-auto">
                   <button
-                    onClick={() => navigate(`/chat?new=${Date.now()}`)}
+                    onClick={() => navigate('/chat')}
                     className="w-full flex items-center gap-3 px-3 h-10 rounded-xl text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
                   >
                     <Plus className="w-5 h-5" />
                     <span>Новый чат</span>
                   </button>
+                  
+                  {!user && (
+                    <div className="px-3 py-2 text-xs text-gray-400">
+                      Войдите, чтобы сохранять чаты
+                    </div>
+                  )}
+                  
+                  {isLoadingChats && (
+                    <div className="px-3 py-2 text-xs text-gray-400">
+                      Загрузка...
+                    </div>
+                  )}
+                  
+                  {user && !isLoadingChats && userChats.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-gray-400">
+                      У вас пока нет чатов
+                    </div>
+                  )}
+                  
                   {userChats.map((chat) => (
                     <Link
                       key={chat.id}
-                      to={`/chat/${chat.id}`}
+                      to={`/chat?chat=${chat.id}`}
                       className={`
-                        flex flex-col px-3 py-2 rounded-xl ml-2
+                        group flex items-center gap-3 px-3 py-2 rounded-xl ml-2
                         transition-colors duration-200
-                        ${location.pathname === `/chat/${chat.id}`
+                        ${location.search.includes(`chat=${chat.id}`)
                           ? 'bg-gray-100 text-gray-900'
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                         }
                       `}
                     >
-                      <div className="flex items-center gap-3">
-                        <MessageSquare className="w-4 h-4 shrink-0" />
-                        <span className="font-medium truncate">{chat.name}</span>
-                      </div>
-                      {chat.lastMessage && (
-                        <div className="ml-7 mt-1">
-                          <p className="text-xs text-gray-500 truncate">{chat.lastMessage}</p>
-                          {chat.timestamp && (
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              {new Date(chat.timestamp).toLocaleDateString('ru-RU', {
-                                day: 'numeric',
-                                month: 'short'
-                              })}
-                            </p>
-                          )}
-                        </div>
-                      )}
+                      <MessageSquare className="w-4 h-4 shrink-0" />
+                      <span className="font-medium truncate flex-1">{chat.title}</span>
+                      <button
+                        onClick={(e) => handleDeleteChat(e, chat.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 hover:text-red-600 rounded transition-all"
+                        title="Удалить чат"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                      <span className="text-xs text-gray-400 whitespace-nowrap">
+                        {new Date(chat.updated_at).toLocaleDateString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short'
+                        })}
+                      </span>
                     </Link>
                   ))}
                 </div>

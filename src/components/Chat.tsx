@@ -19,7 +19,15 @@ const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
 import { useFlightInfo } from '../hooks/useFlightInfo';
-import { loadChatHistory, saveChatHistory } from '../lib/supabase';
+import { 
+  getUserChats,
+  createChat,
+  getChatMessages,
+  addChatMessage,
+  generateChatTitle,
+  type Chat,
+  type ChatMessageDB
+} from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 
 interface Message {
@@ -556,6 +564,8 @@ const Chat = () => {
   const { user } = useAuth();
   const [hasInteracted, setHasInteracted] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [, setUserChats] = useState<Chat[]>([]);
   const isFirstMount = useRef(true);
   const lastSentText = useRef<string | null>(null);
 
@@ -846,6 +856,17 @@ const Chat = () => {
     setInputText('');
     setIsLoading(true);
 
+    // Создаём новый чат при первом сообщении
+    let chatId = currentChatId;
+    if (!chatId && user) {
+      chatId = await startNewChat(messageText);
+    }
+
+    // Сохраняем сообщение пользователя
+    if (chatId && user) {
+      await saveMessageToCurrentChat('user', messageText);
+    }
+
     try {
       // Извлекаем информацию о перелете из сообщения пользователя
       const flightInfo = extractFlightInfo(messageText);
@@ -991,6 +1012,11 @@ const Chat = () => {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      
+      // Сохраняем ответ ассистента
+      if (currentChatId && user) {
+        await saveMessageToCurrentChat('assistant', responseText);
+      }
     } catch (error) {
       console.error('Error in chat:', error);
       const errorMessage: Message = {
@@ -1002,10 +1028,15 @@ const Chat = () => {
         role: 'assistant'
       };
       setMessages(prev => [...prev, errorMessage]);
+      
+      // Сохраняем сообщение об ошибке
+      if (currentChatId && user) {
+        await saveMessageToCurrentChat('assistant', errorMessage.text);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [messages, getFlightInfoForGPT]);
+  }, [messages, getFlightInfoForGPT, currentChatId, user]);
 
   // Reset chat state when URL changes
   useEffect(() => {
@@ -1062,38 +1093,91 @@ const Chat = () => {
     }
   }, [initialQuery, messages, handleSendMessage]);
 
-  // Загрузка истории чатов при входе пользователя
+  // Загрузка конкретного чата из URL параметра
   useEffect(() => {
-    const loadHistory = async () => {
+    const chatIdFromUrl = searchParams.get('chat');
+    if (chatIdFromUrl && user) {
+      loadChat(chatIdFromUrl);
+    } else if (!chatIdFromUrl) {
+      // Сбрасываем текущий чат если нет параметра в URL
+      setCurrentChatId(null);
+      setMessages([{
+        id: Date.now() + Math.random(),
+        text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
+        isUser: false,
+        role: 'assistant'
+      }]);
+    }
+  }, [searchParams.get('chat'), user]);
+
+  // Загрузка списка чатов при входе пользователя
+  useEffect(() => {
+    const loadUserChats = async () => {
       if (user) {
         try {
-          const history = await loadChatHistory();
-          if (history.length > 0) {
-            setMessages(history);
-          }
+          const chats = await getUserChats();
+          setUserChats(chats);
         } catch (error) {
-          console.error('Error loading chat history:', error);
+          console.error('Error loading user chats:', error);
         }
       }
     };
 
-    loadHistory();
+    loadUserChats();
   }, [user]);
 
-  // Сохранение истории чатов при изменении сообщений
-  useEffect(() => {
-    const saveHistory = async () => {
-      if (user && messages.length > 1) { // Не сохраняем, если только приветственное сообщение
-        try {
-          await saveChatHistory(messages);
-        } catch (error) {
-          console.error('Error saving chat history:', error);
-        }
+  // Загрузка конкретного чата
+  const loadChat = async (chatId: string) => {
+    if (!user) return;
+    
+    try {
+      const messages = await getChatMessages(chatId);
+      if (messages.length > 0) {
+        const formattedMessages: Message[] = messages.map((msg: ChatMessageDB, index: number) => ({
+          id: index,
+          text: msg.content,
+          isUser: msg.role === 'user',
+          role: msg.role
+        }));
+        setMessages(formattedMessages);
+        setCurrentChatId(chatId);
       }
-    };
+    } catch (error) {
+      console.error('Error loading chat:', error);
+    }
+  };
 
-    saveHistory();
-  }, [messages, user]);
+  // Создание нового чата
+  const startNewChat = async (firstMessage?: string) => {
+    if (!user) return null;
+    
+    try {
+      const title = firstMessage ? generateChatTitle(firstMessage) : 'Новый чат';
+      const chat = await createChat(title);
+      if (chat) {
+        setCurrentChatId(chat.id);
+        setUserChats(prev => [chat, ...prev]);
+        
+        // Добавляем приветственное сообщение в новый чат
+        await addChatMessage(chat.id, 'assistant', messages[0].text);
+        return chat.id;
+      }
+    } catch (error) {
+      console.error('Error creating new chat:', error);
+    }
+    return null;
+  };
+
+  // Сохранение сообщения в текущий чат
+  const saveMessageToCurrentChat = async (role: 'user' | 'assistant', content: string) => {
+    if (!user || !currentChatId) return;
+    
+    try {
+      await addChatMessage(currentChatId, role, content);
+    } catch (error) {
+      console.error('Error saving message:', error);
+    }
+  };
 
   const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newLocation = e.target.value;
