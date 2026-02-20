@@ -1132,14 +1132,11 @@ const Chat = () => {
   };
 
   // Fix booking URLs - handle both numeric IDs and slugs like 'le_marais'
-  const fixBookingUrl = (url: string): string => {
+  // Note: Using ETG Affiliate API deeplink format
+  // Docs: https://docs.emergingtravel.com/docs/affiliate-api/
+  const fixBookingUrl = (url: string, checkInDate?: string, checkOutDate?: string): string => {
     if (!url || !url.includes('ostrovok.ru/hotel/')) {
       return url;
-    }
-    
-    // If URL already has partner params, clean up tracking params and return
-    if (url.includes('partner_id=')) {
-      return url.split('&_t=')[0].split('?_t=')[0];
     }
     
     // Extract hotel path - can be: 12345 or le_marais or russia/altai/name
@@ -1149,12 +1146,18 @@ const Chat = () => {
     }
     
     const hotelPath = match[1].replace(/\/$/, '');
-    const partnerId = '270392.affiliate.a0bd';
-    const today = new Date();
-    const checkIn = today.toISOString().split('T')[0];
-    const checkOut = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const partnerId = '270392';
     
-    return `https://ostrovok.ru/hotel/${hotelPath}/?partner_id=${partnerId}&check_in=${checkIn}&check_out=${checkOut}&guests=2`;
+    // Use provided dates or defaults
+    const checkIn = checkInDate || new Date().toISOString().split('T')[0];
+    const checkOut = checkOutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    // Try ETG affiliate deeplink format
+    // Format: https://ostrovok.ru/click/?pid=PARTNER_ID&url=ENCODED_HOTEL_URL
+    const hotelUrl = `https://ostrovok.ru/hotel/${hotelPath}/?check_in=${checkIn}&check_out=${checkOut}&guests=2`;
+    const encodedUrl = encodeURIComponent(hotelUrl);
+    
+    return `https://ostrovok.ru/click/?pid=${partnerId}&url=${encodedUrl}`;
   };
 
   // Check if URL is for a test hotel
