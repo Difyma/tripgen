@@ -17,9 +17,9 @@ export function LandingPage() {
       <main className="w-full">
         <Hero />
         <HowItWorks />
-        <ReadyTours />
         <ExampleTour />
         <Services />
+        <ReadyTours />
         <TravelQuiz />
         <CollectiveTour />
         <CreatorSection />
