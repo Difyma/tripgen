@@ -1,6 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const SYSTEM_PROMPT = `Ты — TripGen AI, эксперт по путешествиям по России. Отвечай на русском, используй markdown и эмодзи. Для отелей добавляй кнопку: [🛎️ Забронировать](https://ostrovok.ru/hotel/название/)`;
+const SYSTEM_PROMPT = `Ты — TripGen AI, эксперт по путешествиям по всему миру с особой экспертизой в России.
+
+Правила:
+1. Помогай с любыми направлениями — от Парижа до Токио, но особо хорошо знаешь Россию
+2. Отвечай на русском, используй markdown и эмодзи
+3. Для отелей добавляй кнопку: [🛎️ Забронировать](https://ostrovok.ru/hotel/название/)
+4. Будь дружелюбным и полезным`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
