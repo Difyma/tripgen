@@ -1,38 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// System prompt for the AI
-const SYSTEM_PROMPT = `Ты — TripGen AI, эксперт по путешествиям по России. Твоя задача — помогать пользователям планировать идеальные поездки.
+const SYSTEM_PROMPT = `Ты — TripGen AI, эксперт по путешествиям по России.
 
-Ты можешь:
-1. Составлять маршруты по городам России
-2. Рекомендовать отели (через систему бронирования)
-3. Находить авиабилеты (через Aviasales API)
-4. Предлагать достопримечательности
-5. Давать советы по бюджету
+Правила:
+1. Отвечай на русском языке
+2. Используй markdown и эмодзи
+3. Для отелей добавляй кнопку: [🛎️ Забронировать](https://ostrovok.ru/hotel/название/)
+4. Структурируй ответ с заголовками
 
-Всегда отвечай на русском языке. Будь дружелюбным и полезным.
-
-При составлении маршрутов учитывай:
-- Бюджет пользователя
-- Даты поездки
-- Интересы и предпочтения
-- Сезонность
-
-Если пользователь хочет забронировать тур из готовых предложений — направь его к оформлению бронирования.
-
-ФОРМАТИРОВАНИЕ ОТВЕТА:
-- Используй markdown для форматирования
-- Для отелей ВСЕГДА добавляй кнопку бронирования в формате: [🛎️ Забронировать](https://ostrovok.ru/hotel/название_отеля/)
-- Используй эмодзи для визуального разделения информации
-- Структурируй ответ с заголовками и подзаголовками
-
-ПРИМЕР ОТВЕТА ПРО ОТЕЛЬ:
-### 🏨 Название Отеля ⭐⭐⭐⭐
-- **Описание:** Краткое описание отеля
-- **Услуги:** Wi-Fi, бассейн, спа
-- **Цена:** от 3500 рублей за ночь
-
-[🛎️ Забронировать](https://ostrovok.ru/hotel/russia/altai/nazvanie_otelya/)
+Пример:
+### 🏨 Отель "Алтай" ⭐⭐⭐⭐
+- Описание: уютный отель у реки
+- Цена: от 3500₽/ночь
+[🛎️ Забронировать](https://ostrovok.ru/hotel/altai/)
 
 // Simple fetch-based implementation for OpenRouter
 async function callOpenRouter(apiKey: string, model: string, messages: any[]) {
@@ -113,11 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     const useOpenRouter = !!openRouterKey;
     
-    console.log('Request received');
-    console.log('OpenRouter key exists:', !!openRouterKey);
-    console.log('OpenAI key exists:', !!openAIKey);
-    console.log('Using:', useOpenRouter ? 'OpenRouter' : 'OpenAI');
-    console.log('Raw messages:', JSON.stringify(messages));
+    console.log('Request received, using:', useOpenRouter ? 'OpenRouter' : 'OpenAI');
 
     // Check if any API key is configured
     if (!openRouterKey && !openAIKey) {
@@ -128,11 +104,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Prepare messages - convert 'text' field to 'content' and filter out invalid messages
-    const formattedMessages = messages
-      .filter((msg: any) => msg && (msg.content || msg.text)) // Filter out messages without content
+    // Limit to last 10 messages to avoid token limits
+    const recentMessages = messages.slice(-10);
+    const formattedMessages = recentMessages
+      .filter((msg: any) => msg && (msg.content || msg.text))
       .map((msg: any) => ({
         role: msg.role || 'user',
-        content: msg.content || msg.text || '' // Use 'content' or 'text', never null
+        content: (msg.content || msg.text || '').slice(0, 1000) // Limit each message to 1000 chars
       }));
 
     const fullMessages = [
@@ -176,7 +154,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
   } catch (error: any) {
-    console.error('API Error:', error);
+    console.error('API Error:', error.message || error);
     
     // Handle specific errors
     if (error.message?.includes('401')) {
@@ -193,9 +171,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // Return proper JSON even on error
     return res.status(500).json({
       error: 'Failed to get response from AI',
-      details: error.message || 'Unknown error',
+      details: error.message || 'Unknown server error',
     });
   }
 }
