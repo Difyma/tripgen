@@ -864,7 +864,7 @@ const Chat = () => {
 
     // Сохраняем сообщение пользователя
     if (chatId && user) {
-      await saveMessageToCurrentChat('user', messageText);
+      await saveMessageToCurrentChat(chatId, 'user', messageText);
     }
 
     try {
@@ -1014,8 +1014,8 @@ const Chat = () => {
       setMessages(prev => [...prev, assistantMessage]);
       
       // Сохраняем ответ ассистента
-      if (currentChatId && user) {
-        await saveMessageToCurrentChat('assistant', responseText);
+      if (chatId && user) {
+        await saveMessageToCurrentChat(chatId, 'assistant', responseText);
       }
     } catch (error) {
       console.error('Error in chat:', error);
@@ -1030,8 +1030,8 @@ const Chat = () => {
       setMessages(prev => [...prev, errorMessage]);
       
       // Сохраняем сообщение об ошибке
-      if (currentChatId && user) {
-        await saveMessageToCurrentChat('assistant', errorMessage.text);
+      if (chatId && user) {
+        await saveMessageToCurrentChat(chatId, 'assistant', errorMessage.text);
       }
     } finally {
       setIsLoading(false);
@@ -1096,10 +1096,14 @@ const Chat = () => {
   // Загрузка конкретного чата из URL параметра
   useEffect(() => {
     const chatIdFromUrl = searchParams.get('chat');
-    if (chatIdFromUrl && user) {
+    console.log('URL changed, chatId:', chatIdFromUrl, 'currentChatId:', currentChatId);
+    
+    if (chatIdFromUrl && user && chatIdFromUrl !== currentChatId) {
+      console.log('Loading chat:', chatIdFromUrl);
       loadChat(chatIdFromUrl);
-    } else if (!chatIdFromUrl) {
+    } else if (!chatIdFromUrl && currentChatId) {
       // Сбрасываем текущий чат если нет параметра в URL
+      console.log('Resetting chat');
       setCurrentChatId(null);
       setMessages([{
         id: Date.now() + Math.random(),
@@ -1108,7 +1112,7 @@ const Chat = () => {
         role: 'assistant'
       }]);
     }
-  }, [searchParams.get('chat'), user]);
+  }, [location.search, user]);
 
   // Загрузка списка чатов при входе пользователя
   useEffect(() => {
@@ -1130,18 +1134,30 @@ const Chat = () => {
   const loadChat = async (chatId: string) => {
     if (!user) return;
     
+    console.log('Loading chat messages for:', chatId);
+    
     try {
       const messages = await getChatMessages(chatId);
+      console.log('Loaded messages:', messages.length, messages);
+      
       if (messages.length > 0) {
         const formattedMessages: Message[] = messages.map((msg: ChatMessageDB, index: number) => ({
           id: index,
           text: msg.content,
           isUser: msg.role === 'user',
-          role: msg.role
+          role: msg.role as 'user' | 'assistant' | 'system'
         }));
         setMessages(formattedMessages);
-        setCurrentChatId(chatId);
+      } else {
+        // Если сообщений нет, показываем приветственное
+        setMessages([{
+          id: Date.now() + Math.random(),
+          text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
+          isUser: false,
+          role: 'assistant'
+        }]);
       }
+      setCurrentChatId(chatId);
     } catch (error) {
       console.error('Error loading chat:', error);
     }
@@ -1169,11 +1185,17 @@ const Chat = () => {
   };
 
   // Сохранение сообщения в текущий чат
-  const saveMessageToCurrentChat = async (role: 'user' | 'assistant', content: string) => {
-    if (!user || !currentChatId) return;
+  const saveMessageToCurrentChat = async (chatId: string, role: 'user' | 'assistant', content: string) => {
+    console.log('Saving message:', { role, content: content.slice(0, 50) + '...', chatId, user: !!user });
+    
+    if (!user || !chatId) {
+      console.log('Cannot save: no user or chatId');
+      return;
+    }
     
     try {
-      await addChatMessage(currentChatId, role, content);
+      await addChatMessage(chatId, role, content);
+      console.log('Message saved successfully');
     } catch (error) {
       console.error('Error saving message:', error);
     }
