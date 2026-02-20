@@ -21,6 +21,7 @@ import {
 import { getTourById } from '../data/readyTours';
 import { MainNavbar } from '../components/MainNavbar';
 import { Footer } from '../components/Footer';
+import { BookingModal } from '../components/BookingModal';
 import { useState } from 'react';
 
 export function ReadyTourDetailsPage() {
@@ -28,6 +29,7 @@ export function ReadyTourDetailsPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'itinerary' | 'includes'>('overview');
   const [isLiked, setIsLiked] = useState(false);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
   const tour = id ? getTourById(id) : undefined;
 
@@ -63,7 +65,7 @@ export function ReadyTourDetailsPage() {
   };
 
   const handleBookTour = () => {
-    navigate(`/chat?q=Забронировать тур: ${encodeURIComponent(tour.title)}`);
+    setIsBookingModalOpen(true);
   };
 
   const handleAskQuestion = () => {
@@ -454,6 +456,13 @@ export function ReadyTourDetailsPage() {
       </div>
 
       <Footer />
+
+      {/* Booking Modal */}
+      <BookingModal
+        tour={tour}
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+      />
     </div>
   );
 }
