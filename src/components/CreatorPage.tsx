@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { Globe, DollarSign, Users, Star, ChevronRight, ArrowRight, Coins, Gift, Share2, Trophy } from 'lucide-react';
+import { Globe, DollarSign, Users, Star, ChevronRight, ArrowRight, MapPin, Briefcase, Calendar, Award } from 'lucide-react';
 import { MainNavbar } from './MainNavbar';
 import Footer from './Footer';
 import { CreatorForm } from './CreatorForm';
@@ -9,76 +9,76 @@ import { AuthModal } from './AuthModal';
 const benefits = [
   {
     icon: Globe,
-    title: 'Глобальная аудитория',
-    description: 'Делитесь своими путешествиями с людьми со всего мира'
+    title: 'Прямые клиенты',
+    description: 'Получайте заявки от путешественников со всей России, ищущих готовые туры'
   },
   {
     icon: DollarSign,
-    title: 'Монетизация',
-    description: 'Зарабатывайте на своих путешествиях и рекомендациях'
+    title: 'Никакой комиссии',
+    description: '0% комиссии платформы — все деньги от бронирований идут напрямую вам'
   },
   {
     icon: Users,
-    title: 'Сообщество',
-    description: 'Станьте частью сообщества путешественников и создателей контента'
+    title: 'Готовая аудитория',
+    description: 'Доступ к тысячам пользователей, которые уже ищут туры по России'
   },
   {
     icon: Star,
-    title: 'Эксклюзивные возможности',
-    description: 'Получите доступ к специальным предложениям и мероприятиям'
+    title: 'Репутация и отзывы',
+    description: 'Собирайте отзывы от туристов и становитесь топовым гидом или туроператором'
   }
 ];
 
 const requirements = [
-  'Опыт путешествий и создания контента',
-  'Качественные фото и видеоматериалы',
-  'Умение интересно рассказывать о местах',
-  'Активность в социальных сетях',
-  'Желание делиться опытом'
+  'Опыт проведения туров от 1 года',
+  'Лицензия туроператора или статус гида',
+  'Готовые маршруты и программы',
+  'Фото и видеоматериалы туров',
+  'Готовность работать с онлайн-бронированиями'
 ];
 
 const earningWays = [
   {
-    icon: Coins,
-    title: 'Комиссия с бронирований',
-    description: 'Получайте процент от каждого бронирования по вашим рекомендациям отелей, туров и активностей',
-    percentage: '10%'
+    icon: MapPin,
+    title: 'Продажа готовых туров',
+    description: 'Размещайте свои авторские туры и получайте 100% стоимости бронирования',
+    percentage: '100%'
   },
   {
-    icon: Gift,
-    title: 'Эксклюзивные предложения',
-    description: 'Создавайте специальные предложения и промокоды для ваших подписчиков',
-    percentage: '15%'
+    icon: Briefcase,
+    title: 'Корпоративные заказы',
+    description: 'Получайте заявки на организацию корпоративных мероприятий и тимбилдингов',
+    percentage: 'VIP'
   },
   {
-    icon: Share2,
-    title: 'Партнерские программы',
-    description: 'Зарабатывайте на рекомендациях авиабилетов, страховок и других туристических услуг',
-    percentage: '8%'
+    icon: Calendar,
+    title: 'Индивидуальные маршруты',
+    description: 'Создавайте персонализированные туры под запросы конкретных клиентов',
+    percentage: 'Заказ'
   },
   {
-    icon: Trophy,
-    title: 'Бонусная программа',
-    description: 'Получайте дополнительные бонусы за активность и качественный контент',
-    percentage: '+5%'
+    icon: Award,
+    title: 'Премиум-размещение',
+    description: 'Выделите свои туры в топе выдачи и получайте больше просмотров',
+    percentage: 'Топ'
   }
 ];
 
 const inspirationSteps = [
   {
     number: '01',
-    title: 'Создавайте маршруты',
-    description: 'Делитесь своими любимыми местами и создавайте уникальные маршруты путешествий'
+    title: 'Зарегистрируйтесь',
+    description: 'Создайте профиль гида или туроператора, заполнив информацию о себе и своих турах'
   },
   {
     number: '02',
-    title: 'Вдохновляйте других',
-    description: 'Ваши истории и рекомендации помогут другим путешественникам открыть новые места'
+    title: 'Разместите туры',
+    description: 'Добавьте свои маршруты с фото, описанием, программой и ценами'
   },
   {
     number: '03',
-    title: 'Получайте доход',
-    description: 'Зарабатывайте на бронированиях и рекомендациях от благодарных путешественников'
+    title: 'Получайте бронирования',
+    description: 'Клиенты бронируют туры напрямую, а вы получаете уведомления и оплату'
   }
 ];
 
@@ -107,12 +107,12 @@ const CreatorPage = () => {
             >
               <div>
                 <h1 className="text-5xl md:text-6xl font-bold mb-6 tracking-tight">
-                  Создавайте контент.<br />
-                  Вдохновляйте.<br />
+                  Размещайте свои туры.<br />
+                  Получайте клиентов.<br />
                   Зарабатывайте.
                 </h1>
                 <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                  Станьте частью TripGen — платформы для креативных путешественников, которые хотят делиться своим опытом и зарабатывать на этом.
+                  TripGen — это платформа для гидов и туроператоров, где вы можете разместить свои туры и получать прямых клиентов без комиссии.
                 </p>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -120,28 +120,30 @@ const CreatorPage = () => {
                   className="group bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-900 transition-all inline-flex items-center gap-2"
                   onClick={() => setIsFormOpen(true)}
                 >
-                  Стать создателем
+                  Разместить туры
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </motion.button>
               </div>
               <div className="relative">
                 <div className="aspect-square rounded-3xl overflow-hidden">
                   <img
-                    src="https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=1200&q=80"
-                    alt="Creator background"
+                    src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80"
+                    alt="Tour guide in mountains"
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="absolute -bottom-6 -left-6 bg-white p-6 rounded-2xl shadow-lg max-w-xs">
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-gray-100" />
+                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                      <span className="text-2xl">🏔️</span>
+                    </div>
                     <div>
-                      <div className="font-medium">Анна Петрова</div>
-                      <div className="text-sm text-gray-500">Travel Creator</div>
+                      <div className="font-medium">Алексей Горный</div>
+                      <div className="text-sm text-gray-500">Гид по Алтаю</div>
                     </div>
                   </div>
                   <div className="text-sm text-gray-600">
-                    "TripGen помог мне превратить мою страсть к путешествиям в успешный бизнес"
+                    "За 6 месяцев на TripGen я получил 45 бронирований на свои туры"
                   </div>
                 </div>
               </div>
@@ -159,10 +161,10 @@ const CreatorPage = () => {
               className="text-center mb-16"
             >
               <h2 className="text-4xl font-bold mb-4 tracking-tight">
-                Преимущества для создателей
+                Преимущества для гидов и туроператоров
               </h2>
               <p className="text-xl text-gray-600">
-                Откройте для себя новые возможности с TripGen
+                Развивайте свой турбизнес вместе с TripGen
               </p>
             </motion.div>
 
@@ -200,7 +202,7 @@ const CreatorPage = () => {
                 Как зарабатывать на TripGen
               </h2>
               <p className="text-xl text-gray-600">
-                Множество способов монетизации вашего контента
+                Несколько способов монетизации ваших туров
               </p>
             </motion.div>
 
@@ -238,8 +240,8 @@ const CreatorPage = () => {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-2xl font-bold mb-2">Станьте VIP-создателем</h3>
-                  <p className="text-gray-300">Получите доступ к повышенным комиссиям и эксклюзивным возможностям</p>
+                  <h3 className="text-2xl font-bold mb-2">Станьте партнером TripGen</h3>
+                  <p className="text-gray-300">Получите персонального менеджера и приоритетную поддержку</p>
                 </div>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -259,9 +261,9 @@ const CreatorPage = () => {
           <div className="max-w-7xl mx-auto px-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
               {[
-                { number: '150+', label: 'Активных создателей' },
-                { number: '₽50K+', label: 'Средний месячный доход' },
-                { number: '1.2M', label: 'Просмотров в месяц' }
+                { number: '200+', label: 'Гидов и туроператоров' },
+                { number: '₽50K+', label: 'Средний доход за тур' },
+                { number: '15K+', label: 'Бронирований в месяц' }
               ].map((stat, index) => (
                 <motion.div
                   key={stat.label}
@@ -319,15 +321,15 @@ const CreatorPage = () => {
               >
                 <div className="aspect-[4/3] rounded-3xl overflow-hidden">
                   <img
-                    src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80"
-                    alt="Creator working"
+                    src="https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80"
+                    alt="Tour guide with group"
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="absolute -bottom-6 right-6 bg-white p-6 rounded-2xl shadow-lg">
                   <div className="flex items-center gap-3 text-lg font-medium">
                     <Star className="w-6 h-6 text-yellow-400" />
-                    <span>4.9/5 рейтинг создателей</span>
+                    <span>4.9/5 средний рейтинг гидов</span>
                   </div>
                 </div>
               </motion.div>
@@ -345,10 +347,10 @@ const CreatorPage = () => {
                 viewport={{ once: true }}
               >
                 <h2 className="text-4xl font-bold mb-4 tracking-tight">
-                  Превратите вдохновение<br />в действие
+                  Начните продавать туры<br />уже сегодня
                 </h2>
                 <p className="text-xl text-gray-600 mb-12 leading-relaxed">
-                  Станьте частью сообщества креативных путешественников и начните делиться своими историями уже сегодня
+                  Присоединяйтесь к платформе, где тысячи путешественников ищут готовые туры по России
                 </p>
 
                 <div className="space-y-12">
@@ -383,8 +385,11 @@ const CreatorPage = () => {
                   viewport={{ once: true }}
                   className="mt-12"
                 >
-                  <button className="group bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-900 transition-all inline-flex items-center gap-2">
-                    Начать создавать
+                  <button 
+                    onClick={() => setIsFormOpen(true)}
+                    className="group bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-900 transition-all inline-flex items-center gap-2"
+                  >
+                    Разместить туры
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </motion.div>
@@ -398,23 +403,25 @@ const CreatorPage = () => {
               >
                 <div className="aspect-[4/3] rounded-3xl overflow-hidden">
                   <img
-                    src="https://images.unsplash.com/photo-1527631746610-bca00a040d60?w=800&q=80"
-                    alt="Creator inspiration"
+                    src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&q=80"
+                    alt="Tour group in nature"
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="absolute -bottom-6 -right-6 bg-white p-6 rounded-2xl shadow-lg max-w-xs">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-100" />
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                      <span className="text-xl">🎯</span>
+                    </div>
                     <div>
-                      <div className="font-medium">Михаил Смирнов</div>
-                      <div className="text-sm text-gray-500">1.2M подписчиков</div>
+                      <div className="font-medium">Мария Иванова</div>
+                      <div className="text-sm text-gray-500">Туроператор</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
-                      <div className="text-sm text-gray-600 mb-1">Доход за месяц</div>
-                      <div className="text-xl font-bold">₽127,500</div>
+                      <div className="text-sm text-gray-600 mb-1">За месяц</div>
+                      <div className="text-xl font-bold">23 бронирования</div>
                     </div>
                     <div className="w-12 h-12 bg-green-50 text-green-500 rounded-full flex items-center justify-center">
                       <ArrowRight className="w-6 h-6" />
@@ -436,7 +443,7 @@ const CreatorPage = () => {
                 viewport={{ once: true }}
                 className="text-4xl font-bold mb-6 tracking-tight"
               >
-                Готовы начать свое путешествие?
+                Готовы получать новых клиентов?
               </motion.h2>
               <motion.p
                 initial={{ opacity: 0, y: 20 }}
@@ -445,7 +452,7 @@ const CreatorPage = () => {
                 transition={{ delay: 0.1 }}
                 className="text-xl text-gray-300 mb-8"
               >
-                Присоединяйтесь к сообществу креативных путешественников уже сегодня
+                Присоединяйтесь к TripGen и начните продавать свои туры уже сегодня
               </motion.p>
               <motion.button
                 initial={{ opacity: 0, y: 20 }}
@@ -454,6 +461,7 @@ const CreatorPage = () => {
                 transition={{ delay: 0.2 }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
+                onClick={() => setIsFormOpen(true)}
                 className="group bg-white text-black px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-100 transition-all inline-flex items-center gap-2"
               >
                 Подать заявку
@@ -470,4 +478,4 @@ const CreatorPage = () => {
   );
 };
 
-export default CreatorPage; 
+export default CreatorPage;

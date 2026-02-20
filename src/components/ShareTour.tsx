@@ -8,6 +8,27 @@ const ShareTour = () => {
 
   return (
     <section className="py-24 bg-white relative">
+      {/* СКОРО Overlay */}
+      <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          className="bg-white rounded-2xl shadow-2xl p-8 text-center max-w-md mx-4 border border-gray-100"
+        >
+          <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Users className="w-10 h-10 text-amber-600" />
+          </div>
+          <h3 className="text-2xl font-semibold text-gray-900 mb-2">СКОРО</h3>
+          <p className="text-gray-600 mb-4">
+            Функция совместного планирования путешествий с друзьями находится в разработке
+          </p>
+          <span className="inline-flex items-center px-4 py-2 bg-amber-100 text-amber-800 text-sm font-medium rounded-full">
+            Ожидается весной 2026
+          </span>
+        </motion.div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Заголовок секции */}
         <div className="text-center mb-16">
