@@ -79,7 +79,7 @@ const Services = () => {
                     <h3 className="text-xl font-semibold">{service.title}</h3>
                     {!service.available && (
                       <span className="px-2 py-1 bg-black/5 rounded-full text-xs font-medium">
-                        Coming soon
+                        СКОРО
                       </span>
                     )}
                   </div>
