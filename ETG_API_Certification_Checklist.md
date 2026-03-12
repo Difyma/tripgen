@@ -23,7 +23,8 @@ Test hotel URL: `https://ostrovok.ru/rooms/test_hotel/?utm_medium=partners&partn
 
 ### Comparison Diagram
 - ✅ Yes, please find the diagram attached to the email
-- Or: Diagram available at: https://www.tripgen.ru
+- Full diagram documentation: https://github.com/Difyma/tripgen/blob/main/ETG_API_Integration_Diagram.md
+- Or visit: https://www.tripgen.ru
 
 ### Testing
 We have tested the following scenarios:
