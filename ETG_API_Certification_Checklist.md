@@ -3,6 +3,7 @@
 **Partner ID:** 270392.affiliate.a0bd  
 **Key ID:** 12984  
 **Project:** TripGen AI - AI-powered travel assistant  
+**Website:** https://www.tripgen.ru  
 **Date:** March 2026  
 **Contact:** [your-email@company.com]
 
@@ -17,12 +18,12 @@ Test hotel URL: `https://ostrovok.ru/rooms/test_hotel/?utm_medium=partners&partn
 ### Product Type for Certification
 **Website** - AI Travel Assistant with hotel search and booking redirect  
 - ✅ Access to the website has been provided
-- Website URL: [your-website-url]
+- Website URL: https://www.tripgen.ru
 - Product type: AI Chat-based travel planner with hotel recommendations
 
 ### Comparison Diagram
 - ✅ Yes, please find the diagram attached to the email
-- Or: Diagram available at: [link to diagram/documentation]
+- Or: Diagram available at: https://www.tripgen.ru
 
 ### Testing
 We have tested the following scenarios:
@@ -273,6 +274,7 @@ Commission Tracked via Partner Attribution
 
 If any points require clarification due to our Affiliate API integration model, please contact us:
 
+**Website:** https://www.tripgen.ru  
 **Email:** [your-email@company.com]  
 **Technical Contact:** [Your Name]  
 **Phone:** [+7 XXX XXX XX XX]

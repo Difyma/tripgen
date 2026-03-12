@@ -13,7 +13,7 @@ We are writing to request activation of **production API access** for our travel
 
 **TripGen AI** — AI-powered travel planning platform that helps users plan trips, find hotels, and book accommodations through intelligent chat interface.
 
-- **Website:** [your-website.com]
+- **Website:** https://www.tripgen.ru
 - **Product:** AI Travel Assistant with hotel search and booking
 - **Target Audience:** Russian-speaking travelers planning trips worldwide
 - **Monthly Active Users:** [X,XXX] (projected)
@@ -101,7 +101,8 @@ We are excited to launch this integration and start driving bookings through Ost
 Best regards,  
 [Your Name]  
 [Your Title]  
-[Company Name]
+TripGen AI Team  
+https://www.tripgen.ru
 
 ---
 
@@ -124,6 +125,7 @@ Best regards,
 2. Условия affiliate-программы
 3. Rate limits для production
 
+Сайт: https://www.tripgen.ru  
 Контакты: [ваш email]
 
 Спасибо!
