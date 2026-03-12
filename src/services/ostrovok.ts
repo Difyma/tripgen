@@ -1,30 +1,39 @@
 import axios from 'axios';
+import { buildHotelPageLink } from '@/lib/ostrovok';
+
+const PARTNER_SLUG = import.meta.env.VITE_OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
 
 interface HotelSearchParams {
   location: string;
-  checkIn: string;
-  checkOut: string;
+  checkIn: string; // YYYY-MM-DD
+  checkOut: string; // YYYY-MM-DD
   adults: number;
-  children?: number;
+  children?: number[];
+  currency?: string;
+  lang?: string;
 }
 
 interface Hotel {
+  id: string;
   name: string;
   price: number;
   currency: string;
   url: string;
   rating?: number;
   imageUrl?: string;
+  stars?: number;
 }
 
 interface OstrovokResponse {
   hotels: Array<{
+    id: string;
+    slug?: string;
     name: string;
     price: number;
     currency: string;
-    bookingUrl: string;
     rating?: number;
     imageUrl?: string;
+    stars?: number;
   }>;
 }
 
@@ -45,12 +54,21 @@ export const searchHotels = async (params: HotelSearchParams): Promise<Hotel[]> 
     });
 
     return response.data.hotels.map((hotel) => ({
+      id: hotel.id,
       name: hotel.name,
       price: hotel.price,
       currency: hotel.currency,
-      url: hotel.bookingUrl,
+      url: buildHotelPageLink(hotel.slug || hotel.id, {
+        partnerSlug: PARTNER_SLUG,
+        checkIn: params.checkIn,
+        checkOut: params.checkOut,
+        rooms: [{ adults: params.adults, childrenAges: params.children }],
+        currency: params.currency,
+        lang: params.lang,
+      }),
       rating: hotel.rating,
       imageUrl: hotel.imageUrl,
+      stars: hotel.stars,
     }));
   } catch (error) {
     console.error('Error searching hotels:', error);

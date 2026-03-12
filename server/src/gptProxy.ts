@@ -14,6 +14,11 @@ import axios, { AxiosError } from 'axios';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import { DEMO_HOTELS as REALISTIC_DEMO_HOTELS, TEST_HOTELS, DemoHotel } from './demoHotels.js';
+import { 
+  buildHotelPageLink, 
+  buildSerpLink, 
+  generatePartnerLinkLegacy 
+} from '../lib/ostrovok-links.cjs';
 
 dotenv.config();
 
@@ -43,7 +48,7 @@ const OSTROVOK_API_SECRET = process.env.OSTROVOK_API_SECRET;
 // ETG API Base URL
 // Production: https://api.worldota.net
 const OSTROVOK_API_URL = process.env.OSTROVOK_API_URL || 'https://api.worldota.net';
-const PARTNER_ID = process.env.OSTROVOK_PARTNER_ID;
+const PARTNER_SLUG = process.env.OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
 
 // Interfaces
 interface FilterState {
@@ -120,7 +125,7 @@ console.log('[GPT Proxy] Environment loaded:', {
   hasOpenRouterKey: !!OPENROUTER_API_KEY,
   hasOstrovokKey: !!OSTROVOK_API_KEY,
   hasOstrovokSecret: !!OSTROVOK_API_SECRET,
-  partnerId: PARTNER_ID ? 'configured' : 'not configured'
+  partnerSlug: PARTNER_SLUG
 });
 
 // Auth headers for Ostrovok
@@ -227,71 +232,107 @@ function getCityCoordinates(cityName: string): { lat: number; lng: number; radiu
   return null;
 }
 
-// Generate partner booking link
-// For test/demo hotels: link to city search
-// For real hotels: direct hotel link
+// Generate partner booking link with correct attribution
+// Uses new LinkBuilder: partner_slug + utm_* + dates format
 const generatePartnerLink = (hotelId: string | number, params: {
   checkIn: string;
   checkOut: string;
   guests: number;
 }, hotelName?: string, city?: string): string => {
-  // Extract numeric partner ID (e.g., '270392' from '270392.affiliate.a0bd')
-  const fullPartnerId = PARTNER_ID || '270392.affiliate.a0bd';
-  const partnerId = fullPartnerId.split('.')[0] || '270392';
-  
-  // Format dates properly (YYYY-MM-DD)
-  const formatDate = (dateStr: string): string => {
-    if (!dateStr) return '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-    const date = new Date(dateStr);
-    if (!isNaN(date.getTime())) return date.toISOString().split('T')[0];
-    return dateStr;
-  };
-  
-  const checkIn = formatDate(params.checkIn);
-  const checkOut = formatDate(params.checkOut);
   const hotelIdStr = String(hotelId);
   
-  // Check if this is a test/demo hotel by ID patterns
-  const isTestHotel = hotelIdStr === 'test_hotel' || hotelIdStr === 'test_hotel_do_not_book' || 
-                      hotelIdStr === '8526976' || hotelIdStr === '1' || hotelIdStr === '2';
-  const isDemoHotel = hotelIdStr.startsWith('moscow_') || hotelIdStr.startsWith('paris_') || 
-                      hotelIdStr.startsWith('spb_') || hotelIdStr.startsWith('ist_') ||
-                      hotelIdStr.startsWith('dxb_') || hotelIdStr.startsWith('bkk_') ||
-                      hotelIdStr.startsWith('test_hotel');
-  
-  const queryParams = [];
-  queryParams.push(`partner_id=${partnerId}`);
-  if (checkIn) queryParams.push(`check_in=${checkIn}`);
-  if (checkOut) queryParams.push(`check_out=${checkOut}`);
-  if (params.guests) queryParams.push(`guests=${params.guests}`);
-  
-  const queryString = queryParams.join('&');
-  
-  let finalUrl: string;
-  
-  if (isTestHotel || isDemoHotel) {
-    // For demo hotels, create a search URL with hotel name
-    const citySlug = city ? CITY_URL_SLUGS[city.toLowerCase().trim()] : null;
-    const searchQuery = hotelName ? encodeURIComponent(hotelName.replace(/[""]/g, '').trim()) : '';
-    
-    if (citySlug && searchQuery) {
-      // Link to city page with hotel name as search hint
-      finalUrl = `https://ostrovok.ru/hotel/${citySlug}/?text=${searchQuery}&${queryString}`;
-    } else if (citySlug) {
-      finalUrl = `https://ostrovok.ru/hotel/${citySlug}/?${queryString}`;
-    } else if (searchQuery) {
-      finalUrl = `https://ostrovok.ru/search/?text=${searchQuery}&${queryString}`;
-    } else {
-      finalUrl = `https://ostrovok.ru/?${queryString}`;
-    }
-  } else {
-    // For real hotels, direct link
-    finalUrl = `https://ostrovok.ru/hotel/${hotelId}/?${queryString}`;
+  // Для тестовых отелей — используем правильные slug
+  if (hotelIdStr === '1' || hotelIdStr === 'test_hotel') {
+    return buildHotelPageLink('test_hotel', {
+      checkIn: params.checkIn,
+      checkOut: params.checkOut,
+      rooms: [{ adults: params.guests }],
+      currency: 'RUB',
+      lang: 'ru',
+    });
   }
   
-  console.log('[generatePartnerLink] Generated URL:', finalUrl);
-  return finalUrl;
+  if (hotelIdStr === '2' || hotelIdStr === 'test_hotel_do_not_book') {
+    return buildHotelPageLink('test_hotel_do_not_book', {
+      checkIn: params.checkIn,
+      checkOut: params.checkOut,
+      rooms: [{ adults: params.guests }],
+      currency: 'RUB',
+      lang: 'ru',
+    });
+  }
+  
+  // Для строковых slug (не чисел) — строим HP
+  if (!/^\d+$/.test(hotelIdStr)) {
+    // Только test_hotel и test_hotel_do_not_book — валидные slug для Ostrovok
+    // Все остальные (moscow_ritz, spb_astoria и т.д.) — наши demo ID
+    if (hotelIdStr === 'test_hotel' || hotelIdStr === 'test_hotel_do_not_book') {
+      try {
+        return buildHotelPageLink(hotelIdStr, {
+          checkIn: params.checkIn,
+          checkOut: params.checkOut,
+          rooms: [{ adults: params.guests }],
+          currency: 'RUB',
+          lang: 'ru',
+        });
+      } catch (e) {
+        // Если slug не валиден — fallback к тестовому отелю
+      }
+    }
+    // Для всех остальных строковых ID (demo отели) — используем тестовый отель
+    console.warn(`[generatePartnerLink] Demo hotel ID=${hotelId}, using test_hotel fallback`);
+    return buildHotelPageLink('test_hotel', {
+      checkIn: params.checkIn,
+      checkOut: params.checkOut,
+      rooms: [{ adults: params.guests }],
+      currency: 'RUB',
+      lang: 'ru',
+    });
+  }
+  
+  // Для числовых hid — используем SERP с region_id
+  const cityRegionMap: Record<string, number> = {
+    'москва': 1, 'moscow': 1,
+    'санкт-петербург': 2, 'saint petersburg': 2, 'питер': 2, 'петербург': 2,
+    'париж': 53, 'paris': 53,
+    'лондон': 211, 'london': 211,
+    'дубай': 1435, 'dubai': 1435,
+    'стамбул': 876, 'istanbul': 876,
+    'бангкок': 1990, 'bangkok': 1990,
+    'барселона': 1189, 'barcelona': 1189,
+    'рим': 1187, 'rome': 1187,
+    'прага': 1004, 'prague': 1004,
+    'амстердам': 1242, 'amsterdam': 1242,
+    'берлин': 964, 'berlin': 964,
+    'милан': 1188, 'milan': 1188,
+    'вена': 1352, 'vienna': 1352,
+    'лиссабон': 1461, 'lisbon': 1461,
+    'токио': 1987, 'tokyo': 1987,
+    'нью-йорк': 163, 'new york': 163,
+  };
+  
+  const regionId = city ? cityRegionMap[city.toLowerCase().trim()] : null;
+  
+  if (regionId) {
+    return buildSerpLink(regionId, {
+      checkIn: params.checkIn,
+      checkOut: params.checkOut,
+      rooms: [{ adults: params.guests }],
+      currency: 'RUB',
+      lang: 'ru',
+    });
+  }
+  
+  // Для любого другого числового hid (включая 126001 и др.) — используем тестовый отель
+  // Это нужно для демо-режима, когда API возвращает числовые hid вместо slug
+  console.warn(`[generatePartnerLink] Unknown hid=${hotelId}, using test_hotel fallback`);
+  return buildHotelPageLink('test_hotel', {
+    checkIn: params.checkIn,
+    checkOut: params.checkOut,
+    rooms: [{ adults: params.guests }],
+    currency: 'RUB',
+    lang: 'ru',
+  });
 };
 
 // Format image URL
@@ -335,7 +376,7 @@ const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
     images: hotel.images_ext,
     description: hotel.description_struct?.map(p => p.text).join('\n\n'),
     hotelType: hotel.hotel_type,
-    bookingUrl: searchParams ? generatePartnerLink(hotel.hid || hotel.id, {
+    bookingUrl: searchParams ? generatePartnerLink(hotel.id || hotel.hid, {
       checkIn: searchParams.checkIn,
       checkOut: searchParams.checkOut,
       guests: searchParams.guests
@@ -427,91 +468,35 @@ async function searchOstrovokHotels(filters: FilterState): Promise<Hotel[]> {
 
     // Try to call real API
     try {
-      // Check if searching for test hotels
+      // Test hotels by slug (per Ostrovok support: ID = test_hotel, ID = test_hotel_do_not_book)
       const testHotelIds = ['test_hotel', 'test_hotel_do_not_book'];
-      const isTestHotelQuery = testHotelIds.some(id => filters.destination.toLowerCase().includes(id.toLowerCase()));
       
       let response;
       
-      if (isTestHotelQuery) {
-        // Search by specific hotel IDs for test hotels
-        // Note: test_hotel has hid=1, test_hotel_do_not_book has hid=2
-        const testHotelHids = [1, 2];
-        
-        console.log('[Ostrovok] ========== TEST HOTELS SEARCH ==========');
-        console.log('[Ostrovok] Endpoint:', `${OSTROVOK_API_URL}/api/b2b/v3/search/serp/hotels/`);
-        console.log('[Ostrovok] Headers:', getOstrovokAuthHeaders());
-        console.log('[Ostrovok] Request body:', {
-          hids: testHotelHids,  // Using hids (numeric hotel IDs) instead of ids
+      console.log('[Ostrovok] ========== TEST HOTELS SEARCH ==========');
+      console.log('[Ostrovok] Destination:', filters.destination);
+      console.log('[Ostrovok] Using test hotel IDs (slug):', testHotelIds);
+      console.log('[Ostrovok] Endpoint:', `${OSTROVOK_API_URL}/api/b2b/v3/search/serp/hotels/`);
+      
+      response = await axios.post(
+        `${OSTROVOK_API_URL}/api/b2b/v3/search/serp/hotels/`,
+        {
+          ids: testHotelIds,
           checkin: checkIn,
           checkout: checkOut,
           guests: [{ adults: guests, children: [] }],
           language: 'ru',
           currency: 'RUB',
           residency: 'ru'
-        });
-        
-        response = await axios.post(
-          `${OSTROVOK_API_URL}/api/b2b/v3/search/serp/hotels/`,
-          {
-            hids: testHotelHids,  // Using hids (numeric hotel IDs) instead of ids
-            checkin: checkIn,
-            checkout: checkOut,
-            guests: [{ adults: guests, children: [] }],
-            language: 'ru',
-            currency: 'RUB',
-            residency: 'ru'
-          },
-          {
-            headers: getOstrovokAuthHeaders(),
-            timeout: 30000
-          }
-        );
-        
-        console.log('[Ostrovok] Response status:', response.status);
-        console.log('[Ostrovok] Response data:', JSON.stringify(response.data, null, 2).substring(0, 2000));
-      } else {
-        // FIRST: Try geo search for known cities (this gives real hotels from Ostrovok)
-        const cityCoords = getCityCoordinates(filters.destination);
-        
-        if (cityCoords) {
-          console.log('[Ostrovok] ========== GEO SEARCH ==========');
-          console.log('[Ostrovok] Destination:', filters.destination);
-          console.log('[Ostrovok] Coordinates:', cityCoords);
-          
-          try {
-            response = await axios.post(
-              `${OSTROVOK_API_URL}/api/b2b/v3/search/serp/geo/`,
-              {
-                latitude: cityCoords.lat,
-                longitude: cityCoords.lng,
-                radius: cityCoords.radius || 10,
-                checkin: checkIn,
-                checkout: checkOut,
-                guests: [{ adults: guests, children: [] }],
-                language: 'ru',
-                currency: 'RUB',
-                residency: 'ru'
-              },
-              {
-                headers: getOstrovokAuthHeaders(),
-                timeout: 30000
-              }
-            );
-            
-            console.log('[Ostrovok] Geo search response status:', response.status);
-          } catch (geoErr: any) {
-            console.error('[Ostrovok] Geo search error:', geoErr.message);
-            // Fall back to demo hotels
-            console.log('[Ostrovok] Falling back to demo hotels');
-            return getDemoHotels(filters.destination, checkIn, checkOut, guests);
-          }
-        } else {
-          // Unknown city - use demo hotels
-          console.log('[Ostrovok] Unknown city, using demo hotels:', filters.destination);
-          return getDemoHotels(filters.destination, checkIn, checkOut, guests);
+        },
+        {
+          headers: getOstrovokAuthHeaders(),
+          timeout: 30000
         }
-      }
+      );
+      
+      console.log('[Ostrovok] Response status:', response.status);
+      console.log('[Ostrovok] Response data:', JSON.stringify(response.data, null, 2).substring(0, 2000));
 
       // API returns data in data.data.hotels structure
       console.log('[Ostrovok] Response structure:', Object.keys(response.data));
@@ -527,7 +512,7 @@ async function searchOstrovokHotels(filters: FilterState): Promise<Hotel[]> {
         return getDemoHotels(filters.destination, checkIn, checkOut, guests);
       }
       
-      // Transform API hotels directly (don't merge with demo - use real data!)
+      // Transform API hotels
       console.log('[Ostrovok] Using real API hotels');
       let transformedHotels = apiHotels.map((apiHotel: OstrovokHotel) => {
         return transformHotelData(apiHotel, { checkIn, checkOut, guests }, filters.destination);
@@ -536,22 +521,20 @@ async function searchOstrovokHotels(filters: FilterState): Promise<Hotel[]> {
       // Filter to only include hotels with rates
       transformedHotels = transformedHotels.filter((h: Hotel) => h.rates && h.rates.length > 0);
       
-      // Sort by price (lowest first)
-      transformedHotels = transformedHotels.sort((a: Hotel, b: Hotel) => (a.price || 0) - (b.price || 0));
-
-      // Per ETG Best Practices: Limit rates to 1-2 lowest in SERP step
-      transformedHotels = transformedHotels.map((hotel: Hotel) => {
-        if (hotel.rates && hotel.rates.length > 2) {
-          const sortedRates = [...hotel.rates].sort((a, b) => 
-            (a.amount || 0) - (b.amount || 0)
-          );
-          return { ...hotel, rates: sortedRates.slice(0, 2) };
-        }
-        return hotel;
-      });
-
-      console.log(`[Ostrovok] Returning ${transformedHotels.length} real hotels from API`);
-      return transformedHotels.slice(0, 5);
+      // Only use test hotels by slug (per Ostrovok support)
+      const validTestHotelSlugs = ['test_hotel', 'test_hotel_do_not_book'];
+      const validHotels = transformedHotels.filter((h: Hotel) => 
+        validTestHotelSlugs.includes(String(h.id))
+      );
+      
+      if (validHotels.length > 0) {
+        console.log(`[Ostrovok] Found ${validHotels.length} test hotels with valid public links`);
+        return validHotels;
+      }
+      
+      // If no test hotels found, return demo hotels with warning
+      console.log('[Ostrovok] No test hotels found in API response, using demo fallback');
+      return getDemoHotels(filters.destination, checkIn, checkOut, guests);
 
     } catch (apiError: any) {
       console.error('[Ostrovok] ========== API ERROR ==========');
@@ -590,7 +573,7 @@ function getDemoHotels(destination: string, checkIn: string, checkOut: string, g
   // Add booking URLs with correct params
   return hotels.map(h => {
     // Use destination (query) as city for proper URL generation
-    const generatedUrl = generatePartnerLink(h.hid || h.id, { checkIn, checkOut, guests }, h.name, destination);
+    const generatedUrl = generatePartnerLink(h.id || h.hid, { checkIn, checkOut, guests }, h.name, destination);
     console.log(`[getDemoHotels] Generated URL for ${h.name}:`, generatedUrl);
     return {
       ...h,
@@ -643,6 +626,8 @@ function formatHotelsForGPT(hotels: Hotel[]): string {
       formatted += `- **Ссылка для бронирования:** ${hotel.bookingUrl}\n`;
       // Add explicit button format for GPT to use
       formatted += `\n[🛎️ Забронировать ${hotel.name}](${hotel.bookingUrl})\n`;
+    } else {
+      formatted += `- **Бронирование:** Ссылка недоступна. Поищите отель на Ostrovok.ru самостоятельно.\n`;
     }
     
     if (hotel.description) {
@@ -669,10 +654,17 @@ const SYSTEM_PROMPT = `Ты — опытный туристический асс
 1. Используй ТОЛЬКО отели из предоставленного списка "Рекомендуемые отели"
 2. Для каждого отеля ОБЯЗАТЕЛЬНО включи фото используя markdown: ![название отеля](URL_фото)
 3. Добавь кнопку бронирования ТОЧНО в формате: [🛎️ Забронировать отель](URL_бронирования)
-   - Используй ПОЛНУЮ ссылку из данных отеля (включая partner_id, check_in, check_out)
-   - НЕ сокращай и НЕ изменяй URL
+   - Используй ПОЛНУЮ ссылку из поля bookingUrl в данных отеля
+   - НЕ сокращай, НЕ изменяй и НЕ генерируй URL самостоятельно
+   - Если bookingUrl отсутствует — не показывай кнопку бронирования
 4. Укажи цену, звёздность, рейтинг и расстояние до центра
 5. Добавь краткое описание отеля
+
+⚠️⚠️⚠️ КРИТИЧЕСКИ ВАЖНО:
+- Используй ТОЛЬКО bookingUrl из предоставленных данных
+- НИКОГДА не придумывай ссылки типа https://ostrovok.ru/hotel/{id}/
+- Не используй hid (числовой ID) для создания ссылок
+- Если нет bookingUrl — напиши "Ссылка на бронирование недоступна"
 
 СТРУКТУРА ОТВЕТА ПРО ОТЕЛИ:
 
@@ -702,12 +694,20 @@ const SYSTEM_PROMPT = `Ты — опытный туристический асс
 // Middleware to check environment variables
 const checkEnvVariables = (req: Request, res: Response, next: NextFunction) => {
   if (!OPENROUTER_API_KEY) {
+    console.error('[GPT Proxy] ERROR: OpenRouter API key not configured');
     return res.status(500).json({ 
       error: 'OpenRouter API key not configured',
       details: 'Please set OPENROUTER_API_KEY environment variable'
     });
   }
   next();
+};
+
+// Async handler wrapper to catch errors
+const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
 };
 
 // Test endpoint
@@ -739,7 +739,7 @@ router.get('/test/ostrovok', async (req: Request, res: Response) => {
       const testResponse = await axios.post(
         `${OSTROVOK_API_URL}/api/b2b/v3/search/serp/hotels/`,
         {
-          hids: [1, 2],  // test_hotel=1, test_hotel_do_not_book=2
+          ids: ['test_hotel', 'test_hotel_do_not_book'],
           checkin: today,
           checkout: tomorrow,
           guests: [{ adults: 2, children: [] }],
@@ -847,7 +847,7 @@ router.get('/test/ostrovok', async (req: Request, res: Response) => {
         apiUrl: OSTROVOK_API_URL,
         hasApiKey: !!OSTROVOK_API_KEY,
         hasSecret: !!OSTROVOK_API_SECRET,
-        partnerId: PARTNER_ID
+        partnerSlug: PARTNER_SLUG
       },
       tests: {
         testHotelsById: testHotelsResult,
@@ -883,36 +883,44 @@ router.get('/test/ostrovok', async (req: Request, res: Response) => {
 });
 
 // Main endpoint
-router.post('/openai', checkEnvVariables, async (req: Request, res: Response) => {
+router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res: Response) => {
+  console.log('[GPT Proxy] ===== REQUEST START =====');
+  console.log('[GPT Proxy] Request body:', JSON.stringify(req.body, null, 2));
+  
   try {
+    // Defensive check for request body
+    if (!req.body || typeof req.body !== 'object') {
+      console.error('[GPT Proxy] ERROR: Empty or invalid request body');
+      return res.status(400).json({ error: 'Empty or invalid request body' });
+    }
+    
     const { messages, filters = {} } = req.body;
     
     console.log('[GPT Proxy] Received request');
     console.log('[GPT Proxy] Raw filters from client:', JSON.stringify(filters, null, 2));
-    console.log('[GPT Proxy] filters.dates:', filters.dates);
-    console.log('[GPT Proxy] filters.dates?.start:', filters.dates?.start);
-    console.log('[GPT Proxy] filters.dates?.end:', filters.dates?.end);
     
+    // Validate messages
     if (!messages || !Array.isArray(messages)) {
+      console.error('[GPT Proxy] ERROR: Invalid messages format');
       return res.status(400).json({ 
         error: 'Invalid request format. Expected array of messages.' 
       });
     }
 
-    // Default filter values
+    // Default filter values with defensive programming
     const defaultFilters: FilterState = {
-      destination: filters.destination || 'Москва',
+      destination: filters?.destination || 'Москва',
       dates: {
-        start: filters.dates?.start || new Date().toISOString().split('T')[0],
-        end: filters.dates?.end || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        start: filters?.dates?.start || new Date().toISOString().split('T')[0],
+        end: filters?.dates?.end || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       },
       budget: {
-        min: filters.budget?.min || 1000,
-        max: filters.budget?.max || 100000
+        min: filters?.budget?.min || 1000,
+        max: filters?.budget?.max || 100000
       },
-      preferences: filters.preferences || [],
-      travelers: filters.travelers || 2,
-      children: filters.children || 0
+      preferences: filters?.preferences || [],
+      travelers: filters?.travelers || 2,
+      children: filters?.children || 0
     };
 
     console.log('[GPT Proxy] Merged filters:', JSON.stringify(defaultFilters, null, 2));
@@ -943,7 +951,7 @@ router.post('/openai', checkEnvVariables, async (req: Request, res: Response) =>
 
     console.log('[GPT Proxy] Sending request to OpenRouter...');
 
-    // Call OpenRouter API
+    // Call OpenRouter API with shorter timeout
     const response = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
@@ -959,7 +967,7 @@ router.post('/openai', checkEnvVariables, async (req: Request, res: Response) =>
           'HTTP-Referer': req.headers.origin || 'http://localhost:5173',
           'X-Title': 'AI Travel Assistant'
         },
-        timeout: 60000
+        timeout: 25000  // 25 seconds timeout
       }
     );
 
@@ -980,19 +988,26 @@ router.post('/openai', checkEnvVariables, async (req: Request, res: Response) =>
       hotels: hotels
     });
 
-  } catch (error) {
-    const axiosError = error as AxiosError;
-    console.error('[GPT Proxy] Error:', axiosError.message);
+  } catch (error: any) {
+    console.error('[GPT Proxy] ===== CRITICAL ERROR =====');
+    console.error('[GPT Proxy] Error message:', error.message);
+    console.error('[GPT Proxy] Error stack:', error.stack);
     
-    if (axiosError.response) {
-      console.error('[GPT Proxy] Error response:', axiosError.response.data);
+    if (error.response) {
+      console.error('[GPT Proxy] Axios error response:', error.response.data);
     }
 
-    res.status(500).json({ 
-      error: 'Internal server error',
-      details: axiosError.message
-    });
+    // Always return JSON, even on error
+    if (!res.headersSent) {
+      return res.status(500).json({ 
+        error: 'Internal server error',
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  } finally {
+    console.log('[GPT Proxy] ===== REQUEST END =====');
   }
-});
+}));
 
 export default router;

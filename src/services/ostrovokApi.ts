@@ -1,8 +1,9 @@
 import axios from 'axios';
+import { buildHotelPageLink, buildSerpLink, encodeGuests, type RoomGuests } from '@/lib/ostrovok';
 
 const API_BASE_URL = 'https://api.ostrovok.ru/v2';
 const API_TOKEN = import.meta.env.VITE_OSTROVOK_API_TOKEN;
-const PARTNER_ID = import.meta.env.VITE_OSTROVOK_PARTNER_ID;
+const PARTNER_SLUG = import.meta.env.VITE_OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
 
 interface HotelInfo {
   id: string;
@@ -18,14 +19,19 @@ interface HotelInfo {
 
 interface HotelSearchParams {
   location: string;
-  checkIn: string;
-  checkOut: string;
+  checkIn: string; // YYYY-MM-DD
+  checkOut: string; // YYYY-MM-DD
   guests: number;
+  children?: number[];
+  currency?: string;
+  lang?: string;
 }
 
 interface OstrovokResponse {
   hotels: Array<{
     id: string;
+    hid?: number;
+    slug?: string;
     name: string;
     stars: number;
     address: string;
@@ -59,16 +65,21 @@ class OstrovokApi {
   }
 
   // Формирование партнерской ссылки
-  private generatePartnerUrl(hotelId: string, params: HotelSearchParams): string {
-    const baseUrl = 'https://ostrovok.ru/hotel';
-    const searchParams = new URLSearchParams({
-      partner_id: PARTNER_ID,
-      check_in: params.checkIn,
-      check_out: params.checkOut,
-      guests: params.guests.toString(),
+  private generatePartnerUrl(hotelSlug: string, params: HotelSearchParams): string {
+    // Используем правильный LinkBuilder с partner_slug и UTM
+    const rooms: RoomGuests[] = [{
+      adults: params.guests,
+      childrenAges: params.children
+    }];
+    
+    return buildHotelPageLink(hotelSlug, {
+      partnerSlug: PARTNER_SLUG,
+      checkIn: params.checkIn,
+      checkOut: params.checkOut,
+      rooms,
+      currency: params.currency,
+      lang: params.lang,
     });
-
-    return `${baseUrl}/${hotelId}?${searchParams.toString()}`;
   }
 
   // Поиск отелей
@@ -86,13 +97,15 @@ class OstrovokApi {
       const data = response.data as OstrovokResponse;
       return data.hotels.map(hotel => ({
         id: hotel.id,
+        hid: hotel.hid,
         name: hotel.name,
         stars: hotel.stars,
         address: hotel.address,
         price: hotel.min_price,
         currency: hotel.currency,
         thumbnail: hotel.thumbnail,
-        booking_url: this.generatePartnerUrl(hotel.id, params),
+        // Используем hotel.slug если доступен, иначе hotel.id (если это slug)
+        booking_url: this.generatePartnerUrl(hotel.slug || hotel.id, params),
         rating: hotel.rating
       }));
     } catch (error) {

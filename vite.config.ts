@@ -1,18 +1,28 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react-swc';
+import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      // Отключаем react-refresh для фикса ошибки
+      include: '**/*.tsx',
+    })
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
   server: {
+    host: 'localhost',
+    port: 5173,
+    strictPort: true,
+    // Отключаем HMR
+    hmr: false,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:3001',
+        target: 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
       },
@@ -21,13 +31,5 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-    rollupOptions: {
-      output: {
-        manualChunks: undefined,
-        assetFileNames: 'assets/[name]-[hash][extname]',
-        chunkFileNames: 'assets/[name]-[hash].js',
-        entryFileNames: 'assets/[name]-[hash].js',
-      },
-    },
   },
 });

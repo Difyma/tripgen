@@ -6,15 +6,25 @@
  */
 
 import axios from 'axios';
+import { buildHotelPageLink, buildSerpLink, encodeGuests, type RoomGuests } from '@/lib/ostrovok';
 import type {
   Hotel,
   HotelSearchParams,
   HotelContentResponse,
   SuggestResponse,
   PrebookResponse,
-  ImageSize,
-  PartnerLinkParams
+  ImageSize
 } from '../types/ostrovok';
+
+// Legacy type alias for compatibility
+export type PartnerLinkParams = {
+  hotelId: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  children?: number;
+  partnerId?: string;
+};
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -31,27 +41,22 @@ export function formatImageUrl(url: string, size: ImageSize = DEFAULT_IMAGE_SIZE
 
 /**
  * Generate partner booking link for Ostrovok.ru
+ * @deprecated Use buildHotelPageLink from '@/lib/ostrovok' instead
  */
 export function generatePartnerLink(params: PartnerLinkParams): string {
-  const partnerId = params.partnerId || import.meta.env.VITE_OSTROVOK_PARTNER_ID;
+  const partnerSlug = params.partnerId || import.meta.env.VITE_OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
   
-  if (!partnerId) {
-    console.warn('OSTROVOK_PARTNER_ID not configured');
-    return `https://ostrovok.ru/hotel/${params.hotelId}`;
-  }
+  const rooms: RoomGuests[] = [{
+    adults: params.guests,
+    childrenAges: params.children ? [params.children] : undefined
+  }];
   
-  const searchParams = new URLSearchParams({
-    partner_id: partnerId,
-    check_in: params.checkIn,
-    check_out: params.checkOut,
-    guests: params.guests.toString()
+  return buildHotelPageLink(params.hotelId, {
+    partnerSlug,
+    checkIn: params.checkIn,
+    checkOut: params.checkOut,
+    rooms,
   });
-  
-  if (params.children) {
-    searchParams.append('children', params.children.toString());
-  }
-  
-  return `https://ostrovok.ru/hotel/${params.hotelId}?${searchParams.toString()}`;
 }
 
 /**

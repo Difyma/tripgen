@@ -11,10 +11,11 @@ const footerLinks = {
     { name: 'Фотогалерея', href: '#' }
   ],
   Компания: [
-    { name: 'О нас', href: '#' },
+    { name: 'О нас', href: '/about' },
     { name: 'Наша история', href: '#' },
     { name: 'Команда', href: '#' },
-    { name: 'Для креаторов', href: '/creator' }
+    { name: 'Для креаторов', href: '/creator' },
+    { name: 'Наши креаторы', href: '/creators' }
   ],
   Поддержка: [
     { name: 'Связаться с нами', href: '#' },

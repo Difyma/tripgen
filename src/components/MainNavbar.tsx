@@ -1,4 +1,4 @@
-import { Users, MessageSquare, ChevronDown, Menu, X } from 'lucide-react';
+import { Users, MessageSquare, ChevronDown, Menu, X, LayoutDashboard } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useState } from 'react';
@@ -8,7 +8,7 @@ interface MainNavbarProps {
 }
 
 export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
-  const { user } = useAuth();
+  const { user, isCreator } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const toggleMobileMenu = () => {
@@ -32,6 +32,7 @@ export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
           <div className="hidden md:flex items-center gap-8">
             <Link to="/" className="text-sm text-gray-600 hover:text-black transition-colors">Как это работает</Link>
             <Link to="/about" className="text-sm text-gray-600 hover:text-black transition-colors">О нас</Link>
+            <Link to="/creators" className="text-sm text-gray-600 hover:text-black transition-colors">Наши креаторы</Link>
             <div className="flex items-center gap-4">
               {user ? (
                 <Link 
@@ -63,13 +64,23 @@ export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
                   <Users className="w-4 h-4" />
                 </button>
               )}
-              <Link 
-                to="/creator" 
-                className="bg-white text-black border border-gray-200 px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
-              >
-                <img src="/images/web-brower.png" alt="Для креаторов" className="w-4 h-4" />
-                <span>Для креаторов</span>
-              </Link>
+              {isCreator ? (
+                <Link 
+                  to="/creator-dashboard" 
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-full text-sm font-medium hover:from-purple-700 hover:to-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Дашборд</span>
+                </Link>
+              ) : (
+                <Link 
+                  to="/creator" 
+                  className="bg-white text-black border border-gray-200 px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
+                >
+                  <img src="/images/web-brower.png" alt="Для креаторов" className="w-4 h-4" />
+                  <span>Для креаторов</span>
+                </Link>
+              )}
               <Link 
                 to="/chat" 
                 className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-900 transition-colors"
@@ -121,13 +132,31 @@ export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
                 О нас
               </Link>
               <Link 
-                to="/creator" 
-                className="flex items-center gap-2 text-gray-600 hover:text-black transition-colors"
+                to="/creators" 
+                className="text-gray-600 hover:text-black transition-colors"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <img src="/images/web-brower.png" alt="Для креаторов" className="w-4 h-4" />
-                <span>Для креаторов</span>
+                Наши креаторы
               </Link>
+              {isCreator ? (
+                <Link 
+                  to="/creator-dashboard" 
+                  className="flex items-center gap-2 text-purple-600 hover:text-purple-800 transition-colors font-medium"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Дашборд</span>
+                </Link>
+              ) : (
+                <Link 
+                  to="/creator" 
+                  className="flex items-center gap-2 text-gray-600 hover:text-black transition-colors"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <img src="/images/web-brower.png" alt="Для креаторов" className="w-4 h-4" />
+                  <span>Для креаторов</span>
+                </Link>
+              )}
               {user ? (
                 <Link 
                   to="/profile" 

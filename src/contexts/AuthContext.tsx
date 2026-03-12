@@ -1,7 +1,20 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
-import { auth } from '../lib/supabase';
+import { auth, supabase } from '../lib/supabase';
 import { useRateLimitStore } from '../lib/rateLimit';
+
+interface Creator {
+  id: string;
+  user_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  full_name: string | null;
+  email: string;
+  social_media: string | null;
+  portfolio: string | null;
+  bio: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 interface AuthResponse {
   message: string;
@@ -9,6 +22,8 @@ interface AuthResponse {
 
 interface AuthContextType {
   user: User | null;
+  creator: Creator | null;
+  isCreator: boolean;
   loading: boolean;
   error: Error | null;
   signInOrSignUp: (email: string, password: string) => Promise<AuthResponse>;
@@ -19,9 +34,39 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [creator, setCreator] = useState<Creator | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const { isLimited, incrementAttempts } = useRateLimitStore();
+
+  // Загрузка данных креатора
+  const loadCreatorData = async (userId: string) => {
+    try {
+      console.log('[Auth] Loading creator data for user:', userId);
+      
+      const { data, error } = await supabase
+        .from('creators')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log('[Auth] No creator record found for user');
+        } else {
+          console.error('[Auth] Error loading creator data:', error);
+        }
+        setCreator(null);
+        return;
+      }
+      
+      console.log('[Auth] Creator data loaded:', data);
+      setCreator(data);
+    } catch (err) {
+      console.error('[Auth] Exception loading creator data:', err);
+      setCreator(null);
+    }
+  };
 
   useEffect(() => {
     // Check for initial session
@@ -29,7 +74,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Subscribe to auth changes
     const { data: { subscription } } = auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      
+      if (currentUser) {
+        loadCreatorData(currentUser.id);
+      } else {
+        setCreator(null);
+      }
+      
       setLoading(false);
     });
 
@@ -41,7 +94,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function checkUser() {
     try {
       const session = await auth.getSession();
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      
+      if (currentUser) {
+        await loadCreatorData(currentUser.id);
+      }
     } catch (error) {
       console.error('Error checking user session:', error);
       setError(error as Error);
@@ -89,8 +147,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+    // isCreator = true только если статус 'approved'
+  const isCreator = !!creator && creator.status === 'approved';
+  
+  console.log('[Auth] Auth state:', { 
+    hasUser: !!user, 
+    hasCreator: !!creator, 
+    creatorStatus: creator?.status,
+    isCreator 
+  });
+
   const value = {
     user,
+    creator,
+    isCreator,
     loading,
     error,
     signInOrSignUp,

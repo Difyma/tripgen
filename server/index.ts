@@ -70,17 +70,32 @@ console.log('Routes configured:', {
   hotels: '/api/hotels'
 });
 
-// Error handling middleware
+// Error handling middleware - MUST be last
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Global error handler:', err);
-  res.status(500).json({
-    error: 'Что-то пошло не так!',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  console.error('Stack:', err.stack);
+  
+  // Ensure we always return JSON
+  if (!res.headersSent) {
+    res.status(500).json({
+      error: 'Internal server error',
+      message: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  }
+});
+
+// Catch-all for 404 errors - return JSON instead of HTML
+app.use((req: express.Request, res: express.Response) => {
+  res.status(404).json({
+    error: 'Not found',
+    path: req.path,
+    method: req.method
   });
 });
 
-// Start server
-const server = app.listen(PORT, '0.0.0.0', () => {
+// Start server - listen on all interfaces (IPv4 and IPv6)
+const server = app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);
   console.log('Available routes:');
   console.log('- GET  /         -> Server status');

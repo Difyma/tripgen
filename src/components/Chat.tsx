@@ -19,6 +19,8 @@ const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
 import { useFlightInfo } from '../hooks/useFlightInfo';
+import { buildHotelPageLink, looksLikeHid } from '@/lib/ostrovok';
+import { HotelCard } from './HotelCard';
 import { 
   getUserChats,
   createChat,
@@ -30,13 +32,30 @@ import {
 } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 
+interface AssistantHotel {
+  id: string;
+  name: string;
+  stars: number;
+  rating?: number;
+  address: string;
+  price: number;
+  currency: string;
+  images?: { category: string; url: string }[];
+  bookingUrl?: string;
+  distanceToCenter?: number;
+}
+
 interface Message {
   id: number;
   text: string;
   isUser: boolean;
   role?: 'system' | 'user' | 'assistant';
   showCreateRoute?: boolean;
+  hotels?: AssistantHotel[];
 }
+
+const OSTROVOK_PARTNER_SLUG =
+  import.meta.env.VITE_OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
 
 interface FilterState {
   location: string;
@@ -193,6 +212,14 @@ const SYSTEM_PROMPT = `Ты — опытный travel-эксперт и проф
    • Длительные → качество сервиса
 
 ВАЖНО: Когда я предоставляю информацию о рейсах в формате "# ✈️ Информация о рейсах", используй ТОЛЬКО эту информацию для рекомендаций по перелетам. Не говори, что у тебя нет доступа к данным. Вся необходимая информация будет в сообщении.
+
+⚠️⚠️⚠️ КРИТИЧЕСКИ ВАЖНО — ПРАВИЛА ССЫЛОК НА ОТЕЛИ:
+1. Используй ТОЛЬКО ссылки из поля bookingUrl в предоставленных данных отелей
+2. НИКОГДА не генерируй ссылки на отели самостоятельно — не придумывай URL!
+3. Если bookingUrl отсутствует или пустой — не показывай кнопку бронирования вообще
+4. Не используй формат https://ostrovok.ru/hotel/{id}/ — это неправильный формат
+5. Правильные ссылки содержат partner_slug и utm_medium=partners
+6. Если нет bookingUrl в данных — напиши "Бронирование недоступно" или предложи поискать отели на Ostrovok.ru самостоятельно
 
 ПРИМЕР ФОРМАТИРОВАНИЯ ОТВЕТА:
 
@@ -1002,13 +1029,18 @@ const Chat = () => {
         console.error('Empty response data:', data);
         throw new Error('Empty response from GPT');
       }
-      
+
+      const hotelsFromApi: AssistantHotel[] | undefined = Array.isArray(data.hotels)
+        ? data.hotels
+        : undefined;
+    
       // Добавляем ответ от GPT
       const assistantMessage: Message = {
         id: Date.now() + Math.random(),
         text: responseText,
         isUser: false,
-        role: 'assistant'
+        role: 'assistant',
+        hotels: hotelsFromApi
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -1038,15 +1070,19 @@ const Chat = () => {
     }
   }, [messages, getFlightInfoForGPT, currentChatId, user]);
 
-  // Reset chat state when URL changes
+  // Reset chat state when URL changes (only if no chatId in URL)
   useEffect(() => {
     if (isFirstMount.current) {
-      setMessages([{
-        id: Date.now() + Math.random(),
-        text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
-        isUser: false,
-        role: 'assistant'
-      }]);
+      const hasChatId = new URLSearchParams(location.search).get('chat');
+      // Не сбрасываем сообщения если есть chatId — история загрузится отдельно
+      if (!hasChatId) {
+        setMessages([{
+          id: Date.now() + Math.random(),
+          text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
+          isUser: false,
+          role: 'assistant'
+        }]);
+      }
       setInputText('');
       setShowTripBuilder(false);
       setFilters({
@@ -1095,7 +1131,9 @@ const Chat = () => {
 
   // Загрузка конкретного чата из URL параметра
   useEffect(() => {
-    const chatIdFromUrl = searchParams.get('chat');
+    // Создаём новый URLSearchParams при каждом изменении URL
+    const params = new URLSearchParams(location.search);
+    const chatIdFromUrl = params.get('chat');
     console.log('URL changed, chatId:', chatIdFromUrl, 'currentChatId:', currentChatId);
     
     if (chatIdFromUrl && user && chatIdFromUrl !== currentChatId) {
@@ -1133,15 +1171,16 @@ const Chat = () => {
   // Загрузка конкретного чата
   const loadChat = async (chatId: string) => {
     if (!user) return;
+    if (chatId === currentChatId && messages.length > 1) return; // Уже загружен
     
     console.log('Loading chat messages for:', chatId);
     
     try {
-      const messages = await getChatMessages(chatId);
-      console.log('Loaded messages:', messages.length, messages);
+      const loadedMessages = await getChatMessages(chatId);
+      console.log('Loaded messages:', loadedMessages.length, loadedMessages);
       
-      if (messages.length > 0) {
-        const formattedMessages: Message[] = messages.map((msg: ChatMessageDB, index: number) => ({
+      if (loadedMessages.length > 0) {
+        const formattedMessages: Message[] = loadedMessages.map((msg: ChatMessageDB, index: number) => ({
           id: index,
           text: msg.content,
           isUser: msg.role === 'user',
@@ -1237,33 +1276,110 @@ const Chat = () => {
     }));
   };
 
-  // Fix booking URLs - handle both numeric IDs and slugs like 'le_marais'
-  // Simple format: direct hotel page with partner_id
+  // Порядок параметров как на ostrovok.ru: utm_medium → partner_slug → utm_source
+  const normalizeOstrovokQueryOrder = (url: string): string => {
+    try {
+      const u = new URL(url);
+      const order = ['utm_medium', 'partner_slug', 'utm_source'];
+      const rest: [string, string][] = [];
+      u.searchParams.forEach((v, k) => {
+        if (!order.includes(k)) rest.push([k, v]);
+      });
+      const newUrl = new URL(u.origin + u.pathname);
+      for (const k of order) {
+        const v = u.searchParams.get(k);
+        if (v) newUrl.searchParams.set(k, v);
+      }
+      rest.forEach(([k, v]) => newUrl.searchParams.set(k, v));
+      return newUrl.toString();
+    } catch {
+      return url;
+    }
+  };
+
+  // Fix booking URLs - convert to proper format with partner_slug and utm_*
   const fixBookingUrl = (url: string, checkInDate?: string, checkOutDate?: string): string => {
-    if (!url || !url.includes('ostrovok.ru/hotel/')) {
+    if (!url || (!url.includes('ostrovok.ru/hotel/') && !url.includes('ostrovok.ru/rooms/'))) {
       return url;
     }
     
-    // Extract hotel path - can be: 12345 or le_marais or russia/altai/name
-    const match = url.match(/hotel\/([\w\-\/]+)/);
-    if (!match) {
-      return url;
+    // Пытаемся извлечь hotel ID или slug из URL
+    const roomsMatch = url.match(/rooms\/([^/?]+)/);
+    const hotelMatch = url.match(/hotel\/(\d+)/);
+    const idOrSlug = roomsMatch ? roomsMatch[1] : (hotelMatch ? hotelMatch[1] : null);
+    
+    // Если это ссылка с numeric hid (типа /hotel/1514/) — всегда исправляем на test_hotel
+    // даже если в ней уже есть partner_slug — пропускаем проверку атрибуции
+    const hasNumericHid = hotelMatch && looksLikeHid(hotelMatch[1]);
+    
+    // Если ссылка уже с правильной атрибуцией и НЕ содержит numeric hid — просто нормализуем
+    if (!hasNumericHid && url.includes('partner_slug=') && url.includes('utm_medium=')) {
+      return normalizeOstrovokQueryOrder(url);
     }
     
-    const hotelPath = match[1].replace(/\/$/, '');
-    const partnerId = '270392';
+    if (!idOrSlug) {
+      return url;
+    }
     
     // Use provided dates or defaults
     const checkIn = checkInDate || new Date().toISOString().split('T')[0];
     const checkOut = checkOutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    // Simple direct link format
-    return `https://ostrovok.ru/hotel/${hotelPath}/?partner_id=${partnerId}&check_in=${checkIn}&check_out=${checkOut}&guests=2`;
+    // Для тестовых отелей (1, 2) используем правильные slug
+    if (idOrSlug === '1' || idOrSlug === 'test_hotel') {
+      return buildHotelPageLink('test_hotel', {
+        partnerSlug: OSTROVOK_PARTNER_SLUG,
+        checkIn,
+        checkOut,
+        rooms: [{ adults: 2 }],
+      });
+    }
+    
+    if (idOrSlug === '2' || idOrSlug === 'test_hotel_do_not_book') {
+      return buildHotelPageLink('test_hotel_do_not_book', {
+        partnerSlug: OSTROVOK_PARTNER_SLUG,
+        checkIn,
+        checkOut,
+        rooms: [{ adults: 2 }],
+      });
+    }
+    
+    // Для slug (не чисел) строим HP
+    if (!looksLikeHid(idOrSlug)) {
+      try {
+        return buildHotelPageLink(idOrSlug, {
+          partnerSlug: OSTROVOK_PARTNER_SLUG,
+          checkIn,
+          checkOut,
+          rooms: [{ adults: 2 }],
+        });
+      } catch (e) {
+        // Если не получилось, fallback к исходному URL
+        return url;
+      }
+    }
+    
+    // Для числовых hid не можем построить HP — используем тестовый отель
+    // Это нужно для демо-режима, когда API возвращает числовые hid вместо slug
+    return buildHotelPageLink('test_hotel', {
+      partnerSlug: OSTROVOK_PARTNER_SLUG,
+      checkIn,
+      checkOut,
+      rooms: [{ adults: 2 }],
+    });
   };
 
-  // Check if URL is for a test hotel
+  // Check if URL is for a test hotel (includes any numeric hotel IDs)
   const isTestHotelUrl = (url: string): boolean => {
-    return url.includes('hotel/1/') || url.includes('hotel/2/');
+    // Test hotels by slug
+    if (url.includes('rooms/1/') || url.includes('rooms/2/') || url.includes('hotel/1/') || url.includes('hotel/2/')) {
+      return true;
+    }
+    // Any numeric hotel ID in /hotel/{number}/ pattern (demo mode)
+    if (/hotel\/\d+\//.test(url)) {
+      return true;
+    }
+    return false;
   };
 
   const formatMessage = (text: string): string => {
@@ -1403,6 +1519,182 @@ const Chat = () => {
     return formattedText;
   };
 
+  // Parse hotel data from message text
+  const parseHotelsFromText = (text: string): Array<{
+    name: string;
+    stars: number;
+    rating?: number;
+    reviewCount?: number;
+    address: string;
+    distanceToCenter?: string;
+    distanceToMetro?: string;
+    price: number;
+    currency: string;
+    imageUrl?: string;
+    bookingUrl: string;
+    amenities?: string[];
+    isTop?: boolean;
+  }> => {
+    const hotels: Array<{
+      name: string;
+      stars: number;
+      rating?: number;
+      reviewCount?: number;
+      address: string;
+      distanceToCenter?: string;
+      distanceToMetro?: string;
+      price: number;
+      currency: string;
+      imageUrl?: string;
+      bookingUrl: string;
+      amenities?: string[];
+      isTop?: boolean;
+    }> = [];
+
+    const normalizeCurrency = (raw?: string) => {
+      if (!raw) return 'RUB';
+      const v = raw.trim();
+      if (v === '₽') return 'RUB';
+      if (v === '€') return 'EUR';
+      if (v === '$') return 'USD';
+      return v.toUpperCase();
+    };
+
+    const parseStarsFromTitle = (title: string): number => {
+      const stars = (title.match(/⭐/g) || []).length;
+      if (stars > 0) return stars;
+      const m = title.match(/\b([1-5])\s*[- ]?\s*зв/i);
+      return m ? Number(m[1]) : 0;
+    };
+
+    const extractFirstImage = (block: string): string | undefined => {
+      const m = block.match(/!\[[^\]]*\]\(([^)]+)\)/);
+      return m?.[1]?.trim();
+    };
+
+    const extractBookingUrl = (block: string): string => {
+      const m = block.match(/\[\s*🛎️[^\]]*\]\(([^)]+)\)/);
+      return m ? fixBookingUrl(m[1].trim()) : '';
+    };
+
+    const extractAddress = (block: string): string => {
+      const m = block.match(/-\s*\*\*Адрес:\*\*\s*([^\n]+)/i);
+      return (m?.[1] || '').trim();
+    };
+
+    const extractDistanceToCenter = (block: string): string | undefined => {
+      const m = block.match(/-\s*\*\*До центра:\*\*\s*([^\n]+)/i);
+      return m?.[1]?.trim();
+    };
+
+    const extractDistanceToMetro = (block: string): string | undefined => {
+      const m = block.match(/-\s*\*\*(?:До метро|Метро):\*\*\s*([^\n]+)/i);
+      return m?.[1]?.trim();
+    };
+
+    const extractRating = (block: string): { rating?: number; reviewCount?: number } => {
+      const ratingMatch = block.match(/-\s*\*\*Рейтинг:\*\*\s*(\d+(\.\d+)?)/i);
+      const rating = ratingMatch ? parseFloat(ratingMatch[1]) : undefined;
+
+      // "246 отзывов" or "(246 отзывов)" etc.
+      const reviewsMatch = block.match(/(\d{1,6})\s*отзыв/i);
+      const reviewCount = reviewsMatch ? parseInt(reviewsMatch[1], 10) : undefined;
+
+      return { rating, reviewCount };
+    };
+
+    const extractPrice = (block: string): { price: number; currency: string } => {
+      // Variants:
+      // - "- **Цена:** от 12 345 RUB"
+      // - "💰 **Цена:** от 104 € за ночь"
+      const m =
+        block.match(/(?:-|\u2022)?\s*(?:💰\s*)?\*\*Цена:\*\*\s*от\s*([\d\s]+)\s*([A-Za-z]{3}|₽|€|\$)?/i) ||
+        block.match(/(?:-|\u2022)?\s*(?:💰\s*)?Цена:\s*от\s*([\d\s]+)\s*([A-Za-z]{3}|₽|€|\$)?/i);
+      const price = m ? parseInt(m[1].replace(/\s/g, ''), 10) : 0;
+      const currency = normalizeCurrency(m?.[2]);
+      return { price, currency };
+    };
+
+    const extractAmenities = (block: string): string[] | undefined => {
+      const m = block.match(/-\s*\*\*(?:Удобства|Amenities):\*\*\s*([^\n]+)/i);
+      if (!m?.[1]) return undefined;
+      const list = m[1]
+        .split(/[,•·]/g)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 10);
+      return list.length ? list : undefined;
+    };
+
+    const extractIsTop = (titleLine: string, block: string) => {
+      return /TOP|Топ/i.test(titleLine) || /\btop\b/i.test(block);
+    };
+
+    const collectBlock = (titleLine: string, block: string) => {
+      const bookingUrl = extractBookingUrl(block);
+      if (!bookingUrl) return;
+
+      const stars = parseStarsFromTitle(titleLine);
+      const name = titleLine
+        .replace(/^###\s*\d+\.\s*/i, '')
+        .replace(/^##\s*🏨\s*/i, '')
+        .replace(/⭐+/g, '')
+        .replace(/\s*\bTOP\b\s*/gi, ' ')
+        .replace(/["“”]/g, '')
+        .trim();
+
+      const imageUrl = extractFirstImage(block);
+      const address = extractAddress(block);
+      const { rating, reviewCount } = extractRating(block);
+      const { price, currency } = extractPrice(block);
+      const distanceToCenter = extractDistanceToCenter(block);
+      const distanceToMetro = extractDistanceToMetro(block);
+      const amenities = extractAmenities(block);
+      const isTop = extractIsTop(titleLine, block);
+
+      if (!name) return;
+
+      hotels.push({
+        name,
+        stars,
+        rating,
+        reviewCount,
+        address,
+        distanceToCenter,
+        distanceToMetro,
+        price,
+        currency,
+        imageUrl,
+        bookingUrl,
+        amenities,
+        isTop,
+      });
+    };
+
+    // Split into blocks by hotel headers.
+    // Supports:
+    // - ### 1. Name ⭐⭐⭐
+    // - ## 🏨 Hotel "Name" ⭐⭐⭐
+    const headerRe = /^(###\s*\d+\.\s*[^\n]+|##\s*🏨\s*[^\n]+)$/gmi;
+    const headers: Array<{ index: number; line: string }> = [];
+    let hm: RegExpExecArray | null;
+    while ((hm = headerRe.exec(text)) !== null) {
+      headers.push({ index: hm.index, line: hm[1] });
+    }
+
+    if (headers.length === 0) return hotels;
+
+    for (let i = 0; i < headers.length; i++) {
+      const start = headers[i].index;
+      const end = i + 1 < headers.length ? headers[i + 1].index : text.length;
+      const block = text.slice(start, end).trim();
+      const firstLine = headers[i].line.trim();
+      collectBlock(firstLine, block);
+    }
+
+    return hotels;
+  };
+
   // Update the message rendering in the Chat component
   const renderMessage = (message: Message) => {
     if (message.isUser) {
@@ -1420,14 +1712,7 @@ const Chat = () => {
       if (link && link.href.includes('ostrovok.ru/hotel/')) {
         console.log('[handleMessageClick] Link clicked:', link.href);
         
-        // Check if it's a test hotel
-        if (isTestHotelUrl(link.href)) {
-          e.preventDefault();
-          e.stopPropagation();
-          alert('⚠️ Это тестовый отель (test_hotel / test_hotel_do_not_book).\n\nОн доступен только для API тестирования и не существует в публичной базе Ostrovok.\n\nДля реальных бронирований используйте реальные отели.\n\nСсылка: ' + link.href);
-          return false;
-        }
-        
+        // Fix URL and open (for numeric IDs will redirect to test_hotel)
         const fixedUrl = fixBookingUrl(link.href);
         console.log('[handleMessageClick] Fixed URL:', fixedUrl);
         
@@ -1462,6 +1747,37 @@ const Chat = () => {
         return false;
       }
     };
+
+    // Prefer structured hotels from API, fallback to parsing text
+    const hotelsFromApi = message.hotels && message.hotels.length > 0
+      ? message.hotels.map(h => {
+          const mainImage =
+            h.images?.find(img => img.category === 'exterior' || img.category === 'hotel_front') ||
+            h.images?.[0];
+          const imageUrl = mainImage?.url ? mainImage.url.replace('{size}', '640x400') : undefined;
+          let distanceToCenter: string | undefined;
+          if (typeof h.distanceToCenter === 'number' && h.distanceToCenter > 0) {
+            const km = h.distanceToCenter / 1000;
+            distanceToCenter =
+              km < 1 ? `${Math.round(h.distanceToCenter)} м` : `${km.toFixed(1)} км от центра`;
+          }
+          return {
+            name: h.name,
+            stars: h.stars,
+            rating: h.rating,
+            reviewCount: undefined,
+            address: h.address,
+            distanceToCenter,
+            distanceToMetro: undefined,
+            price: h.price,
+            currency: h.currency,
+            imageUrl,
+            bookingUrl: fixBookingUrl(h.bookingUrl || ''),
+            amenities: undefined,
+            isTop: false,
+          };
+        })
+      : null;
 
     return (
       <div className="bg-gray-50 rounded-2xl rounded-bl-[4px] p-4" onClick={handleMessageClick}>
@@ -1573,10 +1889,53 @@ const Chat = () => {
             background: #374151;
           }
         `}</style>
-        <div 
-          className="prose prose-sm max-w-none text-gray-900"
-          dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
-        />
+        <div className="space-y-4">
+          {(() => {
+            // Prefer hotels from API if present
+            const parsedHotels = hotelsFromApi ?? parseHotelsFromText(message.text);
+
+            if (!parsedHotels || parsedHotels.length === 0) {
+              return (
+                <div
+                  className="prose prose-sm max-w-none text-gray-900"
+                  dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
+                />
+              );
+            }
+
+            // Пока используем полный текст как есть; GPT уже даёт описания,
+            // а карточки дополняют его структурированным списком.
+            return (
+              <>
+                <div
+                  className="prose prose-sm max-w-none text-gray-900"
+                  dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
+                />
+                <div className="space-y-4 mt-4">
+                  <h3 className="text-lg font-semibold text-gray-900">🏨 Рекомендуемые отели</h3>
+                  {parsedHotels.map((hotel, index) => (
+                    <HotelCard
+                      key={index}
+                      name={hotel.name}
+                      stars={hotel.stars}
+                      rating={hotel.rating}
+                      reviewCount={hotel.reviewCount}
+                      address={hotel.address}
+                      price={hotel.price}
+                      currency={hotel.currency}
+                      imageUrl={hotel.imageUrl}
+                      bookingUrl={fixBookingUrl(hotel.bookingUrl)}
+                      distanceToCenter={hotel.distanceToCenter}
+                      distanceToMetro={hotel.distanceToMetro}
+                      amenities={hotel.amenities}
+                      isTop={hotel.isTop}
+                    />
+                  ))}
+                </div>
+              </>
+            );
+          })()}
+        </div>
       </div>
     );
   };
@@ -2000,8 +2359,8 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                   </>
                 )}
                 
-                {/* Показываем остальные сообщения только после взаимодействия */}
-                {hasInteracted && messages.map((message) => (
+                {/* Показываем сообщения после взаимодействия или при загрузке чата */}
+                {(hasInteracted || currentChatId) && messages.map((message) => (
                   <motion.div
                     key={message.id}
                     initial={{ opacity: 0, y: 10 }}

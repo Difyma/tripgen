@@ -9,6 +9,11 @@ import express, { Request, Response } from 'express';
 import axios, { AxiosError } from 'axios';
 import dotenv from 'dotenv';
 import { DEMO_HOTELS as REALISTIC_DEMO_HOTELS, TEST_HOTELS } from '../src/demoHotels.js';
+import { 
+  buildHotelPageLink, 
+  buildSerpLink, 
+  generatePartnerLinkLegacy
+} from '../lib/ostrovok-links.cjs';
 
 dotenv.config();
 
@@ -20,7 +25,7 @@ const router = express.Router();
 const OSTROVOK_API_URL = process.env.OSTROVOK_API_URL || 'https://api.worldota.net';
 const OSTROVOK_API_KEY = process.env.OSTROVOK_API_KEY;
 const OSTROVOK_API_SECRET = process.env.OSTROVOK_API_SECRET;
-const PARTNER_ID = process.env.OSTROVOK_PARTNER_ID;
+const PARTNER_SLUG = process.env.OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
 
 // Default request timeout (30 seconds as per ETG recommendations)
 const DEFAULT_TIMEOUT = 30000;
@@ -188,63 +193,133 @@ const getAuthHeaders = () => {
 
 // ============ UTILS ============
 
-// Generate partner booking link
-// For test/demo hotels: link to city page
-// For real hotels: direct hotel link
+// Generate partner booking link with correct attribution
+// Uses new LinkBuilder: partner_slug + utm_* + dates format
 const generatePartnerLink = (
   hotelId: string | number,
-  params: { checkIn: string; checkOut: string; guests: number },
+  params: { checkIn: string; checkOut: string; guests: number; children?: number[] },
   hotelName?: string,
   city?: string
 ): string => {
-  // Extract numeric partner ID
-  const fullPartnerId = PARTNER_ID || '270392.affiliate.a0bd';
-  const partnerId = fullPartnerId.split('.')[0] || '270392';
-  
-  const hotelIdStr = String(hotelId);
-  
-  // Check if this is a test/demo hotel
-  const isTestHotel = hotelIdStr === 'test_hotel' || hotelIdStr === 'test_hotel_do_not_book' || 
-                      hotelIdStr === '8526976' || hotelIdStr === '1' || hotelIdStr === '2';
-  const isDemoHotel = hotelIdStr.startsWith('moscow_') || hotelIdStr.startsWith('paris_') || 
-                      hotelIdStr.startsWith('spb_') || hotelIdStr.startsWith('ist_') ||
-                      hotelIdStr.startsWith('dxb_') || hotelIdStr.startsWith('bkk_') ||
-                      hotelIdStr.startsWith('test_hotel');
-  
-  const queryParams = [];
-  queryParams.push(`partner_id=${partnerId}`);
-  if (params.checkIn) queryParams.push(`check_in=${params.checkIn}`);
-  if (params.checkOut) queryParams.push(`check_out=${params.checkOut}`);
-  if (params.guests) queryParams.push(`guests=${params.guests}`);
-  
-  const queryString = queryParams.join('&');
-  
-  if (isTestHotel || isDemoHotel) {
-    // For demo hotels, create a search URL with hotel name
-    // This will show search results for the specific hotel
-    const citySlug = city ? CITY_URL_SLUGS[city.toLowerCase().trim()] : null;
+  try {
+    const hotelIdStr = String(hotelId);
     
-    // Build search query with hotel name for better targeting
-    const searchQuery = hotelName ? encodeURIComponent(hotelName.replace(/[""]/g, '').trim()) : '';
+    // Check if this is a test/demo hotel
+    const isTestHotel = hotelIdStr === 'test_hotel' || hotelIdStr === 'test_hotel_do_not_book' || 
+                        hotelIdStr === '8526976' || hotelIdStr === '1' || hotelIdStr === '2';
     
-    if (citySlug && searchQuery) {
-      // Link to city page with hotel name as search hint
-      // Using text parameter for search
-      return `https://ostrovok.ru/hotel/${citySlug}/?text=${searchQuery}&${queryString}`;
-    } else if (citySlug) {
-      // Fallback to city page only
-      return `https://ostrovok.ru/hotel/${citySlug}/?${queryString}`;
-    } else if (searchQuery) {
-      // Search by hotel name only
-      return `https://ostrovok.ru/search/?text=${searchQuery}&${queryString}`;
-    } else {
-      // Fallback to homepage with partner ID
-      return `https://ostrovok.ru/?${queryString}`;
+    // For test hotels — используем правильные slug
+    if (hotelIdStr === '1' || hotelIdStr === 'test_hotel') {
+      return buildHotelPageLink('test_hotel', {
+        checkIn: params.checkIn,
+        checkOut: params.checkOut,
+        rooms: [{ adults: params.guests, childrenAges: params.children }],
+        currency: 'RUB',
+        lang: 'ru',
+      });
     }
+    
+    if (hotelIdStr === '2' || hotelIdStr === 'test_hotel_do_not_book') {
+      return buildHotelPageLink('test_hotel_do_not_book', {
+        checkIn: params.checkIn,
+        checkOut: params.checkOut,
+        rooms: [{ adults: params.guests, childrenAges: params.children }],
+        currency: 'RUB',
+        lang: 'ru',
+      });
+    }
+    
+    // Для строковых slug (не чисел) — строим HP
+    if (!/^\d+$/.test(hotelIdStr)) {
+      // Только test_hotel и test_hotel_do_not_book — валидные slug для Ostrovok
+      // Все остальные (moscow_ritz, spb_astoria и т.д.) — наши demo ID
+      if (hotelIdStr === 'test_hotel' || hotelIdStr === 'test_hotel_do_not_book') {
+        return buildHotelPageLink(hotelIdStr, {
+          checkIn: params.checkIn,
+          checkOut: params.checkOut,
+          rooms: [{ adults: params.guests, childrenAges: params.children }],
+          currency: 'RUB',
+          lang: 'ru',
+        });
+      }
+      // Для всех остальных строковых ID (demo отели) — используем тестовый отель
+      console.warn(`[generatePartnerLink] Demo hotel ID=${hotelId}, using test_hotel fallback`);
+      return buildHotelPageLink('test_hotel', {
+        checkIn: params.checkIn,
+        checkOut: params.checkOut,
+        rooms: [{ adults: params.guests, childrenAges: params.children }],
+        currency: 'RUB',
+        lang: 'ru',
+      });
+    }
+    
+    // Для числовых hid — используем SERP с region_id
+    // Маппинг городов на region_id
+    const cityRegionMap: Record<string, number> = {
+      'москва': 1,
+      'moscow': 1,
+      'санкт-петербург': 2,
+      'saint petersburg': 2,
+      'питер': 2,
+      'петербург': 2,
+      'париж': 53,
+      'paris': 53,
+      'лондон': 211,
+      'london': 211,
+      'дубай': 1435,
+      'dubai': 1435,
+      'стамбул': 876,
+      'istanbul': 876,
+      'бангкок': 1990,
+      'bangkok': 1990,
+      'барселона': 1189,
+      'barcelona': 1189,
+      'рим': 1187,
+      'rome': 1187,
+      'прага': 1004,
+      'prague': 1004,
+      'амстердам': 1242,
+      'amsterdam': 1242,
+      'берлин': 964,
+      'berlin': 964,
+      'милан': 1188,
+      'milan': 1188,
+      'вена': 1352,
+      'vienna': 1352,
+    };
+    
+    const regionId = city ? cityRegionMap[city.toLowerCase().trim()] : null;
+    
+    if (regionId) {
+      return buildSerpLink(regionId, {
+        checkIn: params.checkIn,
+        checkOut: params.checkOut,
+        rooms: [{ adults: params.guests, childrenAges: params.children }],
+        currency: 'RUB',
+        lang: 'ru',
+      });
+    }
+    
+    // Для любого другого числового hid (включая 126001 и др.) — используем тестовый отель
+    // Это нужно для демо-режима, когда API возвращает числовые hid вместо slug
+    console.warn(`[generatePartnerLink] Unknown hid=${hotelId}, using test_hotel fallback`);
+    return buildHotelPageLink('test_hotel', {
+      checkIn: params.checkIn,
+      checkOut: params.checkOut,
+      rooms: [{ adults: params.guests, childrenAges: params.children }],
+      currency: 'RUB',
+      lang: 'ru',
+    });
+    
+  } catch (error) {
+    console.error('[generatePartnerLink] Error:', error);
+    // Emergency fallback — но с правильной атрибуцией
+    return buildSerpLink(1, {
+      checkIn: params.checkIn,
+      checkOut: params.checkOut,
+      rooms: [{ adults: params.guests }],
+    });
   }
-  
-  // For real hotels with numeric ID, direct link
-  return `https://ostrovok.ru/hotel/${hotelId}/?${queryString}`;
 };
 
 // Format image URL with size
@@ -423,7 +498,7 @@ const transformHotelData = (hotel: any, searchParams?: any, city?: string) => {
     
     // Booking link
     bookingUrl: searchParams ? generatePartnerLink(
-      hotel.hid || hotel.id, 
+      hotel.id || hotel.hid, 
       {
         checkIn: searchParams.checkIn,
         checkOut: searchParams.checkOut,
@@ -583,7 +658,7 @@ router.post('/search', validateCredentials, async (req: Request, res: Response):
         // Pass query (destination) as city for proper URL generation
         return {
           ...transformHotelData(demoHotel, { checkIn, checkOut, guests }),
-          bookingUrl: generatePartnerLink(demoHotel.hid || demoHotel.id, { checkIn, checkOut, guests }, demoHotel.name, query)
+          bookingUrl: generatePartnerLink(demoHotel.id || demoHotel.hid, { checkIn, checkOut, guests }, demoHotel.name, query)
         };
       }
     });
@@ -612,7 +687,7 @@ router.post('/search', validateCredentials, async (req: Request, res: Response):
     // Return demo data as fallback
     const demoHotels = getDemoHotels(query).map((hotel: any) => ({
       ...transformHotelData(hotel, { checkIn, checkOut, guests }),
-      bookingUrl: generatePartnerLink(hotel.hid || hotel.id, { checkIn, checkOut, guests }, hotel.name, query)
+      bookingUrl: generatePartnerLink(hotel.id || hotel.hid, { checkIn, checkOut, guests }, hotel.name, query)
     }));
     
     res.json({
@@ -970,7 +1045,8 @@ router.post('/prebook', validateCredentials, async (req: Request, res: Response)
 router.get('/config', (req: Request, res: Response) => {
   res.json({
     configured: !!(OSTROVOK_API_KEY && OSTROVOK_API_SECRET),
-    partnerId: PARTNER_ID ? 'configured' : 'not configured',
+    partnerSlug: PARTNER_SLUG,
+    partnerId: 'deprecated_use_partner_slug',
     apiUrl: OSTROVOK_API_URL
   });
 });
@@ -1001,7 +1077,7 @@ router.post('/booking-link', validateCredentials, async (req: Request, res: Resp
         success: true,
         isTestHotel: true,
         warning: '⚠️ Это тестовый отель. Бронирование доступно только через API тестирования. Для реальных бронирований используйте реальные отели.',
-        bookingUrl: generatePartnerLink(hid || hotelId, { checkIn, checkOut, guests }),
+        bookingUrl: generatePartnerLink(hotelId || hid, { checkIn, checkOut, guests }),
         apiBookingInfo: {
           endpoint: '/api/hotels/prebook',
           method: 'POST',
@@ -1038,7 +1114,7 @@ router.post('/booking-link', validateCredentials, async (req: Request, res: Resp
         success: true,
         isTestHotel: false,
         hotelName: hotelpageResponse.data.name,
-        bookingUrl: generatePartnerLink(hid || hotelId, { checkIn, checkOut, guests }),
+        bookingUrl: generatePartnerLink(hotelId || hid, { checkIn, checkOut, guests }),
         ratesAvailable: hotelpageResponse.data.rates?.length > 0,
         minPrice: hotelpageResponse.data.min_price
       });
@@ -1050,7 +1126,7 @@ router.post('/booking-link', validateCredentials, async (req: Request, res: Resp
         isTestHotel: false,
         error: 'Hotel not found or unavailable',
         details: apiError.response?.data?.error || apiError.message,
-        fallbackUrl: generatePartnerLink(hid || hotelId, { checkIn, checkOut, guests })
+        fallbackUrl: generatePartnerLink(hotelId || hid, { checkIn, checkOut, guests })
       });
     }
 
