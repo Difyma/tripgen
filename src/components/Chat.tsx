@@ -961,7 +961,8 @@ const Chat = () => {
       console.log('Extracted location from text:', extractedLocation);
       console.log('Using destination:', destinationLocation);
 
-      const response = await fetch('/api/openai', {
+      const apiBase = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${apiBase}/api/openai`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

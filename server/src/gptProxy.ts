@@ -17,7 +17,8 @@ import { DEMO_HOTELS as REALISTIC_DEMO_HOTELS, TEST_HOTELS, DemoHotel } from './
 import { 
   buildHotelPageLink, 
   buildSerpLink, 
-  generatePartnerLinkLegacy 
+  generatePartnerLinkLegacy,
+  PARTNER_SLUG 
 } from '../lib/ostrovok-links.cjs';
 
 dotenv.config();
@@ -376,11 +377,17 @@ const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
     images: hotel.images_ext,
     description: hotel.description_struct?.map(p => p.text).join('\n\n'),
     hotelType: hotel.hotel_type,
-    bookingUrl: searchParams ? generatePartnerLink(hotel.id || hotel.hid, {
-      checkIn: searchParams.checkIn,
-      checkOut: searchParams.checkOut,
-      guests: searchParams.guests
-    }, hotel.name, city) : undefined,
+    // Пока всегда открываем только тестовый отель (по запросу)
+    bookingUrl: searchParams
+      ? buildHotelPageLink('test_hotel', {
+          partnerSlug: PARTNER_SLUG,
+          checkIn: searchParams.checkIn,
+          checkOut: searchParams.checkOut,
+          rooms: [{ adults: searchParams.guests }],
+          currency: 'RUB',
+          lang: 'ru',
+        })
+      : undefined,
     distanceToCenter: hotel.distance_center
   };
 };
@@ -570,16 +577,19 @@ function getDemoHotels(destination: string, checkIn: string, checkOut: string, g
     hotels = DEMO_HOTELS['Италия'] || [];
   }
   
-  // Add booking URLs with correct params
-  return hotels.map(h => {
-    // Use destination (query) as city for proper URL generation
-    const generatedUrl = generatePartnerLink(h.id || h.hid, { checkIn, checkOut, guests }, h.name, destination);
-    console.log(`[getDemoHotels] Generated URL for ${h.name}:`, generatedUrl);
-    return {
-      ...h,
-      bookingUrl: generatedUrl
-    };
+  // Пока всегда ведём на тестовый отель
+  const testHotelUrl = buildHotelPageLink('test_hotel', {
+    partnerSlug: PARTNER_SLUG,
+    checkIn,
+    checkOut,
+    rooms: [{ adults: guests }],
+    currency: 'RUB',
+    lang: 'ru',
   });
+  return hotels.map(h => ({
+    ...h,
+    bookingUrl: testHotelUrl,
+  }));
 }
 
 // Format hotels for GPT prompt
