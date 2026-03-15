@@ -12,6 +12,7 @@ import ProfilePage from './components/ProfilePage';
 import AboutPage from './components/AboutPage';
 import CreatorsListPage from './pages/CreatorsListPage';
 import CreatorClientChatPage from './pages/CreatorClientChatPage';
+import FavoritesPage from './pages/FavoritesPage';
 import { AuthProvider } from './contexts/AuthContext';
 import { SidebarProvider } from './contexts/SidebarContext';
 import ScrollToTop from './components/ScrollToTop';
@@ -61,6 +62,8 @@ export function App() {
           <Route path="/chat/:chatId" element={<CreatorClientChatPage />} />
           <Route path="/trips" element={<TripsRoute />} />
           <Route path="/trips/:id" element={<TripDetailsRoute />} />
+          <Route path="/favorites" element={<FavoritesPage />} />
+          <Route path="/settings" element={<ProfilePage />} />
           <Route path="/flights" element={<FlightsPage />} />
           <Route path="/hotels" element={<HotelTestPage />} />
           <Route path="/flight" element={<FlightsPage />} />

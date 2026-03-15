@@ -108,13 +108,13 @@ export function Sidebar({ className }: SidebarProps) {
           <svg className="w-7 h-7 text-black" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-3 px-4 h-[72px] border-b border-gray-200">
+        <Link to="/" className={`flex items-center gap-3 h-[72px] border-b border-gray-200 ${isSidebarCollapsed ? 'justify-center px-0' : 'px-4'}`}>
           <img
             src="/images/TRIPGEN_logo_2.png"
             alt="TRIPGEN"
-            className={`transition-all duration-300 ${isSidebarCollapsed ? 'w-10 h-10' : 'w-8 h-8'}`}
+            className={`transition-all duration-300 shrink-0 ${isSidebarCollapsed ? 'w-11 h-11' : 'w-8 h-8'}`}
           />
-          <span className={`font-bold text-xl transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0' : 'opacity-100'}`}>
+          <span className={`font-bold text-xl transition-opacity duration-300 ${isSidebarCollapsed ? 'sr-only' : 'opacity-100'}`}>
             TRIPGEN
           </span>
         </Link>
@@ -125,16 +125,16 @@ export function Sidebar({ className }: SidebarProps) {
             onClick={() => setIsCreateTripModalOpen(true)}
             className={`
               w-full bg-black text-white
-              flex items-center gap-3
+              flex items-center justify-center gap-3
               transition-all duration-300
               hover:bg-gray-900
               ${isSidebarCollapsed
-                ? 'h-10 w-10 p-0 justify-center mx-auto rounded-xl'
+                ? 'h-8 w-8 min-w-0 p-0 rounded-lg mx-auto'
                 : 'px-4 h-10 rounded-xl'
               }
             `}
           >
-            <Plus className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
+            <Plus className={`shrink-0 ${isSidebarCollapsed ? 'w-4 h-4' : 'w-5 h-5'}`} />
             <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
               Создать маршрут
             </span>
@@ -148,8 +148,8 @@ export function Sidebar({ className }: SidebarProps) {
               <Link
                 to="/chat"
                 className={`
-                  flex items-center gap-3 px-3 h-10 rounded-xl
-                  transition-colors duration-200
+                  flex items-center gap-3 h-10 rounded-xl transition-colors duration-200
+                  ${isSidebarCollapsed ? 'justify-center px-0 w-10 min-w-0 mx-auto' : 'px-3'}
                   ${isActivePath('/chat')
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -157,7 +157,7 @@ export function Sidebar({ className }: SidebarProps) {
                 `}
                 onClick={toggleChatList}
               >
-                <MessageSquare className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
+                <MessageSquare className="w-5 h-5 shrink-0" />
                 <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
                   Чаты
                 </span>
@@ -232,15 +232,15 @@ export function Sidebar({ className }: SidebarProps) {
             <Link
               to="/trips"
               className={`
-                flex items-center gap-3 px-3 h-10 rounded-xl
-                transition-colors duration-200
+                flex items-center gap-3 h-10 rounded-xl transition-colors duration-200
+                ${isSidebarCollapsed ? 'justify-center px-0 w-10 min-w-0 mx-auto' : 'px-3'}
                 ${isActivePath('/trips')
                   ? 'bg-gray-100 text-gray-900'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }
               `}
             >
-              <Compass className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
+              <Compass className="w-5 h-5 shrink-0" />
               <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
                 Мои путешествия
               </span>
@@ -249,15 +249,15 @@ export function Sidebar({ className }: SidebarProps) {
             <Link
               to="/favorites"
               className={`
-                flex items-center gap-3 px-3 h-10 rounded-xl
-                transition-colors duration-200
+                flex items-center gap-3 h-10 rounded-xl transition-colors duration-200
+                ${isSidebarCollapsed ? 'justify-center px-0 w-10 min-w-0 mx-auto' : 'px-3'}
                 ${isActivePath('/favorites')
                   ? 'bg-gray-100 text-gray-900'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }
               `}
             >
-              <Heart className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
+              <Heart className="w-5 h-5 shrink-0" />
               <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
                 Избранное
               </span>
@@ -275,10 +275,10 @@ export function Sidebar({ className }: SidebarProps) {
               <Link
                 to="/profile"
                 className={`
-                  group flex items-center gap-3 px-3 h-10 rounded-xl
+                  group flex items-center gap-3 h-10 rounded-xl
                   text-gray-600 hover:bg-gray-50 hover:text-gray-900
                   transition-all duration-200
-                  ${isSidebarCollapsed ? 'justify-center' : ''}
+                  ${isSidebarCollapsed ? 'justify-center px-0 w-10 min-w-0 mx-auto' : 'px-3'}
                 `}
                 title="Перейти в профиль"
               >
@@ -286,7 +286,7 @@ export function Sidebar({ className }: SidebarProps) {
                   <img
                     src="/images/user.png"
                     alt="User"
-                    className={`rounded-full ring-2 ring-transparent group-hover:ring-black/10 transition-all ${isSidebarCollapsed ? 'w-8 h-8' : 'w-8 h-8'}`}
+                    className="rounded-full ring-2 ring-transparent group-hover:ring-black/10 transition-all w-8 h-8 object-cover"
                   />
                   <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                 </div>
@@ -303,13 +303,13 @@ export function Sidebar({ className }: SidebarProps) {
               <button
                 onClick={() => setShowAuthModal(true)}
                 className={`
-                  flex items-center gap-3 px-3 h-10 rounded-xl w-full
+                  flex items-center gap-3 h-10 rounded-xl
                   text-gray-600 hover:bg-gray-50 hover:text-gray-900
                   transition-colors duration-200
-                  ${isSidebarCollapsed ? 'justify-center' : ''}
+                  ${isSidebarCollapsed ? 'justify-center px-0 w-10 min-w-0 mx-auto' : 'px-3 w-full'}
                 `}
               >
-                <Users className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
+                <Users className="w-5 h-5 shrink-0" />
                 {!isSidebarCollapsed && (
                   <span>Войти</span>
                 )}
@@ -320,13 +320,13 @@ export function Sidebar({ className }: SidebarProps) {
             <Link
               to="/settings"
               className={`
-                flex items-center gap-3 px-3 h-10 rounded-xl
+                flex items-center gap-3 h-10 rounded-xl
                 text-gray-600 hover:bg-gray-50 hover:text-gray-900
                 transition-colors duration-200
-                ${isSidebarCollapsed ? 'justify-center' : ''}
+                ${isSidebarCollapsed ? 'justify-center px-0 w-10 min-w-0 mx-auto' : 'px-3'}
               `}
             >
-              <Settings className={`${isSidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'}`} />
+              <Settings className="w-5 h-5 shrink-0" />
               {!isSidebarCollapsed && (
                 <span>Настройки</span>
               )}
@@ -336,17 +336,17 @@ export function Sidebar({ className }: SidebarProps) {
             <button
               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               className={`
-                hidden lg:flex items-center gap-3 px-3 h-10 rounded-xl w-full
+                hidden lg:flex items-center gap-3 h-10 rounded-xl
                 text-gray-600 hover:bg-gray-50 hover:text-gray-900
                 transition-colors duration-200
-                ${isSidebarCollapsed ? 'justify-center' : ''}
+                ${isSidebarCollapsed ? 'justify-center px-0 w-10 min-w-0 mx-auto' : 'px-3 w-full'}
               `}
             >
               {isSidebarCollapsed ? (
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-5 h-5 shrink-0" />
               ) : (
                 <>
-                  <ChevronLeft className="w-5 h-5" />
+                  <ChevronLeft className="w-5 h-5 shrink-0" />
                   <span>Свернуть</span>
                 </>
               )}

@@ -4,7 +4,7 @@ import {
   MapPin, 
   Users,
   Calendar as CalendarIcon,
-  DollarSign,
+  RussianRuble,
   X
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -52,6 +52,8 @@ interface Message {
   role?: 'system' | 'user' | 'assistant';
   showCreateRoute?: boolean;
   hotels?: AssistantHotel[];
+  /** Структурированный маршрут по дням из JSON-ответа AI (для TripBuilder) */
+  itinerary?: import('../types/tripPlan').TripPlanDay[];
 }
 
 const OSTROVOK_PARTNER_SLUG =
@@ -336,22 +338,22 @@ function ChatFilters({
   getDateFilterDisplay
 }: any) {
   return (
-    <div className="flex flex-col md:flex-row gap-3 w-full">
+    <div className="flex flex-col md:flex-row gap-3 w-full min-w-0">
       {/* Location Filter */}
-      <div className="relative flex-1 min-w-[160px]">
+      <div className="relative flex-1 min-w-0 md:min-w-[200px]">
         <input
           type="text"
           placeholder="Куда едем"
           value={filters.location}
           onChange={handleLocationChange}
-          className="w-full pl-8 pr-3 h-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 placeholder:text-gray-400"
+          className="w-full min-w-0 pl-8 pr-3 h-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 placeholder:text-gray-400"
         />
         <MapPin className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2" />
       </div>
       {/* Date Filter */}
       <Popover>
         <PopoverTrigger asChild>
-          <button className="flex-1 min-w-[160px] h-10 pl-8 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 text-left relative">
+          <button className="flex-1 min-w-0 md:min-w-[200px] h-10 pl-8 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 text-left relative">
             <CalendarIcon className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2" />
             <span className="block truncate mt-[7px]">
               {getDateFilterDisplay()}
@@ -437,7 +439,7 @@ function ChatFilters({
       {/* Travelers Filter */}
       <Popover>
         <PopoverTrigger asChild>
-          <button className="flex-1 min-w-[160px] h-10 pl-8 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 text-left relative">
+          <button className="flex-1 min-w-0 md:min-w-[160px] h-10 pl-8 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 text-left relative">
             <Users className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2" />
             <span className="block truncate mt-[7px]">
               {filters.travelers} взр • {filters.children} реб • {filters.pets} пит
@@ -522,9 +524,9 @@ function ChatFilters({
       {/* Budget Filter */}
       <Popover>
         <PopoverTrigger asChild>
-          <button className="flex-1 min-w-[160px] h-10 pl-8 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 text-left relative">
-            <DollarSign className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2" />
-            <span className="block truncate mt-[7px]">
+          <button className="flex-1 min-w-0 md:min-w-[160px] h-10 pl-8 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black/5 bg-gray-50/50 text-left relative">
+            <RussianRuble className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 transform -translate-y-1/2 flex-shrink-0" />
+            <span className="block truncate mt-[7px] min-w-0" title={`${filters.budget.min}₽ - ${filters.budget.max}₽`}>
               {filters.budget.min}₽ - {filters.budget.max}₽
             </span>
           </button>
@@ -595,7 +597,9 @@ const Chat = () => {
 
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
   const [currentMessage, setCurrentMessage] = useState<string>('');
+  const [currentItinerary, setCurrentItinerary] = useState<import('../types/tripPlan').TripPlanDay[] | null>(null);
   const [showTripBuilder, setShowTripBuilder] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilter>({ type: 'specific' });
   const { getFlightInfoForGPT } = useFlightInfo();
@@ -604,7 +608,7 @@ const Chat = () => {
   const [hasInteracted, setHasInteracted] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-  const [, setUserChats] = useState<Chat[]>([]);
+  const [userChats, setUserChats] = useState<Chat[]>([]);
   const isFirstMount = useRef(true);
   const lastSentText = useRef<string | null>(null);
 
@@ -973,7 +977,19 @@ const Chat = () => {
       console.log('Extracted location from text:', extractedLocation);
       console.log('Using destination:', destinationLocation);
 
-      const apiBase = import.meta.env.VITE_API_URL || '';
+      // Сразу показываем пузырь ответа ИИ (печатается), чтобы был эффект стриминга
+      const streamMessageId = Date.now() + Math.random();
+      setMessages(prev => [...prev, {
+        id: streamMessageId,
+        text: '',
+        isUser: false,
+        role: 'assistant',
+        hotels: undefined
+      }]);
+      setStreamingMessageId(streamMessageId);
+
+      // В dev обращаемся к бэкенду напрямую, чтобы стрим не буферизовался прокси Vite
+      const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '');
       const response = await fetch(`${apiBase}/api/openai`, {
         method: 'POST',
         headers: {
@@ -1011,16 +1027,7 @@ const Chat = () => {
       }
 
       if (isStream && response.body) {
-        const streamMessageId = Date.now() + Math.random();
-        const streamingMessage: Message = {
-          id: streamMessageId,
-          text: '',
-          isUser: false,
-          role: 'assistant',
-          hotels: undefined
-        };
-        setMessages(prev => [...prev, streamingMessage]);
-
+        // Пузырь уже добавлен перед fetch, обновляем его текст по чанкам
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -1039,8 +1046,8 @@ const Chat = () => {
               lineEnd = buffer.indexOf('\n');
 
               if (line.startsWith('data: ')) {
-                const data = line.slice(6);
-                if (data === '[DONE]') continue;
+                const data = line.slice(6).trim();
+                if (data === '' || data === '[DONE]') continue;
                 try {
                   const parsed = JSON.parse(data);
                   if (parsed.type === 'hotels' && Array.isArray(parsed.hotels)) {
@@ -1064,13 +1071,14 @@ const Chat = () => {
                     );
                   }
                 } catch {
-                  // ignore JSON parse errors (e.g. SSE comments)
+                  // ignore JSON parse errors (e.g. SSE comments or incomplete chunks)
                 }
               }
             }
           }
         } finally {
           reader.releaseLock?.();
+          setStreamingMessageId(null);
         }
 
         if (chatId && user && fullText) {
@@ -1079,7 +1087,7 @@ const Chat = () => {
         return;
       }
 
-      let data: { text?: string; response?: string; hotels?: AssistantHotel[]; error?: string; message?: string };
+      let data: { text?: string; response?: string; hotels?: AssistantHotel[]; itinerary?: import('../types/tripPlan').TripPlanDay[]; error?: string; message?: string };
       try {
         const responseText = await response.text();
         if (!responseText?.trim()) throw new Error('Empty response from server');
@@ -1099,22 +1107,23 @@ const Chat = () => {
       const hotelsFromApi: AssistantHotel[] | undefined = Array.isArray(data.hotels)
         ? data.hotels
         : undefined;
+      const itineraryFromApi = Array.isArray(data.itinerary) && data.itinerary.length > 0
+        ? data.itinerary as import('../types/tripPlan').TripPlanDay[]
+        : undefined;
 
-      const assistantMessage: Message = {
-        id: Date.now() + Math.random(),
-        text: responseText,
-        isUser: false,
-        role: 'assistant',
-        hotels: hotelsFromApi
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
+      setStreamingMessageId(null);
+      setMessages(prev => prev.map(m =>
+        m.id === streamMessageId
+          ? { id: streamMessageId, text: responseText, isUser: false, role: 'assistant' as const, hotels: hotelsFromApi, itinerary: itineraryFromApi }
+          : m
+      ));
 
       if (chatId && user) {
         await saveMessageToCurrentChat(chatId, 'assistant', responseText);
       }
     } catch (error) {
       console.error('Error in chat:', error);
+      setStreamingMessageId(null);
       const errorMessage: Message = {
         id: Date.now() + Math.random(),
         text: error instanceof Error 
@@ -1123,7 +1132,12 @@ const Chat = () => {
         isUser: false,
         role: 'assistant'
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => {
+        const hasPlaceholder = prev.some(m => m.id === streamingMessageId);
+        return hasPlaceholder
+          ? prev.map(m => m.id === streamingMessageId ? { ...errorMessage, id: streamingMessageId } : m)
+          : [...prev, errorMessage];
+      });
       
       // Сохраняем сообщение об ошибке
       if (chatId && user) {
@@ -1958,33 +1972,25 @@ const Chat = () => {
           {(() => {
             const parsedHotels = hotelsFromApi ?? parseHotelsFromText(message.text);
 
-            if (!parsedHotels || parsedHotels.length === 0) {
-              return (
-                <div
-                  className="prose prose-sm max-w-none text-gray-900"
-                  dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
-                />
-              );
-            }
-
-            // Убираем из текста все блоки с детальным описанием отелей — показываем только мини-карточки (без дублирования)
-            let textWithoutHotels = message.text;
-            parsedHotels.forEach(hotel => {
-              const escapedName = hotel.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              const patternOld = new RegExp(
-                `###\\s*\\d+\\.\\s*${escapedName}[\\s\\S]*?(?=###\\s*\\d+\\.|##\\s*🏨|\\n---\\s*\\n|$)`,
-                'gmi'
-              );
-              const patternNew = new RegExp(
-                `##\\s*🏨\\s*${escapedName}[\\s\\S]*?(?=##\\s*🏨|###\\s*\\d+\\.|\\n---\\s*\\n|$)`,
-                'gmi'
-              );
-              textWithoutHotels = textWithoutHotels.replace(patternOld, '');
-              textWithoutHotels = textWithoutHotels.replace(patternNew, '');
-            });
-            // Удаляем любые блоки с деталями отеля (заголовок ###/## или картинка + Адрес/Цена/Описание)
+            // Всегда убираем из текста блоки с деталями отелей (даже если парсер не нашёл список — напр. формат «Главные рекомендации» / «Оптимальный вариант»)
             const isHotelDetailBlock = (s: string) =>
               /Адрес:|Цена:|Описание:/i.test(s) && (/Цена:/i.test(s) || /Описание:/i.test(s));
+            let textWithoutHotels = message.text;
+            if (parsedHotels?.length) {
+              parsedHotels.forEach(hotel => {
+                const escapedName = hotel.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const patternOld = new RegExp(
+                  `###\\s*\\d+\\.\\s*${escapedName}[\\s\\S]*?(?=###\\s*\\d+\\.|##\\s*🏨|\\n---\\s*\\n|$)`,
+                  'gmi'
+                );
+                const patternNew = new RegExp(
+                  `##\\s*🏨\\s*${escapedName}[\\s\\S]*?(?=##\\s*🏨|###\\s*\\d+\\.|\\n---\\s*\\n|$)`,
+                  'gmi'
+                );
+                textWithoutHotels = textWithoutHotels.replace(patternOld, '');
+                textWithoutHotels = textWithoutHotels.replace(patternNew, '');
+              });
+            }
             // Блоки с заголовком ### N. или ##
             textWithoutHotels = textWithoutHotels.replace(
               /(?:^|\n)((?:###\s*\d+\.\s*[^\n]+|##\s[^\n]+)\n[\s\S]*?)(?=\n(?:###\s*\d+\.|##\s|\n---\s*\n)|$)/gim,
@@ -1995,6 +2001,20 @@ const Chat = () => {
               /(?:^|\n)((!\[[^\]]*\]\([^)]+\)\s*\n[\s\S]*?))(?=\n\n|(?:\n###|\n##)\s|\n---\s*\n|$)/gim,
               (fullMatch, block) => (isHotelDetailBlock(block) ? '\n' : fullMatch)
             );
+            // Блоки с произвольным заголовком (Главные рекомендации, Оптимальный вариант и т.д.)
+            textWithoutHotels = textWithoutHotels.replace(
+              /(?:^|\n\n)([\s\S]*?)(?=\n\n|\n(?:###|##)\s|\n---\s*\n|$)/gim,
+              (fullMatch, segment) => (isHotelDetailBlock(segment) ? '\n\n' : fullMatch)
+            );
+
+            if (!parsedHotels || parsedHotels.length === 0) {
+              return (
+                <div
+                  className="prose prose-sm max-w-none text-gray-900"
+                  dangerouslySetInnerHTML={{ __html: formatMessage(textWithoutHotels) }}
+                />
+              );
+            }
 
             const seenNames = new Set<string>();
             const uniqueHotels = parsedHotels.filter(h => {
@@ -2037,7 +2057,7 @@ const Chat = () => {
                           distanceToMetro={hotel.distanceToMetro}
                           amenities={hotel.amenities}
                           isTop={hotel.isTop}
-                          description={hotel.description}
+                          description={'description' in hotel ? hotel.description : undefined}
                         />
                       );
                     })}
@@ -2047,6 +2067,9 @@ const Chat = () => {
             );
           })()}
         </div>
+        {streamingMessageId === message.id && (
+          <span className="inline-block w-2 h-4 ml-0.5 bg-gray-800 animate-pulse rounded-sm align-text-bottom" aria-hidden />
+        )}
       </div>
     );
   };
@@ -2169,13 +2192,13 @@ const Chat = () => {
     return '';
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    scrollToBottom(streamingMessageId != null ? 'auto' : 'smooth');
+  }, [messages, streamingMessageId]);
 
   // Add new function to generate itinerary based on duration
   const generateItinerary = (location: string, duration: number) => {
@@ -2216,13 +2239,44 @@ ${Array.from({ length: duration - 2 }, (_, i) => `
     }
   };
 
-  // Update location change handler
-  const handleTripGenClick = () => {
-    if (dateFilter.type === 'duration' && dateFilter.duration && filters.location) {
-      generateItinerary(filters.location, dateFilter.duration);
-    } else {
-      setShowTripBuilder(true);
+  // Извлечь из ответов чата блок с маршрутом по дням (День 1, День 2, ...)
+  const extractRouteFromMessages = (): string | null => {
+    const dayPattern = /(?:^|\n)(?:#+\s*)?(?:📅\s*)?День\s*\d+/i;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.isUser || !msg.text?.trim()) continue;
+      const idx = msg.text.search(dayPattern);
+      if (idx === -1) continue;
+      let block = msg.text.slice(idx);
+      const cut = block.search(/\n(?:Если у тебя|Если у вас|Если есть вопросы|💡 Полезные советы|⚡ Важно знать|Если будут вопросы)/i);
+      if (cut !== -1) block = block.slice(0, cut);
+      // Нормализация для парсера TripBuilder: "День N:"
+      const normalized = block.replace(/(?:#+\s*)?(?:📅\s*)?День\s*(\d+)\s*:?\s*/gi, 'День $1: ');
+      if (/День\s*1\s*:/i.test(normalized)) return normalized.trim();
     }
+    return null;
+  };
+
+  // Данные маршрута всегда берём из сообщений текущего чата (в котором мы находимся)
+  const syncBuilderFromCurrentChat = useCallback(() => {
+    const lastWithItinerary = [...messages].reverse().find(m => !m.isUser && m.itinerary?.length);
+    if (lastWithItinerary?.itinerary?.length) {
+      setCurrentItinerary(lastWithItinerary.itinerary);
+      setCurrentMessage(lastWithItinerary.text);
+    } else {
+      setCurrentItinerary(null);
+      setCurrentMessage(extractRouteFromMessages() || '');
+    }
+  }, [messages]);
+
+  // При открытии билдера и при смене чата — показываем маршрут именно этого чата
+  useEffect(() => {
+    if (showTripBuilder) syncBuilderFromCurrentChat();
+  }, [showTripBuilder, syncBuilderFromCurrentChat]);
+
+  const handleTripGenClick = () => {
+    syncBuilderFromCurrentChat();
+    setShowTripBuilder(true);
   };
 
   // Function to format date filter display
@@ -2368,13 +2422,25 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
     }
   }, [searchParams.get('new')]);
 
+  const currentChatTitle = currentChatId ? (userChats.find(c => c.id === currentChatId)?.title ?? 'Чат') : null;
+
   return (
     <div className={`h-full flex flex-col bg-white transition-all duration-300 w-full ${isSidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[280px]'}`}>
       <div className="w-full flex-1 flex flex-col min-h-0">
         <div className="w-full flex-1 flex flex-col min-h-0">
           {/* Top Navigation */}
           <div className={`fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 md:sticky md:z-10 ${mobileOpen ? 'hidden' : ''} w-full`}>
-            <div className="max-w-3xl md:max-w-4xl md:ml-12 md:mr-auto px-4 py-3">
+            <div className="max-w-3xl md:max-w-6xl md:ml-12 md:mr-auto px-4 py-3">
+              {currentChatTitle != null && (
+                <div className="mb-2 md:mb-1">
+                  <h1
+                    className="text-sm font-medium text-gray-900 truncate max-w-[min(100%,40rem)]"
+                    title={currentChatTitle}
+                  >
+                    {currentChatTitle}
+                  </h1>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-4">
                 {/* Mobile Navigation */}
                 <div className="flex items-center gap-2 md:hidden">
@@ -2395,35 +2461,37 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                     <span>Фильтры</span>
                   </button>
                   <button
-                    onClick={() => setShowTripBuilder(true)}
+                    onClick={handleTripGenClick}
                     className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-full font-medium hover:bg-gray-900 transition-colors"
                   >
                     <img src={AILogo} alt="TripGen" className="w-5 h-5" />
                     <span>Маршрут</span>
                   </button>
                 </div>
-                {/* Desktop Navigation */}
-                <div className="hidden md:flex items-center gap-4">
-                  <ChatFilters
-                    filters={filters}
-                    setFilters={setFilters}
-                    dateFilter={dateFilter}
-                    setDateFilter={setDateFilter}
-                    handleLocationChange={handleLocationChange}
-                    handleTravelersChange={handleTravelersChange}
-                    handleChildrenChange={handleChildrenChange}
-                    handlePetsChange={handlePetsChange}
-                    handleBudgetChange={handleBudgetChange}
-                    handleDurationChange={handleDurationChange}
-                    handleMonthSelection={handleMonthSelection}
-                    getDateFilterDisplay={getDateFilterDisplay}
-                  />
+                {/* Desktop Navigation: широкая зона, фильтры слева (макс. ширина), кнопка прижата вправо */}
+                <div className="hidden md:flex items-center justify-between w-full min-w-0 gap-6">
+                  <div className="min-w-0 flex-1 max-w-4xl">
+                    <ChatFilters
+                      filters={filters}
+                      setFilters={setFilters}
+                      dateFilter={dateFilter}
+                      setDateFilter={setDateFilter}
+                      handleLocationChange={handleLocationChange}
+                      handleTravelersChange={handleTravelersChange}
+                      handleChildrenChange={handleChildrenChange}
+                      handlePetsChange={handlePetsChange}
+                      handleBudgetChange={handleBudgetChange}
+                      handleDurationChange={handleDurationChange}
+                      handleMonthSelection={handleMonthSelection}
+                      getDateFilterDisplay={getDateFilterDisplay}
+                    />
+                  </div>
                   <button
                     onClick={handleTripGenClick}
-                    className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-full font-medium hover:bg-gray-900 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-full font-medium hover:bg-gray-900 transition-colors flex-shrink-0"
                   >
-                    <img src={AILogo} alt="TripGen" className="w-6 h-6" />
-                    <span>TRIPGEN МАРШРУТ</span>
+                    <img src={AILogo} alt="TripGen" className="w-6 h-6 flex-shrink-0" />
+                    <span className="whitespace-nowrap">TRIPGEN МАРШРУТ</span>
                   </button>
                 </div>
               </div>
@@ -2554,12 +2622,71 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
         </div>
 
         {showTripBuilder && (
-          <TripBuilder
-            message={currentMessage}
-            duration={dateFilter.type === 'duration' ? `${dateFilter.duration} days` : 'Custom dates'}
-            travelers={filters.travelers}
-            onClose={() => setShowTripBuilder(false)}
-          />
+          <>
+            <div
+              className="fixed top-[72px] left-0 right-0 bottom-0 bg-black/30 z-[45]"
+              aria-hidden
+              onClick={() => setShowTripBuilder(false)}
+            />
+            <div className="fixed top-[72px] left-0 right-0 bottom-0 z-[46] flex justify-end pointer-events-none">
+              <div className="pointer-events-auto w-full max-w-2xl h-full bg-white border-l border-gray-200 shadow-xl flex flex-col overflow-hidden">
+                {(currentMessage.trim() || (currentItinerary && currentItinerary.length > 0)) ? (
+                  <TripBuilder
+                    message={currentMessage}
+                    itinerary={currentItinerary ?? undefined}
+                    duration={dateFilter.type === 'duration' ? `${dateFilter.duration} дней` : 'Выберите даты'}
+                    travelers={filters.travelers}
+                    onClose={() => setShowTripBuilder(false)}
+                    dateFilter={dateFilter}
+                    setDateFilter={setDateFilter}
+                    getDateFilterDisplay={getDateFilterDisplay}
+                    onDurationChange={handleDurationChange}
+                    onMonthSelection={handleMonthSelection}
+                  />
+                ) : (
+                  <div className="flex flex-col flex-1 relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowTripBuilder(false)}
+                      className="absolute top-4 right-4 z-10 p-2 rounded-full hover:bg-gray-100 transition-colors"
+                      aria-label="Закрыть"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 6L6 18M6 6l12 12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    <div className="flex flex-col items-center justify-center flex-1 p-8 text-center">
+                      <div className="max-w-md">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Маршрут по дням</h3>
+                      <p className="text-gray-600 mb-6">
+                        В ответах чата пока нет детального маршрута по дням. Попросите ассистента составить маршрут, например:
+                      </p>
+                      <p className="text-left bg-gray-50 rounded-xl p-4 text-sm text-gray-800 mb-6 font-medium">
+                        «Составь маршрут по {filters.location || 'городу'} на {dateFilter.type === 'duration' && dateFilter.duration ? dateFilter.duration : 5} дней»
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const prompt = `Составь детальный маршрут по ${filters.location || 'этому городу'} на ${dateFilter.type === 'duration' && dateFilter.duration ? dateFilter.duration : 5} дней с расписанием по дням.`;
+                          setInputText(prompt);
+                          setShowTripBuilder(false);
+                        }}
+                        className="px-5 py-2.5 bg-black text-white rounded-full font-medium hover:bg-gray-800 transition-colors"
+                      >
+                        Отправить запрос в чат
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowTripBuilder(false)}
+                        className="mt-4 text-gray-500 hover:text-gray-700 text-sm"
+                      >
+                        Закрыть
+                      </button>
+                    </div>
+                  </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
         )}
       </div>
 

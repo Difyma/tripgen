@@ -430,9 +430,13 @@ export const updateChatTitle = async (chatId: string, title: string): Promise<vo
   }
 };
 
-// Генерация названия чата на основе первого сообщения
+// Генерация короткого названия чата по первому сообщению (в стиле ChatGPT)
+const MAX_TITLE_WORDS = 6;
+
 export const generateChatTitle = (message: string): string => {
-  // Берём первые 30 символов сообщения
-  const title = message.slice(0, 30).trim();
-  return title.length < message.length ? title + '...' : title;
+  const trimmed = message.trim();
+  if (!trimmed) return 'Новый чат';
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  const short = words.slice(0, MAX_TITLE_WORDS).join(' ');
+  return words.length > MAX_TITLE_WORDS ? `${short}…` : short;
 }; 

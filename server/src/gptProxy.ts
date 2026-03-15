@@ -17,9 +17,13 @@ import { DEMO_HOTELS as REALISTIC_DEMO_HOTELS, TEST_HOTELS, DemoHotel } from './
 import { 
   buildHotelPageLink, 
   buildSerpLink, 
-  generatePartnerLinkLegacy,
-  PARTNER_SLUG 
+  generatePartnerLinkLegacy
 } from '../lib/ostrovok-links.cjs';
+import { TRAVEL_JSON_SYSTEM_PROMPT } from './prompts/travelJsonSystemPrompt.js';
+import { parseTripPlanResponse } from './lib/parseTripPlanResponse.js';
+import { formatTripPlanToMarkdown } from './lib/formatTripPlanToMarkdown.js';
+import { mergeHotelRecommendationsWithSource } from './lib/mergeHotelRecommendationsWithSource.js';
+import type { SourceHotelForWhitelist } from './types/tripPlan.js';
 
 dotenv.config();
 
@@ -904,9 +908,9 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
       return res.status(400).json({ error: 'Empty or invalid request body' });
     }
     
-    const { messages, filters = {} } = req.body;
+    const { messages, filters = {}, stream: useStream = false } = req.body;
     
-    console.log('[GPT Proxy] Received request');
+    console.log('[GPT Proxy] Received request', useStream ? '(streaming)' : '');
     console.log('[GPT Proxy] Raw filters from client:', JSON.stringify(filters, null, 2));
     
     // Validate messages
@@ -950,18 +954,69 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
       content: msg.text || msg.content || ''
     }));
 
-    // Add system prompt with context
+    const contextBlock = `Контекст путешествия:\n- Направление: ${defaultFilters.destination}\n- Даты: с ${defaultFilters.dates.start} по ${defaultFilters.dates.end}\n- Бюджет: от ${defaultFilters.budget.min} до ${defaultFilters.budget.max} ₽\n- Путешественников: ${defaultFilters.travelers}${hotelsText}`;
+
+    // Non-streaming: use JSON system prompt so we can parse and format to markdown. Streaming: keep text prompt.
+    const systemPromptForRequest = useStream ? SYSTEM_PROMPT : TRAVEL_JSON_SYSTEM_PROMPT;
     const fullMessages = [
       {
         role: 'system',
-        content: `${SYSTEM_PROMPT}\n\nКонтекст путешествия:\n- Направление: ${defaultFilters.destination}\n- Даты: с ${defaultFilters.dates.start} по ${defaultFilters.dates.end}\n- Бюджет: от ${defaultFilters.budget.min} до ${defaultFilters.budget.max} ₽\n- Путешественников: ${defaultFilters.travelers}${hotelsText}`
+        content: `${systemPromptForRequest}\n\n${contextBlock}`
       },
       ...conversationMessages
     ];
 
     console.log('[GPT Proxy] Sending request to OpenRouter...');
 
-    // Call OpenRouter API with shorter timeout
+    if (useStream) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      if (res.socket) res.socket.setNoDelay(true);
+      res.flushHeaders?.();
+      res.write(`data: ${JSON.stringify({ type: 'hotels', hotels })}\n\n`);
+
+      const response = await axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          model: 'openai/gpt-4o-mini',
+          messages: fullMessages,
+          temperature: 0.7,
+          max_tokens: 2000,
+          stream: true
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': req.headers.origin || 'http://localhost:5173',
+            'X-Title': 'AI Travel Assistant'
+          },
+          responseType: 'stream',
+          timeout: 60000
+        }
+      );
+
+      const stream = response.data as NodeJS.ReadableStream;
+      stream.on('data', (chunk: Buffer | string) => {
+        if (res.writableEnded) return;
+        res.write(chunk);
+        if (typeof (res as any).flush === 'function') (res as any).flush();
+      });
+      stream.on('end', () => {
+        if (!res.writableEnded) res.end();
+      });
+      stream.on('error', (err: Error) => {
+        if (!res.writableEnded) {
+          console.error('[GPT Proxy] Stream error:', err.message);
+          res.end();
+        }
+      });
+      return;
+    }
+
+    // Call OpenRouter API with shorter timeout (non-streaming)
     const response = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
@@ -992,10 +1047,39 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
       });
     }
 
-    // Return response with hotels data
+    // Try to parse as structured JSON, merge hotels with whitelist, convert to markdown; fallback to raw text
+    let textToSend: string;
+    let itineraryToSend: import('./types/tripPlan.js').TripPlanDay[] | undefined;
+    const parsed = parseTripPlanResponse(assistantMessage);
+    if (parsed) {
+      const sourceHotels: SourceHotelForWhitelist[] = hotels.map((h) => {
+        const mainImg = h.images?.find((img: any) => img.category === 'exterior' || img.category === 'hotel_front') || h.images?.[0];
+        const photoUrl = mainImg?.url ? String(mainImg.url).replace('{size}', '640x400') : undefined;
+        return {
+          name: h.name,
+          bookingUrl: h.bookingUrl,
+          photoUrl,
+          price: h.price,
+          currency: h.currency,
+          rating: h.rating,
+          stars: h.stars,
+          address: h.address,
+          distanceToCenter: h.distanceToCenter,
+          description: h.description,
+        };
+      });
+      const merged = mergeHotelRecommendationsWithSource(parsed, sourceHotels);
+      textToSend = formatTripPlanToMarkdown(merged);
+      if (!textToSend) textToSend = assistantMessage;
+      if (merged.itinerary?.length) itineraryToSend = merged.itinerary;
+    } else {
+      textToSend = assistantMessage;
+    }
+
     res.json({
-      text: assistantMessage,
-      hotels: hotels
+      text: textToSend,
+      hotels: hotels,
+      ...(itineraryToSend && { itinerary: itineraryToSend })
     });
 
   } catch (error: any) {

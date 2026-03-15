@@ -1,5 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import axios from 'axios';
+import { TRAVEL_JSON_SYSTEM_PROMPT } from '../src/prompts/travelJsonSystemPrompt';
+import { parseTripPlanResponse } from '../src/lib/parseTripPlanResponse';
+import { formatTripPlanToMarkdown } from '../src/lib/formatTripPlanToMarkdown';
+import { mergeHotelRecommendationsWithSource } from '../src/lib/mergeHotelRecommendationsWithSource';
+import type { SourceHotelForWhitelist } from '../src/types/tripPlan';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const PARTNER_SLUG = process.env.OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
@@ -40,6 +45,13 @@ const SYSTEM_PROMPT = `Ты — опытный туристический асс
 5. Добавь краткое описание отеля
 
 ⚠️ ВАЖНО: Используй ТОЛЬКО bookingUrl из предоставленных данных. Не придумывай ссылки.`;
+
+interface OpenRouterChoice {
+  message?: { content?: string };
+}
+interface OpenRouterCompletionResponse {
+  choices?: OpenRouterChoice[];
+}
 
 interface HotelForApi {
   id: string;
@@ -131,9 +143,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const body = req.body as { messages?: { role: string; text: string }[]; filters?: Record<string, unknown> };
+    const body = req.body as {
+      messages?: { role: string; text: string }[];
+      filters?: Record<string, unknown>;
+      stream?: boolean;
+    };
     const messages = body?.messages ?? [];
     const filters = body?.filters as { destination?: string; dates?: { start?: string; end?: string }; budget?: { min?: number; max?: number }; travelers?: number } | undefined;
+    const useStream = body?.stream === true;
 
     const destination = filters?.destination ?? 'Москва';
     const start = filters?.dates?.start ?? new Date().toISOString().split('T')[0];
@@ -150,9 +167,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       content: msg.text || '',
     }));
 
-    const systemContent = `${SYSTEM_PROMPT}\n\nКонтекст путешествия:\n- Направление: ${destination}\n- Даты: с ${start} по ${end}\n- Бюджет: от ${budgetMin} до ${budgetMax} ₽\n- Путешественников: ${travelers}${hotelsText}`;
+    const contextBlock = `Контекст путешествия:\n- Направление: ${destination}\n- Даты: с ${start} по ${end}\n- Бюджет: от ${budgetMin} до ${budgetMax} ₽\n- Путешественников: ${travelers}${hotelsText}`;
+    const systemPromptForRequest = useStream ? SYSTEM_PROMPT : TRAVEL_JSON_SYSTEM_PROMPT;
+    const systemContent = `${systemPromptForRequest}\n\n${contextBlock}`;
 
-    const response = await axios.post(
+    if (useStream) {
+      const streamHeaders = {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      };
+      res.writeHead(200, streamHeaders);
+      res.write(`data: ${JSON.stringify({ type: 'hotels', hotels })}\n\n`);
+
+      const response = await axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          model: 'openai/gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemContent },
+            ...conversationMessages,
+          ],
+          temperature: 0.7,
+          max_tokens: 2000,
+          stream: true,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': req.headers.origin || 'https://vercel.app',
+            'X-Title': 'AI Travel Assistant',
+          },
+          responseType: 'stream',
+          timeout: 60000,
+        }
+      );
+
+      (response.data as NodeJS.ReadableStream).pipe(res);
+      return;
+    }
+
+    const response = await axios.post<OpenRouterCompletionResponse>(
       'https://openrouter.ai/api/v1/chat/completions',
       {
         model: 'openai/gpt-4o-mini',
@@ -174,16 +231,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     );
 
-    const assistantMessage = response.data?.choices?.[0]?.message?.content;
+    const assistantMessage = response.data.choices?.[0]?.message?.content;
     if (!assistantMessage) {
       Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
       return res.status(502).json({ error: 'Empty response from OpenRouter API' });
     }
 
+    let textToSend: string;
+    let itineraryToSend: import('../src/types/tripPlan').TripPlanDay[] | undefined;
+    const parsed = parseTripPlanResponse(assistantMessage);
+    if (parsed) {
+      const sourceHotels: SourceHotelForWhitelist[] = hotels.map((h) => ({
+        name: h.name,
+        bookingUrl: h.bookingUrl,
+        photoUrl: h.images?.[0]?.url,
+        price: h.price,
+        currency: h.currency,
+        rating: h.rating,
+        stars: h.stars,
+        address: h.address,
+        distanceToCenter: h.distanceToCenter,
+      }));
+      const merged = mergeHotelRecommendationsWithSource(parsed, sourceHotels);
+      textToSend = formatTripPlanToMarkdown(merged);
+      if (!textToSend) textToSend = assistantMessage;
+      if (merged.itinerary?.length) itineraryToSend = merged.itinerary;
+    } else {
+      textToSend = assistantMessage;
+    }
+
     Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
     return res.status(200).json({
-      text: assistantMessage,
+      text: textToSend,
       hotels,
+      ...(itineraryToSend && { itinerary: itineraryToSend }),
     });
   } catch (error: unknown) {
     const err = error as { message?: string; response?: { data?: unknown } };
