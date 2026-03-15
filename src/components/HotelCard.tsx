@@ -14,6 +14,10 @@ interface HotelCardProps {
   bookingUrl: string;
   amenities?: string[];
   isTop?: boolean;
+  /** Краткое описание (для мини-карточки) */
+  description?: string;
+  /** Компактный вид для списка в чате */
+  variant?: 'default' | 'mini';
 }
 
 export const HotelCard = ({
@@ -30,16 +34,55 @@ export const HotelCard = ({
   bookingUrl,
   amenities = [],
   isTop = false,
+  description,
+  variant = 'default',
 }: HotelCardProps) => {
   const formatPrice = (price: number, currency: string) => {
     return new Intl.NumberFormat('ru-RU').format(price) + ' ' + currency;
   };
 
-  const renderStars = (count: number) => {
+  const renderStars = (count: number, size: 'sm' | 'md' = 'md') => {
+    const cls = size === 'sm' ? 'w-3 h-3' : 'w-4 h-4';
     return Array(count).fill(null).map((_, i) => (
-      <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+      <Star key={i} className={`${cls} fill-amber-400 text-amber-400`} />
     ));
   };
+
+  if (variant === 'mini') {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex">
+        <div className="w-24 h-20 flex-shrink-0">
+          {imageUrl ? (
+            <img src={imageUrl} alt={name} className="w-full h-full object-cover" loading="lazy" />
+          ) : (
+            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+              <span className="text-gray-400 text-xs font-medium px-1 text-center line-clamp-2">{name}</span>
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0 p-2.5 flex flex-col justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 truncate">{name}</h3>
+            <div className="flex items-center gap-0.5 mt-0.5">{renderStars(stars, 'sm')}</div>
+            {description && (
+              <p className="text-xs text-gray-600 mt-1 line-clamp-2 leading-snug">{description}</p>
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-2 mt-1.5">
+            <span className="text-sm font-bold text-gray-900">от {formatPrice(price, currency)}</span>
+            <a
+              href={bookingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-black hover:bg-gray-800 text-white px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors"
+            >
+              Забронировать
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const renderAmenities = () => {
     const icons = [

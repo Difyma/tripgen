@@ -57,6 +57,18 @@ interface Message {
 const OSTROVOK_PARTNER_SLUG =
   import.meta.env.VITE_OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
 
+// Пока всегда открывать только тестовый отель (по запросу)
+function getTestHotelBookingUrl(checkIn?: string, checkOut?: string, guests = 2): string {
+  const start = checkIn || new Date().toISOString().split('T')[0];
+  const end = checkOut || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  return buildHotelPageLink('test_hotel', {
+    partnerSlug: OSTROVOK_PARTNER_SLUG,
+    checkIn: start,
+    checkOut: end,
+    rooms: [{ adults: guests }],
+  });
+}
+
 interface FilterState {
   location: string;
   travelers: number;
@@ -967,15 +979,16 @@ const Chat = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           messages: messagesToSend,
+          stream: true,
           filters: {
             destination: destinationLocation,
             dates: {
-              start: dateFilter.type === 'specific' && dateFilter.startDate 
+              start: dateFilter.type === 'specific' && dateFilter.startDate
                 ? dateFilter.startDate.toISOString().split('T')[0]
                 : new Date().toISOString().split('T')[0],
-              end: dateFilter.type === 'specific' && dateFilter.endDate 
+              end: dateFilter.type === 'specific' && dateFilter.endDate
                 ? dateFilter.endDate.toISOString().split('T')[0]
                 : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
             },
@@ -988,54 +1001,105 @@ const Chat = () => {
         }),
       });
 
-      console.log('API Response status:', response.status);
-      console.log('API Response headers:', Object.fromEntries(response.headers.entries()));
+      const contentType = response.headers.get('Content-Type') || '';
+      const isStream = contentType.includes('text/event-stream');
 
-      let data;
-      try {
-        const responseText = await response.text();
-        console.log('Response text length:', responseText.length);
-        console.log('Response text:', responseText);
+      if (!response.ok && !isStream) {
+        const errData = await response.json().catch(() => ({}));
+        const errorMessage = errData.error || errData.message || `Server error: ${response.status}`;
+        throw new Error(errorMessage);
+      }
 
-        if (!responseText || responseText.trim() === '') {
-          throw new Error('Empty response from server');
-        }
+      if (isStream && response.body) {
+        const streamMessageId = Date.now() + Math.random();
+        const streamingMessage: Message = {
+          id: streamMessageId,
+          text: '',
+          isUser: false,
+          role: 'assistant',
+          hotels: undefined
+        };
+        setMessages(prev => [...prev, streamingMessage]);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullText = '';
 
         try {
-          data = JSON.parse(responseText);
-          console.log('Successfully parsed response data:', data);
-        } catch (parseError) {
-          console.error('Error parsing response JSON:', parseError);
-          console.error('Response text that failed to parse:', responseText);
-          throw new Error('Invalid response format from server');
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            let lineEnd = buffer.indexOf('\n');
+            while (lineEnd !== -1) {
+              const line = buffer.slice(0, lineEnd).trim();
+              buffer = buffer.slice(lineEnd + 1);
+              lineEnd = buffer.indexOf('\n');
+
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+                try {
+                  const parsed = JSON.parse(data);
+                  if (parsed.type === 'hotels' && Array.isArray(parsed.hotels)) {
+                    setMessages(prev =>
+                      prev.map(m =>
+                        m.id === streamMessageId ? { ...m, hotels: parsed.hotels } : m
+                      )
+                    );
+                    continue;
+                  }
+                  if (parsed.error) {
+                    throw new Error(parsed.error.message || parsed.error);
+                  }
+                  const content = parsed.choices?.[0]?.delta?.content;
+                  if (typeof content === 'string') {
+                    fullText += content;
+                    setMessages(prev =>
+                      prev.map(m =>
+                        m.id === streamMessageId ? { ...m, text: fullText } : m
+                      )
+                    );
+                  }
+                } catch {
+                  // ignore JSON parse errors (e.g. SSE comments)
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock?.();
         }
-      } catch (error) {
-        console.error('Error reading response:', error);
-        throw new Error('Failed to read server response');
+
+        if (chatId && user && fullText) {
+          await saveMessageToCurrentChat(chatId, 'assistant', fullText);
+        }
+        return;
+      }
+
+      let data: { text?: string; response?: string; hotels?: AssistantHotel[]; error?: string; message?: string };
+      try {
+        const responseText = await response.text();
+        if (!responseText?.trim()) throw new Error('Empty response from server');
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        throw new Error('Invalid response format from server');
       }
 
       if (!response.ok) {
-        const errorMessage = data.error || 
-          (data.details && typeof data.details === 'object' 
-            ? data.details.message 
-            : data.details) || 
-          `Server error: ${response.status} ${response.statusText}`;
-        console.error('API error:', errorMessage);
-        throw new Error(errorMessage);
+        throw new Error(data.error || data.message || `Server error: ${response.status}`);
       }
-      
-      // Get response from data.response (API format) or data.text (legacy)
+
       const responseText = data.response || data.text;
-      if (!responseText) {
-        console.error('Empty response data:', data);
-        throw new Error('Empty response from GPT');
-      }
+      if (!responseText) throw new Error('Empty response from GPT');
 
       const hotelsFromApi: AssistantHotel[] | undefined = Array.isArray(data.hotels)
         ? data.hotels
         : undefined;
-    
-      // Добавляем ответ от GPT
+
       const assistantMessage: Message = {
         id: Date.now() + Math.random(),
         text: responseText,
@@ -1045,8 +1109,7 @@ const Chat = () => {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      
-      // Сохраняем ответ ассистента
+
       if (chatId && user) {
         await saveMessageToCurrentChat(chatId, 'assistant', responseText);
       }
@@ -1535,6 +1598,7 @@ const Chat = () => {
     bookingUrl: string;
     amenities?: string[];
     isTop?: boolean;
+    description?: string;
   }> => {
     const hotels: Array<{
       name: string;
@@ -1550,6 +1614,7 @@ const Chat = () => {
       bookingUrl: string;
       amenities?: string[];
       isTop?: boolean;
+      description?: string;
     }> = [];
 
     const normalizeCurrency = (raw?: string) => {
@@ -1627,6 +1692,13 @@ const Chat = () => {
       return list.length ? list : undefined;
     };
 
+    const extractDescription = (block: string): string | undefined => {
+      const m = block.match(/(?:-|\u2022)?\s*(?:[^\s]*\s*)?(?:\*\*)?Описание:\s*\*?\*?\s*([^\n]+)/i);
+      const raw = m?.[1]?.trim();
+      if (!raw) return undefined;
+      return raw.length > 200 ? raw.slice(0, 197) + '…' : raw;
+    };
+
     const extractIsTop = (titleLine: string, block: string) => {
       return /TOP|Топ/i.test(titleLine) || /\btop\b/i.test(block);
     };
@@ -1652,6 +1724,7 @@ const Chat = () => {
       const distanceToMetro = extractDistanceToMetro(block);
       const amenities = extractAmenities(block);
       const isTop = extractIsTop(titleLine, block);
+      const description = extractDescription(block);
 
       if (!name) return;
 
@@ -1669,6 +1742,7 @@ const Chat = () => {
         bookingUrl,
         amenities,
         isTop,
+        description,
       });
     };
 
@@ -1706,45 +1780,35 @@ const Chat = () => {
       );
     }
 
-    // Handle link clicks to fix broken booking URLs
+    // Handle link clicks: пока всегда открываем только тестовый отель
     const handleMessageClick = (e: React.MouseEvent) => {
       const target = e.target as HTMLElement;
       const link = target.closest('a');
-      if (link && link.href.includes('ostrovok.ru/hotel/')) {
-        console.log('[handleMessageClick] Link clicked:', link.href);
-        
-        // Fix URL and open (for numeric IDs will redirect to test_hotel)
-        const fixedUrl = fixBookingUrl(link.href);
-        console.log('[handleMessageClick] Fixed URL:', fixedUrl);
-        
-        // Always prevent default and open fixed URL
+      const isOstrovok = link && (link.href.includes('ostrovok.ru/hotel/') || link.href.includes('ostrovok.ru/rooms/'));
+      if (isOstrovok && link) {
         e.preventDefault();
         e.stopPropagation();
-        
-        // Add timestamp to bypass cache
-        const urlWithCache = fixedUrl + '&_t=' + Date.now();
-        console.log('[handleMessageClick] Opening URL:', urlWithCache);
-        
-        // Try different methods to open the link
+        const checkIn = dateFilter.type === 'specific' && dateFilter.startDate
+          ? dateFilter.startDate.toISOString().split('T')[0]
+          : undefined;
+        const checkOut = dateFilter.type === 'specific' && dateFilter.endDate
+          ? dateFilter.endDate.toISOString().split('T')[0]
+          : undefined;
+        const urlToOpen = getTestHotelBookingUrl(checkIn, checkOut, filters.travelers);
         try {
-          const newWindow = window.open(urlWithCache, '_blank', 'noopener,noreferrer');
+          const newWindow = window.open(urlToOpen, '_blank', 'noopener,noreferrer');
           if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-            // Popup blocked, try location.assign
-            console.log('[handleMessageClick] Popup blocked, using location.assign');
-            window.location.assign(urlWithCache);
+            window.location.assign(urlToOpen);
           }
-        } catch (err) {
-          console.error('[handleMessageClick] Error opening link:', err);
-          // Fallback: create a temporary link and click it
+        } catch {
           const tempLink = document.createElement('a');
-          tempLink.href = urlWithCache;
+          tempLink.href = urlToOpen;
           tempLink.target = '_blank';
           tempLink.rel = 'noopener noreferrer';
           document.body.appendChild(tempLink);
           tempLink.click();
           document.body.removeChild(tempLink);
         }
-        
         return false;
       }
     };
@@ -1892,7 +1956,6 @@ const Chat = () => {
         `}</style>
         <div className="space-y-4">
           {(() => {
-            // Prefer hotels from API if present
             const parsedHotels = hotelsFromApi ?? parseHotelsFromText(message.text);
 
             if (!parsedHotels || parsedHotels.length === 0) {
@@ -1904,34 +1967,81 @@ const Chat = () => {
               );
             }
 
-            // Пока используем полный текст как есть; GPT уже даёт описания,
-            // а карточки дополняют его структурированным списком.
+            // Убираем из текста все блоки с детальным описанием отелей — показываем только мини-карточки (без дублирования)
+            let textWithoutHotels = message.text;
+            parsedHotels.forEach(hotel => {
+              const escapedName = hotel.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const patternOld = new RegExp(
+                `###\\s*\\d+\\.\\s*${escapedName}[\\s\\S]*?(?=###\\s*\\d+\\.|##\\s*🏨|\\n---\\s*\\n|$)`,
+                'gmi'
+              );
+              const patternNew = new RegExp(
+                `##\\s*🏨\\s*${escapedName}[\\s\\S]*?(?=##\\s*🏨|###\\s*\\d+\\.|\\n---\\s*\\n|$)`,
+                'gmi'
+              );
+              textWithoutHotels = textWithoutHotels.replace(patternOld, '');
+              textWithoutHotels = textWithoutHotels.replace(patternNew, '');
+            });
+            // Удаляем любые блоки с деталями отеля (заголовок ###/## или картинка + Адрес/Цена/Описание)
+            const isHotelDetailBlock = (s: string) =>
+              /Адрес:|Цена:|Описание:/i.test(s) && (/Цена:/i.test(s) || /Описание:/i.test(s));
+            // Блоки с заголовком ### N. или ##
+            textWithoutHotels = textWithoutHotels.replace(
+              /(?:^|\n)((?:###\s*\d+\.\s*[^\n]+|##\s[^\n]+)\n[\s\S]*?)(?=\n(?:###\s*\d+\.|##\s|\n---\s*\n)|$)/gim,
+              (fullMatch, block) => (isHotelDetailBlock(block) ? '\n' : fullMatch)
+            );
+            // Блоки без заголовка: начинаются с картинки ![...](...) и содержат детали отеля
+            textWithoutHotels = textWithoutHotels.replace(
+              /(?:^|\n)((!\[[^\]]*\]\([^)]+\)\s*\n[\s\S]*?))(?=\n\n|(?:\n###|\n##)\s|\n---\s*\n|$)/gim,
+              (fullMatch, block) => (isHotelDetailBlock(block) ? '\n' : fullMatch)
+            );
+
+            const seenNames = new Set<string>();
+            const uniqueHotels = parsedHotels.filter(h => {
+              const key = h.name.trim().toLowerCase();
+              if (seenNames.has(key)) return false;
+              seenNames.add(key);
+              return true;
+            });
+
             return (
               <>
                 <div
                   className="prose prose-sm max-w-none text-gray-900"
-                  dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
+                  dangerouslySetInnerHTML={{ __html: formatMessage(textWithoutHotels) }}
                 />
-                <div className="space-y-4 mt-4">
-                  <h3 className="text-lg font-semibold text-gray-900">🏨 Рекомендуемые отели</h3>
-                  {parsedHotels.map((hotel, index) => (
-                    <HotelCard
-                      key={index}
-                      name={hotel.name}
-                      stars={hotel.stars}
-                      rating={hotel.rating}
-                      reviewCount={hotel.reviewCount}
-                      address={hotel.address}
-                      price={hotel.price}
-                      currency={hotel.currency}
-                      imageUrl={hotel.imageUrl}
-                      bookingUrl={fixBookingUrl(hotel.bookingUrl)}
-                      distanceToCenter={hotel.distanceToCenter}
-                      distanceToMetro={hotel.distanceToMetro}
-                      amenities={hotel.amenities}
-                      isTop={hotel.isTop}
-                    />
-                  ))}
+                <div className="mt-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">🏨 Рекомендуемые отели</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {uniqueHotels.map((hotel, index) => {
+                      const checkIn = dateFilter.type === 'specific' && dateFilter.startDate
+                        ? dateFilter.startDate.toISOString().split('T')[0]
+                        : undefined;
+                      const checkOut = dateFilter.type === 'specific' && dateFilter.endDate
+                        ? dateFilter.endDate.toISOString().split('T')[0]
+                        : undefined;
+                      return (
+                        <HotelCard
+                          key={index}
+                          variant="mini"
+                          name={hotel.name}
+                          stars={hotel.stars}
+                          rating={hotel.rating}
+                          reviewCount={hotel.reviewCount}
+                          address={hotel.address}
+                          price={hotel.price}
+                          currency={hotel.currency}
+                          imageUrl={hotel.imageUrl}
+                          bookingUrl={getTestHotelBookingUrl(checkIn, checkOut, filters.travelers)}
+                          distanceToCenter={hotel.distanceToCenter}
+                          distanceToMetro={hotel.distanceToMetro}
+                          amenities={hotel.amenities}
+                          isTop={hotel.isTop}
+                          description={hotel.description}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
               </>
             );
