@@ -332,22 +332,7 @@ export function Sidebar({ className }: SidebarProps) {
               </span>
             </Link>
 
-            <Link
-              to="/favorites"
-              className={`
-                flex items-center gap-3 h-10 rounded-xl transition-colors duration-200
-                ${isSidebarCollapsed ? 'justify-center px-0 w-10 min-w-0 mx-auto' : 'px-3'}
-                ${isActivePath('/favorites')
-                  ? 'bg-gray-100 text-gray-900'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }
-              `}
-            >
-              <Heart className="w-5 h-5 shrink-0" />
-              <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-                Избранное
-              </span>
-            </Link>
+            {/* Пункт "Избранное" временно скрыт из сайдбара */}
 
           </nav>
         </div>

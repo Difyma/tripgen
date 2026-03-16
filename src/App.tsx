@@ -13,6 +13,7 @@ import AboutPage from './components/AboutPage';
 import CreatorsListPage from './pages/CreatorsListPage';
 import CreatorClientChatPage from './pages/CreatorClientChatPage';
 import FavoritesPage from './pages/FavoritesPage';
+import { DestinationsPage } from './pages/DestinationsPage';
 import { BlogPage } from './pages/BlogPage';
 import { BlogPostPage } from './pages/BlogPostPage';
 import { ToursPage } from './pages/ToursPage';
@@ -44,6 +45,7 @@ export function App() {
         <Route path="/creator" element={<CreatorPage />} />
         <Route path="/creators" element={<CreatorsListPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/destinations" element={<DestinationsPage />} />
         <Route path="/tours" element={<ToursPage />} />
         <Route path="/ready-tours/:id" element={<ReadyTourDetailsPage />} />
         <Route path="/blog" element={<BlogPage />} />

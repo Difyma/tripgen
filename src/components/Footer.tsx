@@ -8,7 +8,7 @@ type FooterLink = { name: string; href: string; isRouterLink?: boolean };
 
 const footerLinks: Record<string, FooterLink[]> = {
   Путешествия: [
-    { name: 'Направления', href: '#' },
+    { name: 'Направления', href: '/destinations', isRouterLink: true },
     { name: 'Туры и пакеты', href: '/tours', isRouterLink: true },
     { name: 'Блог о путешествиях', href: '/blog', isRouterLink: true },
     { name: 'Фотогалерея', href: '#' }
