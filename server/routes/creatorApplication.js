@@ -4,7 +4,8 @@ import axios from 'axios';
 const router = Router();
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+// Все заявки креаторов шлём в фиксированный канал
+const TELEGRAM_CHAT_ID = '-5155824311';
 
 const sendTelegramMessage = async (text) => {
   const response = await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {

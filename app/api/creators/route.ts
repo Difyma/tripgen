@@ -4,7 +4,8 @@ import axios from 'axios';
 export const runtime = 'edge';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+// Фиксируем канал для заявок креаторов
+const TELEGRAM_CHAT_ID = '-5155824311';
 
 interface TelegramResponse {
   ok: boolean;
@@ -72,28 +73,25 @@ export async function POST(request: Request) {
       throw new Error('Telegram credentials are not configured');
     }
 
-    // Отправляем несколько сообщений вместо одного большого
-    await sendTelegramMessage('🎉 Новая заявка на роль креатора!');
-    
-    await sendTelegramMessage(
-      `👤 Личная информация:\n` +
+    // Одно большое сообщение с полной анкетой
+    const text =
+      '🎉 Новая заявка на роль креатора!\n\n' +
+      '👤 Личная информация:\n' +
       `• Имя: ${data.fullName}\n` +
       `• Email: ${data.email}\n` +
-      `• Телефон: ${data.phone}`
-    );
-
-    await sendTelegramMessage(
-      `📱 Социальные сети:\n` +
+      `• Телефон: ${data.phone}\n\n` +
+      '📱 Социальные сети:\n' +
       `• Instagram: ${data.instagram || 'Не указан'}\n` +
       `• Telegram: ${data.telegram || 'Не указан'}\n` +
-      `• YouTube: ${data.youtube || 'Не указан'}`
-    );
+      `• YouTube: ${data.youtube || 'Не указан'}\n\n` +
+      '📝 О себе:\n' +
+      `${data.bio}\n\n` +
+      '✈️ Опыт путешествий:\n' +
+      `${data.experience}\n\n` +
+      '💫 Почему хочет стать креатором:\n' +
+      `${data.expectations}`;
 
-    await sendTelegramMessage(`📝 О себе:\n${data.bio}`);
-    
-    await sendTelegramMessage(`✈️ Опыт путешествий:\n${data.experience}`);
-    
-    await sendTelegramMessage(`💫 Почему хочет стать креатором:\n${data.expectations}`);
+    await sendTelegramMessage(text);
 
     return new NextResponse(
       JSON.stringify({

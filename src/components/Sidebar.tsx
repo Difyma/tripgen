@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Plus, MessageSquare, Compass, Heart, Settings, ChevronLeft, ChevronRight, Users, Trash2 } from 'lucide-react';
+import { Plus, MessageSquare, Compass, Heart, Settings, ChevronLeft, ChevronRight, Users, Trash2, Mountain } from 'lucide-react';
 import { CreateTripModal } from './CreateTripModal';
 import { AuthModal } from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,7 +15,9 @@ export function Sidebar({ className }: SidebarProps) {
   const { user } = useAuth();
   const { isSidebarCollapsed, setIsSidebarCollapsed, mobileOpen, setMobileOpen } = useSidebar();
   const navigate = useNavigate();
-  const [showChatList, setShowChatList] = useState(false);
+  const [showChatList, setShowChatList] = useState(true);
+  const [showTourChatList, setShowTourChatList] = useState(false);
+  const [activeChatTab, setActiveChatTab] = useState<'regular' | 'tours'>('regular');
   const [isCreateTripModalOpen, setIsCreateTripModalOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const location = useLocation();
@@ -44,12 +46,13 @@ export function Sidebar({ className }: SidebarProps) {
     loadChats();
   }, [user]);
 
-  // Обновляем список чатов при открытии списка
+  // Обновляем список чатов при переходе в основной чат,
+  // чтобы новые чаты (в том числе по турам) появлялись в сайдбаре
   useEffect(() => {
-    if (showChatList && user) {
+    if (user && location.pathname.startsWith('/chat')) {
       getUserChats().then(setUserChats).catch(console.error);
     }
-  }, [showChatList, user]);
+  }, [location.pathname, location.search, user]);
 
   const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
     e.preventDefault();
@@ -69,12 +72,30 @@ export function Sidebar({ className }: SidebarProps) {
     return location.pathname.startsWith(path);
   };
 
-  const toggleChatList = () => {
-    setShowChatList(!showChatList);
+  // Чат по турам: отдельный тип, чтобы не дублировать в обычных чатах
+  const isTourChat = (chat: Chat) => {
+    const title = (chat.title || '').trim().toLowerCase();
+    // Исторически тур-чаты могли называться по-разному:
+    // - "Тур: <название тура>" — новая схема
+    // - "Я перешёл из детальной страницы тура…" — старая схема
+    return (
+      title.startsWith('тур:') ||
+      title.startsWith('я перешёл из детальной страницы тура')
+    );
   };
 
+  const toggleChatList = () => {
+    setShowChatList(prev => !prev);
+  };
+
+  const toggleTourChatList = () => {
+    setShowTourChatList(!showTourChatList);
+  };
+
+  const hasTourChats = userChats.some(isTourChat);
+
   return (
-    <>
+    <div>
       {/* Мобильная кнопка-гамбургер */}
       <button
         className="fixed top-4 left-4 z-40 bg-white rounded-full p-2 shadow-md lg:hidden"
@@ -91,12 +112,14 @@ export function Sidebar({ className }: SidebarProps) {
 
       <div
         className={
-          `fixed inset-0 z-50 flex flex-col bg-white border-r border-gray-200 transition-all duration-300
-          ${isSidebarCollapsed ? 'w-[72px] max-w-[72px]' : 'w-[280px] max-w-[100vw]'}
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0
-          lg:inset-y-0 lg:left-0 lg:right-auto lg:w-[${isSidebarCollapsed ? '72px' : '280px'}] lg:max-w-none lg:z-40
-          ${className || ''}`
+          'fixed inset-0 z-50 flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ' +
+          (isSidebarCollapsed ? 'w-[72px] max-w-[72px]' : 'w-[280px] max-w-[100vw]') +
+          ' ' +
+          (mobileOpen ? 'translate-x-0' : '-translate-x-full') +
+          ' lg:translate-x-0 lg:inset-y-0 lg:left-0 lg:right-auto ' +
+          (isSidebarCollapsed ? 'lg:w-[72px] lg:max-w-none lg:z-40' : 'lg:w-[280px] lg:max-w-none lg:z-40') +
+          ' ' +
+          (className || '')
         }
       >
         {/* Кнопка закрытия на мобильных */}
@@ -145,17 +168,17 @@ export function Sidebar({ className }: SidebarProps) {
         <div className="flex-1 overflow-y-auto py-2">
           <nav className="px-2 space-y-1">
             <div>
-              <Link
-                to="/chat"
-                className={`
-                  flex items-center gap-3 h-10 rounded-xl transition-colors duration-200
-                  ${isSidebarCollapsed ? 'justify-center px-0 w-10 min-w-0 mx-auto' : 'px-3'}
-                  ${isActivePath('/chat')
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }
-                `}
+              <button
+                type="button"
                 onClick={toggleChatList}
+                className={
+                  'w-full flex items-center gap-3 h-10 rounded-xl transition-colors duration-200 text-left ' +
+                  (isSidebarCollapsed ? 'justify-center px-0 w-10 min-w-0 mx-auto' : 'px-3') +
+                  ' ' +
+                  (isActivePath('/chat')
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')
+                }
               >
                 <MessageSquare className="w-5 h-5 shrink-0" />
                 <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
@@ -164,71 +187,134 @@ export function Sidebar({ className }: SidebarProps) {
                 {!isSidebarCollapsed && (
                   <ChevronRight className={`w-4 h-4 ml-auto transition-transform ${showChatList ? 'rotate-90' : ''}`} />
                 )}
-              </Link>
+              </button>
 
-              {/* Список чатов */}
+              {/* Таббар "Чаты / Чат туров" + списки, внутри выпадающего блока */}
               {showChatList && !isSidebarCollapsed && (
-                <div className="mt-2 space-y-1 max-h-[300px] overflow-y-auto">
-                  <button
-                    onClick={() => navigate('/chat')}
-                    className="w-full flex items-center gap-3 px-3 h-10 rounded-xl text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
-                  >
-                    <Plus className="w-5 h-5" />
-                    <span>Новый чат</span>
-                  </button>
-                  
-                  {!user && (
-                    <div className="px-3 py-2 text-xs text-gray-400">
-                      Войдите, чтобы сохранять чаты
-                    </div>
-                  )}
-                  
-                  {isLoadingChats && (
-                    <div className="px-3 py-2 text-xs text-gray-400">
-                      Загрузка...
-                    </div>
-                  )}
-                  
-                  {user && !isLoadingChats && userChats.length === 0 && (
-                    <div className="px-3 py-2 text-xs text-gray-400">
-                      У вас пока нет чатов
-                    </div>
-                  )}
-                  
-                  {userChats.map((chat) => (
-                    <Link
-                      key={chat.id}
-                      to={`/chat?chat=${chat.id}`}
-                      className={`
-                        group flex items-center gap-3 px-3 py-2 rounded-xl ml-2
-                        transition-colors duration-200
-                        ${location.search.includes(`chat=${chat.id}`)
-                          ? 'bg-gray-100 text-gray-900'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                        }
-                      `}
+                <div className="mt-2 space-y-2 max-h-[320px] overflow-y-auto">
+                  {/* Tabbar */}
+                  <div className="px-3 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveChatTab('regular')}
+                      className={
+                        'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-colors ' +
+                        (activeChatTab === 'regular'
+                          ? 'bg-black text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                      }
                     >
-                      <MessageSquare className="w-4 h-4 shrink-0" />
-                      <span className="font-medium truncate flex-1">{chat.title}</span>
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Чаты</span>
+                    </button>
+                    {hasTourChats && (
                       <button
-                        onClick={(e) => handleDeleteChat(e, chat.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 hover:text-red-600 rounded transition-all"
-                        title="Удалить чат"
+                        type="button"
+                        onClick={() => setActiveChatTab('tours')}
+                        className={
+                          'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-colors ' +
+                          (activeChatTab === 'tours'
+                            ? 'bg-black text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
+                        }
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Mountain className="w-4 h-4" />
+                        <span>Чат туров</span>
                       </button>
-                      <span className="text-xs text-gray-400 whitespace-nowrap">
-                        {new Date(chat.updated_at).toLocaleDateString('ru-RU', {
-                          day: 'numeric',
-                          month: 'short'
-                        })}
-                      </span>
-                    </Link>
-                  ))}
+                    )}
+                  </div>
+
+                  {/* Кнопка "Новый чат" только для обычных чатов */}
+                  {activeChatTab === 'regular' && (
+                    <button
+                      onClick={() => navigate('/chat?new=1')}
+                      className="mt-1 w-full flex items-center gap-3 px-3 h-10 rounded-xl text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
+                    >
+                      <Plus className="w-5 h-5" />
+                      <span>Новый чат</span>
+                    </button>
+                  )}
+
+                  {/* Обычные чаты */}
+                  {user && !isLoadingChats && userChats.length > 0 && activeChatTab === 'regular' && (
+                    <div className="space-y-1 mt-1">
+                      <div className="px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                        Обычные чаты
+                      </div>
+                      {userChats
+                        .filter(chat => !isTourChat(chat))
+                        .map(chat => (
+                          <Link
+                            key={chat.id}
+                            to={`/chat?chat=${chat.id}`}
+                            className={
+                              'group flex items-center gap-3 px-3 py-2 rounded-xl ml-2 transition-colors duration-200 ' +
+                              (location.search.includes('chat=' + chat.id)
+                                ? 'bg-gray-100 text-gray-900'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')
+                            }
+                          >
+                            <MessageSquare className="w-4 h-4 shrink-0" />
+                            <span className="font-medium truncate flex-1">{chat.title}</span>
+                            <button
+                              onClick={(e) => handleDeleteChat(e, chat.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 hover:text-red-600 rounded transition-all"
+                              title="Удалить чат"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                            <span className="text-xs text-gray-400 whitespace-nowrap">
+                              {new Date(chat.updated_at).toLocaleDateString('ru-RU', {
+                                day: 'numeric',
+                                month: 'short'
+                              })}
+                            </span>
+                          </Link>
+                        ))}
+                    </div>
+                  )}
+
+                  {/* Чаты туров */}
+                  {user && !isLoadingChats && hasTourChats && activeChatTab === 'tours' && (
+                    <div className="space-y-1 mt-1">
+                      <div className="px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                        Чаты туров
+                      </div>
+                      {userChats
+                        .filter(isTourChat)
+                        .map(chat => (
+                          <Link
+                            key={chat.id}
+                            to={`/chat?chat=${chat.id}`}
+                            className={
+                              'group flex items-center gap-3 px-3 py-2 rounded-xl ml-2 transition-colors duration-200 ' +
+                              (location.search.includes('chat=' + chat.id)
+                                ? 'bg-gray-100 text-gray-900'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')
+                            }
+                          >
+                            <Mountain className="w-4 h-4 shrink-0" />
+                            <span className="font-medium truncate flex-1">{chat.title}</span>
+                            <button
+                              onClick={(e) => handleDeleteChat(e, chat.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 hover:text-red-600 rounded transition-all"
+                              title="Удалить чат"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                            <span className="text-xs text-gray-400 whitespace-nowrap">
+                              {new Date(chat.updated_at).toLocaleDateString('ru-RU', {
+                                day: 'numeric',
+                                month: 'short'
+                              })}
+                            </span>
+                          </Link>
+                        ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-
             <Link
               to="/trips"
               className={`
@@ -262,7 +348,6 @@ export function Sidebar({ className }: SidebarProps) {
                 Избранное
               </span>
             </Link>
-
 
           </nav>
         </div>
@@ -371,6 +456,6 @@ export function Sidebar({ className }: SidebarProps) {
           onClose={() => setShowAuthModal(false)}
         />
       )}
-    </>
+    </div>
   );
 } 

@@ -1,21 +1,22 @@
 'use client';
 
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Send } from 'lucide-react';
 
-const footerLinks = {
+type FooterLink = { name: string; href: string; isRouterLink?: boolean };
+
+const footerLinks: Record<string, FooterLink[]> = {
   Путешествия: [
     { name: 'Направления', href: '#' },
-    { name: 'Туры и пакеты', href: '#' },
-    { name: 'Блог о путешествиях', href: '#' },
+    { name: 'Туры и пакеты', href: '/tours', isRouterLink: true },
+    { name: 'Блог о путешествиях', href: '/blog', isRouterLink: true },
     { name: 'Фотогалерея', href: '#' }
   ],
   Компания: [
-    { name: 'О нас', href: '/about' },
-    { name: 'Наша история', href: '#' },
-    { name: 'Команда', href: '#' },
-    { name: 'Для креаторов', href: '/creator' },
-    { name: 'Наши креаторы', href: '/creators' }
+    { name: 'О нас', href: '/about', isRouterLink: true },
+    { name: 'Для креаторов', href: '/creator', isRouterLink: true },
+    { name: 'Наши креаторы', href: '/creators', isRouterLink: true }
   ],
   Поддержка: [
     { name: 'Связаться с нами', href: '#' },
@@ -57,12 +58,21 @@ export const Footer = () => {
               <ul className="space-y-4">
                 {links.map((link) => (
                   <li key={link.name}>
-                    <a
-                      href={link.href}
-                      className="text-gray-600 hover:text-[#094D92] transition-colors duration-300"
-                    >
-                      {link.name}
-                    </a>
+                    {link.isRouterLink ? (
+                      <Link
+                        to={link.href}
+                        className="text-gray-600 hover:text-[#094D92] transition-colors duration-300"
+                      >
+                        {link.name}
+                      </Link>
+                    ) : (
+                      <a
+                        href={link.href}
+                        className="text-gray-600 hover:text-[#094D92] transition-colors duration-300"
+                      >
+                        {link.name}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>

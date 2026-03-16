@@ -63,13 +63,27 @@ export function ReadyTourDetailsPage() {
     medium: 'bg-yellow-100 text-yellow-700',
     hard: 'bg-red-100 text-red-700',
   };
-
+  
   const handleBookTour = () => {
     setIsBookingModalOpen(true);
   };
 
   const handleAskQuestion = () => {
-    navigate(`/chat?q=Вопрос о туре: ${encodeURIComponent(tour.title)}`);
+    const query = `Вопрос организатору по туру "${tour.title}" в регионе ${tour.region}.`;
+    navigate(
+      `/chat?q=${encodeURIComponent(query)}&tourTitle=${encodeURIComponent(
+        tour.title
+      )}&newTour=1`
+    );
+  };
+
+  const handleStartAiChat = () => {
+    const query =
+      `Я перешёл из детальной страницы тура "${tour.title}" в регионе ${tour.region}. ` +
+      `Помоги как AI-ассистент подобрать и сравнить готовые туры на сайте TRIPGEN, ` +
+      `а также ответить на вопросы по бронированию. Сначала задай пару уточняющих вопросов ` +
+      `про даты, бюджет и формат отдыха, а потом предложи варианты туров.`;
+    navigate(`/chat?q=${encodeURIComponent(query)}`);
   };
 
   return (
@@ -465,7 +479,7 @@ export function ReadyTourDetailsPage() {
                   Наш AI-ассистент поможет подобрать тур и ответит на все вопросы
                 </p>
                 <button
-                  onClick={handleAskQuestion}
+                  onClick={handleStartAiChat}
                   className="w-full py-3 bg-white/10 backdrop-blur-sm rounded-xl text-sm font-medium hover:bg-white/20 transition-colors"
                 >
                   Начать чат

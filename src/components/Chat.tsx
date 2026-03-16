@@ -13,7 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { AuthModal } from './AuthModal';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSidebar } from '../contexts/SidebarContext';
 const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
@@ -571,6 +571,7 @@ function ChatFilters({
 
 const Chat = () => {
   const { isSidebarCollapsed, setMobileOpen, mobileOpen } = useSidebar();
+  const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const initialQuery = searchParams.get('q');
@@ -901,6 +902,15 @@ const Chat = () => {
 
     // Создаём новый чат при первом сообщении
     let chatId = currentChatId;
+
+    // Если пришли по кнопке "Задать вопрос" с детальной страницы тура,
+    // форсируем создание отдельного нового чата тура
+    const params = new URLSearchParams(location.search);
+    const isNewTourChat = params.get('newTour') === '1';
+    if (isNewTourChat) {
+      chatId = null;
+    }
+
     if (!chatId && user) {
       chatId = await startNewChat(messageText);
     }
@@ -1180,6 +1190,10 @@ const Chat = () => {
   }, []);
 
   useEffect(() => {
+    // ВАЖНО: ждём, пока загрузится user, чтобы при авто-запросе
+    // по initialQuery можно было создать и сохранить чат
+    if (!user) return;
+
     if (
       initialQuery &&
       messages.length === 1 &&
@@ -1205,7 +1219,7 @@ const Chat = () => {
       handleSendMessage(textToSend);
       lastSentText.current = textToSend;
     }
-  }, [initialQuery, messages, handleSendMessage]);
+  }, [initialQuery, messages, handleSendMessage, user]);
 
   // Загрузка конкретного чата из URL параметра
   useEffect(() => {
@@ -1285,7 +1299,26 @@ const Chat = () => {
     if (!user) return null;
     
     try {
-      const title = firstMessage ? generateChatTitle(firstMessage) : 'Новый чат';
+      // Пытаемся определить, что это чат по туру
+      const params = new URLSearchParams(location.search);
+      const tourTitleFromUrl = params.get('tourTitle');
+
+      let title: string;
+      if (tourTitleFromUrl) {
+        // Явно переданный заголовок тура из URL
+        title = `Тур: ${tourTitleFromUrl}`;
+      } else if (firstMessage && firstMessage.includes('Вопрос организатору по туру "')) {
+        // Резервный вариант: извлечь название тура из текста вопроса
+        const match = firstMessage.match(/Вопрос организатору по туру "([^"]+)"/);
+        if (match && match[1]) {
+          title = `Тур: ${match[1]}`;
+        } else {
+          title = firstMessage ? generateChatTitle(firstMessage) : 'Новый чат';
+        }
+      } else {
+        title = firstMessage ? generateChatTitle(firstMessage) : 'Новый чат';
+      }
+
       const chat = await createChat(title);
       if (chat) {
         setCurrentChatId(chat.id);
@@ -1293,6 +1326,18 @@ const Chat = () => {
         
         // Добавляем приветственное сообщение в новый чат
         await addChatMessage(chat.id, 'assistant', messages[0].text);
+
+        // Обновляем URL, чтобы прокинуть chatId — это триггерит
+        // повторную загрузку списка чатов в сайдбаре
+        try {
+          const params = new URLSearchParams(location.search);
+          params.set('chat', chat.id);
+          params.delete('newTour');
+          navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+        } catch (e) {
+          console.error('Error updating URL with new chatId:', e);
+        }
+
         return chat.id;
       }
     } catch (error) {
