@@ -153,6 +153,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const filters = body?.filters as { destination?: string; dates?: { start?: string; end?: string }; budget?: { min?: number; max?: number }; travelers?: number } | undefined;
     useStream = body?.stream === true;
 
+    // На Vercel streaming может падать с FUNCTION_INVOCATION_FAILED.
+    // Для стабильности в проде отключаем stream и возвращаем обычный JSON.
+    if (useStream && process.env.VERCEL === '1') {
+      useStream = false;
+    }
+
     const destination = filters?.destination ?? 'Москва';
     const start = filters?.dates?.start ?? new Date().toISOString().split('T')[0];
     const end = filters?.dates?.end ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
