@@ -151,13 +151,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
     const messages = body?.messages ?? [];
     const filters = body?.filters as { destination?: string; dates?: { start?: string; end?: string }; budget?: { min?: number; max?: number }; travelers?: number } | undefined;
-    useStream = body?.stream === true;
-
-    // На Vercel streaming может падать с FUNCTION_INVOCATION_FAILED.
-    // Для стабильности в проде отключаем stream и возвращаем обычный JSON.
-    if (useStream && process.env.VERCEL === '1') {
-      useStream = false;
-    }
+    // IMPORTANT:
+    // На Vercel иногда стриминг (`stream=true`) падает с FUNCTION_INVOCATION_FAILED.
+    // Чтобы гарантировать стабильность и корректную работу фронта,
+    // отключаем stream и всегда возвращаем обычный JSON.
+    useStream = false;
 
     const destination = filters?.destination ?? 'Москва';
     const start = filters?.dates?.start ?? new Date().toISOString().split('T')[0];
