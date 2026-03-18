@@ -1,8 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import axios from 'axios';
-import { parseTripPlanResponse } from '../src/lib/parseTripPlanResponse';
-import { formatTripPlanToMarkdown } from '../src/lib/formatTripPlanToMarkdown';
-import { mergeHotelRecommendationsWithSource } from '../src/lib/mergeHotelRecommendationsWithSource';
+// Use the `server/` copies to avoid Vercel runtime module resolution issues
+// (ERR_MODULE_NOT_FOUND for `../src/lib/*`).
+import { parseTripPlanResponse } from '../server/src/lib/parseTripPlanResponse';
+import { formatTripPlanToMarkdown } from '../server/src/lib/formatTripPlanToMarkdown';
+import { mergeHotelRecommendationsWithSource } from '../server/src/lib/mergeHotelRecommendationsWithSource';
 import type { SourceHotelForWhitelist } from '../src/types/tripPlan';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
