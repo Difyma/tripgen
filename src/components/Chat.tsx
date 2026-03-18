@@ -1031,8 +1031,32 @@ const Chat = () => {
       const isStream = contentType.includes('text/event-stream');
 
       if (!response.ok && !isStream) {
-        const errData = await response.json().catch(() => ({}));
-        const errorMessage = errData.error || errData.message || `Server error: ${response.status}`;
+        // В проде ответ может быть не JSON (HTML/текст), поэтому читаем body один раз
+        const responseText = await response.text().catch(() => '');
+        let errData: any = {};
+
+        try {
+          if (responseText) {
+            errData = JSON.parse(responseText);
+          }
+        } catch {
+          // ignore JSON parse errors
+        }
+
+        const errorMessage =
+          errData?.error ||
+          errData?.message ||
+          responseText?.trim() ||
+          `Server error: ${response.status}`;
+
+        // Чтобы было проще дебажить продовые 500
+        console.error('OpenAI proxy error:', {
+          status: response.status,
+          contentType,
+          responseText: responseText?.slice(0, 500),
+          parsed: errData,
+        });
+
         throw new Error(errorMessage);
       }
 
@@ -1190,9 +1214,12 @@ const Chat = () => {
   }, []);
 
   useEffect(() => {
-    // ВАЖНО: ждём, пока загрузится user, чтобы при авто-запросе
-    // по initialQuery можно было создать и сохранить чат
-    if (!user) return;
+    // ВАЖНО:
+    // - обычные автозапросы (например, с главной страницы) должны уходить даже без user
+    // - для "Задать вопрос" по туру (newTour=1) ждём user, чтобы создать и сохранить отдельный тур-чат
+    const params = new URLSearchParams(location.search);
+    const isNewTourChat = params.get('newTour') === '1' || Boolean(params.get('tourTitle'));
+    if (isNewTourChat && !user) return;
 
     if (
       initialQuery &&
@@ -1219,7 +1246,7 @@ const Chat = () => {
       handleSendMessage(textToSend);
       lastSentText.current = textToSend;
     }
-  }, [initialQuery, messages, handleSendMessage, user]);
+  }, [initialQuery, messages, handleSendMessage, user, location.search]);
 
   // Загрузка конкретного чата из URL параметра
   useEffect(() => {
@@ -1856,7 +1883,10 @@ const Chat = () => {
         const urlToOpen = getTestHotelBookingUrl(checkIn, checkOut, filters.travelers);
         try {
           const newWindow = window.open(urlToOpen, '_blank', 'noopener,noreferrer');
-          if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+          // Если попап заблокирован — откроем в этой же вкладке.
+          // Важно: не проверяем newWindow.closed / typeof, т.к. в некоторых браузерах
+          // это может давать ложные срабатывания и приводить к двойному открытию.
+          if (!newWindow) {
             window.location.assign(urlToOpen);
           }
         } catch {
