@@ -142,6 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  let useStream = false;
   try {
     const body = req.body as {
       messages?: { role: string; text: string }[];
@@ -150,7 +151,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
     const messages = body?.messages ?? [];
     const filters = body?.filters as { destination?: string; dates?: { start?: string; end?: string }; budget?: { min?: number; max?: number }; travelers?: number } | undefined;
-    const useStream = body?.stream === true;
+    useStream = body?.stream === true;
 
     const destination = filters?.destination ?? 'Москва';
     const start = filters?.dates?.start ?? new Date().toISOString().split('T')[0];
@@ -180,33 +181,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
       res.writeHead(200, streamHeaders);
       res.write(`data: ${JSON.stringify({ type: 'hotels', hotels })}\n\n`);
-
-      const response = await axios.post(
-        'https://openrouter.ai/api/v1/chat/completions',
-        {
-          model: 'openai/gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemContent },
-            ...conversationMessages,
-          ],
-          temperature: 0.7,
-          max_tokens: 2000,
-          stream: true,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': req.headers.origin || 'https://vercel.app',
-            'X-Title': 'AI Travel Assistant',
+      try {
+        const response = await axios.post(
+          'https://openrouter.ai/api/v1/chat/completions',
+          {
+            model: 'openai/gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemContent },
+              ...conversationMessages,
+            ],
+            temperature: 0.7,
+            max_tokens: 2000,
+            stream: true,
           },
-          responseType: 'stream',
-          timeout: 60000,
-        }
-      );
+          {
+            headers: {
+              Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer': req.headers.origin || 'https://vercel.app',
+              'X-Title': 'AI Travel Assistant',
+            },
+            responseType: 'stream',
+            timeout: 60000,
+          }
+        );
 
-      (response.data as NodeJS.ReadableStream).pipe(res);
-      return;
+        (response.data as NodeJS.ReadableStream).pipe(res);
+        return;
+      } catch (streamError) {
+        // Важно: в режиме stream нельзя пытаться вернуть JSON 500 —
+        // headers уже отправлены. Завершаем stream корректно.
+        console.error('[api/openai] streamError:', streamError);
+        try {
+          res.write(
+            `data: ${JSON.stringify({
+              error: {
+                message: 'Streaming failed',
+              },
+            })}\n\n`
+          );
+        } catch {
+          // ignore write errors
+        }
+        res.end();
+        return;
+      }
     }
 
     const response = await axios.post<OpenRouterCompletionResponse>(
@@ -270,6 +289,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const err = error as { message?: string; response?: { data?: unknown } };
     console.error('[api/openai] Error:', err?.message, err?.response?.data);
     Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+    if (useStream && res.headersSent) {
+      try {
+        res.end();
+      } catch {
+        // ignore
+      }
+      return;
+    }
     return res.status(500).json({
       error: 'Internal server error',
       message: err?.message ?? 'Unknown error',
