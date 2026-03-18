@@ -1007,7 +1007,9 @@ const Chat = () => {
         },
         body: JSON.stringify({
           messages: messagesToSend,
-          stream: true,
+          // On production Vercel we intentionally avoid streaming to prevent
+          // FUNCTION_INVOCATION_FAILED. Streaming is kept for local dev.
+          stream: import.meta.env.DEV,
           filters: {
             destination: destinationLocation,
             dates: {
@@ -1517,19 +1519,6 @@ const Chat = () => {
       checkOut,
       rooms: [{ adults: 2 }],
     });
-  };
-
-  // Check if URL is for a test hotel (includes any numeric hotel IDs)
-  const isTestHotelUrl = (url: string): boolean => {
-    // Test hotels by slug
-    if (url.includes('rooms/1/') || url.includes('rooms/2/') || url.includes('hotel/1/') || url.includes('hotel/2/')) {
-      return true;
-    }
-    // Any numeric hotel ID in /hotel/{number}/ pattern (demo mode)
-    if (/hotel\/\d+\//.test(url)) {
-      return true;
-    }
-    return false;
   };
 
   const formatMessage = (text: string): string => {
