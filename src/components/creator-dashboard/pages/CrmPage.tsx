@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Phone, Mail, MoreHorizontal, Filter, Download, MapPin, Calendar, Users, Clock, Eye, Send, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -135,6 +136,7 @@ const categories = [
 ];
 
 export default function CrmPage() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('clients');
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [clientFilter, setClientFilter] = useState('all');
