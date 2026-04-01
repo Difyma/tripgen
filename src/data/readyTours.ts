@@ -55,6 +55,7 @@ export const readyTours: ReadyTour[] = [
   {
     id: '1',
     title: 'Тайга и водопады Алтая',
+    creatorId: 'a1453f1c-f27c-4420-8779-e03a830801fa',
     location: 'Горный Алтай',
     region: 'Республика Алтай',
     image: '/images/Traveling_around_Altai.jpg',
@@ -181,6 +182,7 @@ export const readyTours: ReadyTour[] = [
   {
     id: '2',
     title: 'Байкал: Остров Ольхон',
+    creatorId: 'a1453f1c-f27c-4420-8779-e03a830801fa',
     location: 'Иркутская область',
     region: 'Иркутская область',
     image: '/images/Traveling_around_Baikal.jpg',
@@ -285,6 +287,7 @@ export const readyTours: ReadyTour[] = [
   {
     id: '3',
     title: 'Карельские шхеры',
+    creatorId: 'a1453f1c-f27c-4420-8779-e03a830801fa',
     location: 'Республика Карелия',
     region: 'Республика Карелия',
     image: '/images/Traveling_around_Karelia.jpg',
@@ -377,6 +380,7 @@ export const readyTours: ReadyTour[] = [
   {
     id: '4',
     title: 'Восхождение на вулканы',
+    creatorId: 'a1453f1c-f27c-4420-8779-e03a830801fa',
     location: 'Камчатка',
     region: 'Камчатский край',
     image: '/images/Traveling_around_Kamchatka.jpg',
