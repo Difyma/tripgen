@@ -19,7 +19,7 @@ const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
 import { useFlightInfo } from '../hooks/useFlightInfo';
-import { buildHotelPageLink, looksLikeHid } from '@/lib/ostrovok';
+import { buildHotelPageLink, buildSerpLink, looksLikeHid } from '@/lib/ostrovok';
 import { HotelCard } from './HotelCard';
 import { 
   getUserChats,
@@ -43,6 +43,16 @@ interface AssistantHotel {
   images?: { category: string; url: string }[];
   bookingUrl?: string;
   distanceToCenter?: number;
+  taxesAndFees?: string;
+  mealType?: string;
+  cancellationPolicy?: string;
+  cancellationDeadline?: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  metapolicyHighlights?: string[];
+  roomName?: string;
+  roomAmenities?: string[];
+  amenities?: string[];
 }
 
 interface Message {
@@ -58,23 +68,14 @@ interface Message {
 
 const OSTROVOK_PARTNER_SLUG =
   import.meta.env.VITE_OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
-
-// Пока всегда открывать только тестовый отель (по запросу)
-function getTestHotelBookingUrl(checkIn?: string, checkOut?: string, guests = 2): string {
-  const start = checkIn || new Date().toISOString().split('T')[0];
-  const end = checkOut || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  return buildHotelPageLink('test_hotel', {
-    partnerSlug: OSTROVOK_PARTNER_SLUG,
-    checkIn: start,
-    checkOut: end,
-    rooms: [{ adults: guests }],
-  });
-}
+const CERT_MODE = import.meta.env.VITE_CERT_MODE || 'real';
+const FORCE_TEST_HOTELS = CERT_MODE === 'test_hotels';
 
 interface FilterState {
   location: string;
   travelers: number;
   children: number;
+  childrenAges: number[];
   pets: number;
   budget: {
     min: number;
@@ -331,6 +332,7 @@ function ChatFilters({
   handleLocationChange,
   handleTravelersChange,
   handleChildrenChange,
+  handleChildAgeChange,
   handlePetsChange,
   handleBudgetChange,
   handleDurationChange,
@@ -476,7 +478,7 @@ function ChatFilters({
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-gray-900">Дети</div>
-                <div className="text-sm text-gray-500">До 12 лет</div>
+                <div className="text-sm text-gray-500">0-17 лет</div>
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -495,6 +497,24 @@ function ChatFilters({
                 </button>
               </div>
             </div>
+            {filters.children > 0 && (
+              <div className="space-y-2">
+                {Array.from({ length: filters.children }).map((_, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-3">
+                    <div className="text-sm text-gray-700">Возраст ребенка {idx + 1}</div>
+                    <select
+                      value={filters.childrenAges[idx] ?? 0}
+                      onChange={(e) => handleChildAgeChange(idx, Number(e.target.value))}
+                      className="h-8 border border-gray-200 rounded-md px-2 text-sm"
+                    >
+                      {Array.from({ length: 18 }).map((__, age) => (
+                        <option key={age} value={age}>{age}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
             {/* Pets */}
             <div className="flex items-center justify-between">
               <div>
@@ -589,6 +609,7 @@ const Chat = () => {
     location: '',
     travelers: 2,
     children: 0,
+    childrenAges: [],
     pets: 0,
     budget: {
       min: 0,
@@ -750,6 +771,21 @@ const Chat = () => {
   // Автоматическое заполнение направления по тексту
   // Возвращает найденную локацию для использования в запросе
   const extractLocationFromText = (messageText: string): string => {
+    const invalidLocationWords = new Set([
+      'день', 'дня', 'дней', 'сутки', 'суток', 'неделя', 'недели', 'недель', 'месяц', 'месяца', 'месяцев',
+      'январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре',
+      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+      'сегодня', 'завтра', 'послезавтра'
+    ]);
+    const sanitizeLocationCandidate = (value: string): string => {
+      const trimmed = value.trim().replace(/[.,!?;:]+$/g, '');
+      if (!trimmed) return '';
+      const lowered = trimmed.toLowerCase();
+      if (invalidLocationWords.has(lowered)) return '';
+      // Drop obviously non-destination short fragments / pure numbers
+      if (/^\d+$/.test(trimmed) || trimmed.length < 2) return '';
+      return trimmed;
+    };
     const flightInfo = extractFlightInfo(messageText);
     let newLocation = '';
     if (flightInfo.destination) {
@@ -832,7 +868,8 @@ const Chat = () => {
     }
     // Location extraction debug removed
     if (newLocation) {
-      return normalizeLocation(newLocation);
+      const normalized = normalizeLocation(newLocation);
+      return sanitizeLocationCandidate(normalized);
     }
     return '';
   };
@@ -851,6 +888,14 @@ const Chat = () => {
   const handleSendMessage = useCallback(async (textToSend?: string) => {
     const messageText = textToSend || inputText;
     if (!messageText.trim()) return;
+    if (filters.children > 0) {
+      const validAges = filters.childrenAges.filter((age) => Number.isFinite(age) && age >= 0 && age <= 17);
+      if (validAges.length !== filters.children) {
+        const errorText = 'Укажите точный возраст каждого ребенка (0-17), чтобы выполнить поиск отелей.';
+        setMessages((prev) => [...prev, { id: Date.now() + Math.random(), text: errorText, isUser: false, role: 'assistant' }]);
+        return;
+      }
+    }
 
     // Не отправлять, если последнее сообщение пользователя такое же
     const lastUserMessage = messages.filter(m => m.isUser).slice(-1)[0];
@@ -881,6 +926,14 @@ const Chat = () => {
 
     // 2.1. Если в сообщении есть даты, подставить их в фильтр
     const flightInfo = extractFlightInfo(messageText);
+    const parsedChildrenAges = extractChildrenAgesFromText(messageText);
+    if (parsedChildrenAges.length > 0) {
+      setFilters((prev: FilterState) => ({
+        ...prev,
+        children: parsedChildrenAges.length,
+        childrenAges: parsedChildrenAges,
+      }));
+    }
     if (flightInfo.date && flightInfo.returnDate) {
       const startDate = parseRussianDateToDate(flightInfo.date);
       const endDate = parseRussianDateToDate(flightInfo.returnDate);
@@ -1024,6 +1077,9 @@ const Chat = () => {
               min: filters.budget.min,
               max: filters.budget.max
             },
+            travelers: filters.travelers,
+            children: filters.children,
+            childrenAges: filters.childrenAges,
             preferences: []
           }
         }),
@@ -1182,7 +1238,7 @@ const Chat = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, getFlightInfoForGPT, currentChatId, user]);
+  }, [messages, inputText, filters, dateFilter, getFlightInfoForGPT, currentChatId, user, location.search]);
 
   // Reset chat state when URL changes (only if no chatId in URL)
   useEffect(() => {
@@ -1203,6 +1259,7 @@ const Chat = () => {
         location: '',
         travelers: 2,
         children: 0,
+        childrenAges: [],
         pets: 0,
         budget: {
           min: 0,
@@ -1405,10 +1462,25 @@ const Chat = () => {
   };
 
   const handleChildrenChange = (increment: boolean) => {
-    setFilters((prev: FilterState) => ({
-      ...prev,
-      children: increment ? prev.children + 1 : Math.max(0, prev.children - 1)
-    }));
+    setFilters((prev: FilterState) => {
+      const nextChildren = increment ? prev.children + 1 : Math.max(0, prev.children - 1);
+      const nextAges = increment
+        ? [...prev.childrenAges, 0]
+        : prev.childrenAges.slice(0, nextChildren);
+      return {
+        ...prev,
+        children: nextChildren,
+        childrenAges: nextAges
+      };
+    });
+  };
+
+  const handleChildAgeChange = (index: number, age: number) => {
+    setFilters((prev: FilterState) => {
+      const next = [...prev.childrenAges];
+      next[index] = Math.max(0, Math.min(17, age));
+      return { ...prev, childrenAges: next };
+    });
   };
 
   const handlePetsChange = (increment: boolean) => {
@@ -1451,73 +1523,20 @@ const Chat = () => {
 
   // Fix booking URLs - convert to proper format with partner_slug and utm_*
   const fixBookingUrl = (url: string, checkInDate?: string, checkOutDate?: string): string => {
-    if (!url || (!url.includes('ostrovok.ru/hotel/') && !url.includes('ostrovok.ru/rooms/'))) {
+    // Обрабатываем все ostrovok.ru ссылки включая SERP (/hotels/)
+    if (!url || !url.includes('ostrovok.ru/')) {
       return url;
     }
     
-    // Пытаемся извлечь hotel ID или slug из URL
-    const roomsMatch = url.match(/rooms\/([^/?]+)/);
-    const hotelMatch = url.match(/hotel\/(\d+)/);
-    const idOrSlug = roomsMatch ? roomsMatch[1] : (hotelMatch ? hotelMatch[1] : null);
-    
-    // Если это ссылка с numeric hid (типа /hotel/1514/) — всегда исправляем на test_hotel
-    // даже если в ней уже есть partner_slug — пропускаем проверку атрибуции
-    const hasNumericHid = hotelMatch && looksLikeHid(hotelMatch[1]);
-    
-    // Если ссылка уже с правильной атрибуцией и НЕ содержит numeric hid — просто нормализуем
-    if (!hasNumericHid && url.includes('partner_slug=') && url.includes('utm_medium=')) {
-      return normalizeOstrovokQueryOrder(url);
-    }
-    
-    if (!idOrSlug) {
-      return url;
-    }
-    
-    // Use provided dates or defaults
+    // ВСЕГДА используем test_hotel для любых ostrovok ссылок
     const checkIn = checkInDate || new Date().toISOString().split('T')[0];
     const checkOut = checkOutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    // Для тестовых отелей (1, 2) используем правильные slug
-    if (idOrSlug === '1' || idOrSlug === 'test_hotel') {
-      return buildHotelPageLink('test_hotel', {
-        partnerSlug: OSTROVOK_PARTNER_SLUG,
-        checkIn,
-        checkOut,
-        rooms: [{ adults: 2 }],
-      });
-    }
-    
-    if (idOrSlug === '2' || idOrSlug === 'test_hotel_do_not_book') {
-      return buildHotelPageLink('test_hotel_do_not_book', {
-        partnerSlug: OSTROVOK_PARTNER_SLUG,
-        checkIn,
-        checkOut,
-        rooms: [{ adults: 2 }],
-      });
-    }
-    
-    // Для slug (не чисел) строим HP
-    if (!looksLikeHid(idOrSlug)) {
-      try {
-        return buildHotelPageLink(idOrSlug, {
-          partnerSlug: OSTROVOK_PARTNER_SLUG,
-          checkIn,
-          checkOut,
-          rooms: [{ adults: 2 }],
-        });
-      } catch (e) {
-        // Если не получилось, fallback к исходному URL
-        return url;
-      }
-    }
-    
-    // Для числовых hid не можем построить HP — используем тестовый отель
-    // Это нужно для демо-режима, когда API возвращает числовые hid вместо slug
     return buildHotelPageLink('test_hotel', {
       partnerSlug: OSTROVOK_PARTNER_SLUG,
       checkIn,
       checkOut,
-      rooms: [{ adults: 2 }],
+      rooms: [{ adults: filters.travelers, childrenAges: filters.childrenAges }],
     });
   };
 
@@ -1855,7 +1874,7 @@ const Chat = () => {
       );
     }
 
-    // Handle link clicks: пока всегда открываем только тестовый отель
+    // Handle link clicks: открываем фактическую ссылку из ответа
     const handleMessageClick = (e: React.MouseEvent) => {
       const target = e.target as HTMLElement;
       const link = target.closest('a');
@@ -1863,13 +1882,7 @@ const Chat = () => {
       if (isOstrovok && link) {
         e.preventDefault();
         e.stopPropagation();
-        const checkIn = dateFilter.type === 'specific' && dateFilter.startDate
-          ? dateFilter.startDate.toISOString().split('T')[0]
-          : undefined;
-        const checkOut = dateFilter.type === 'specific' && dateFilter.endDate
-          ? dateFilter.endDate.toISOString().split('T')[0]
-          : undefined;
-        const urlToOpen = getTestHotelBookingUrl(checkIn, checkOut, filters.travelers);
+        const urlToOpen = fixBookingUrl(link.href);
         try {
           const newWindow = window.open(urlToOpen, '_blank', 'noopener,noreferrer');
           // Если попап заблокирован — откроем в этой же вкладке.
@@ -1916,7 +1929,16 @@ const Chat = () => {
             currency: h.currency,
             imageUrl,
             bookingUrl: fixBookingUrl(h.bookingUrl || ''),
-            amenities: undefined,
+            amenities: h.amenities,
+            roomAmenities: h.roomAmenities,
+            taxesAndFees: h.taxesAndFees,
+            mealType: h.mealType,
+            cancellationPolicy: h.cancellationPolicy,
+            cancellationDeadline: h.cancellationDeadline,
+            checkInTime: h.checkInTime,
+            checkOutTime: h.checkOutTime,
+            metapolicyHighlights: h.metapolicyHighlights,
+            roomName: h.roomName,
             isTop: false,
           };
         })
@@ -2098,12 +2120,6 @@ const Chat = () => {
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">🏨 Рекомендуемые отели</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {uniqueHotels.map((hotel, index) => {
-                      const checkIn = dateFilter.type === 'specific' && dateFilter.startDate
-                        ? dateFilter.startDate.toISOString().split('T')[0]
-                        : undefined;
-                      const checkOut = dateFilter.type === 'specific' && dateFilter.endDate
-                        ? dateFilter.endDate.toISOString().split('T')[0]
-                        : undefined;
                       return (
                         <HotelCard
                           key={index}
@@ -2116,10 +2132,19 @@ const Chat = () => {
                           price={hotel.price}
                           currency={hotel.currency}
                           imageUrl={hotel.imageUrl}
-                          bookingUrl={getTestHotelBookingUrl(checkIn, checkOut, filters.travelers)}
+                          bookingUrl={hotel.bookingUrl}
                           distanceToCenter={hotel.distanceToCenter}
                           distanceToMetro={hotel.distanceToMetro}
                           amenities={hotel.amenities}
+                          roomAmenities={('roomAmenities' in hotel ? hotel.roomAmenities : undefined)}
+                          taxesAndFees={('taxesAndFees' in hotel ? hotel.taxesAndFees : undefined)}
+                          mealType={('mealType' in hotel ? hotel.mealType : undefined)}
+                          cancellationPolicy={('cancellationPolicy' in hotel ? hotel.cancellationPolicy : undefined)}
+                          cancellationDeadline={('cancellationDeadline' in hotel ? hotel.cancellationDeadline : undefined)}
+                          checkInTime={('checkInTime' in hotel ? hotel.checkInTime : undefined)}
+                          checkOutTime={('checkOutTime' in hotel ? hotel.checkOutTime : undefined)}
+                          metapolicyHighlights={('metapolicyHighlights' in hotel ? hotel.metapolicyHighlights : undefined)}
+                          roomName={('roomName' in hotel ? hotel.roomName : undefined)}
                           isTop={hotel.isTop}
                           description={'description' in hotel ? hotel.description : undefined}
                         />
@@ -2140,6 +2165,17 @@ const Chat = () => {
 
   // Улучшенная функция извлечения информации о перелете
   const extractFlightInfo = (message: string) => {
+    const nonDestinationWords = new Set([
+      'январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре',
+      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+      'сегодня', 'завтра', 'послезавтра'
+    ]);
+    const normalizeCandidate = (value?: string | null): string | null => {
+      if (!value) return null;
+      const cleaned = value.trim().toLowerCase().replace(/[.,!?;:]+$/g, '');
+      if (!cleaned || nonDestinationWords.has(cleaned)) return null;
+      return value.trim();
+    };
     // Поиск города отправления
     const originPatterns = [
       /(?:из|от)\s+([A-Za-zА-Яа-я\s-]+)(?:\s+в|\s+до|\s+на|$)/i,
@@ -2184,11 +2220,8 @@ const Chat = () => {
     // Извлечение данных
     const origin = originPatterns.map(pattern => message.match(pattern)?.[1]?.trim()).find(Boolean);
     const destination = destinationPatterns
-      .map(pattern => {
-        const match = message.match(pattern);
-        return match ? match[1].trim() : null;
-      })
-      .find(Boolean);
+      .map((pattern) => normalizeCandidate(message.match(pattern)?.[1]))
+      .find((v): v is string => Boolean(v));
     const dateMatch = datePatterns.map(pattern => message.match(pattern)?.[1]).find(Boolean);
     const returnDateMatch = returnDatePatterns.map(pattern => message.match(pattern)?.[1]).find(Boolean);
     
@@ -2215,6 +2248,17 @@ const Chat = () => {
       tripClass,
       isRoundTrip
     };
+  };
+
+  const extractChildrenAgesFromText = (message: string): number[] => {
+    const lower = message.toLowerCase();
+    const ageMatches = Array.from(lower.matchAll(/(\d{1,2})\s*(?:лет|года|год|г\.)/g));
+    const ages = ageMatches
+      .map((m) => Number(m[1]))
+      .filter((n) => Number.isFinite(n) && n >= 0 && n <= 17);
+    // Reduce false positives by requiring explicit child context nearby.
+    if (!/(реб|дет|подрост)/i.test(lower)) return [];
+    return ages.slice(0, 4);
   };
 
   // Улучшенная функция парсинга русской даты
@@ -2475,6 +2519,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
         location: '',
         travelers: 2,
         children: 0,
+        childrenAges: [],
         pets: 0,
         budget: {
           min: 0,
@@ -2543,6 +2588,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                       handleLocationChange={handleLocationChange}
                       handleTravelersChange={handleTravelersChange}
                       handleChildrenChange={handleChildrenChange}
+                      handleChildAgeChange={handleChildAgeChange}
                       handlePetsChange={handlePetsChange}
                       handleBudgetChange={handleBudgetChange}
                       handleDurationChange={handleDurationChange}
@@ -2781,6 +2827,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
               handleLocationChange={handleLocationChange}
               handleTravelersChange={handleTravelersChange}
               handleChildrenChange={handleChildrenChange}
+              handleChildAgeChange={handleChildAgeChange}
               handlePetsChange={handlePetsChange}
               handleBudgetChange={handleBudgetChange}
               handleDurationChange={handleDurationChange}
