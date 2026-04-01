@@ -170,7 +170,7 @@ export function CreatorDashboardSidebar({ className }: CreatorDashboardSidebarPr
                 to={item.path}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-3 h-10 rounded-xl transition-colors duration-200',
+                  'flex items-center gap-3 px-3 h-10 rounded-xl transition-colors duration-200 relative',
                   isActive
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -183,13 +183,20 @@ export function CreatorDashboardSidebar({ className }: CreatorDashboardSidebarPr
                 {!isCollapsed && (
                   <span className="font-medium text-sm flex-1">{item.label}</span>
                 )}
-                {!isCollapsed && item.id === 'chat' && unreadCount > 0 && (
-                  <Badge 
-                    variant="default" 
-                    className="bg-red-500 text-white text-xs min-w-[20px] h-5 flex items-center justify-center px-1.5"
-                  >
-                    {unreadCount}
-                  </Badge>
+                {/* Индикатор новых сообщений */}
+                {item.id === 'chat' && unreadCount > 0 && (
+                  isCollapsed ? (
+                    // Красная точка для свернутого состояния
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white" />
+                  ) : (
+                    // Бейдж с числом для развернутого состояния
+                    <Badge 
+                      variant="default" 
+                      className="bg-red-500 text-white text-xs min-w-[20px] h-5 flex items-center justify-center px-1.5"
+                    >
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Badge>
+                  )
                 )}
               </Link>
             );
