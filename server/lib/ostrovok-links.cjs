@@ -17,7 +17,7 @@ function encodeGuests(rooms) {
   if (!rooms || rooms.length === 0) return undefined;
   const roomStr = rooms.map((r) => {
     const adults = Math.max(1, Math.floor(r.adults || 1));
-    const kids = (r.childrenAges || []).map(a => Math.floor(a)).filter(a => a >= 0).slice(0, 4);
+    const kids = (r.childrenAges || []).map(a => Math.floor(a)).filter(a => a >= 0 && a <= 17).slice(0, 4);
     if (kids.length === 0) return String(adults);
     return adults + 'and' + kids.join(".");
   });

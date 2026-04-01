@@ -1,0 +1,30 @@
+CREATE TABLE IF NOT EXISTS etg_hotels_static (
+  hotel_id TEXT PRIMARY KEY,
+  payload JSONB NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS etg_regions (
+  region_id TEXT PRIMARY KEY,
+  payload JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS etg_sync_state (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS etg_sync_runs (
+  id BIGSERIAL PRIMARY KEY,
+  job_name TEXT NOT NULL,
+  status TEXT NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  finished_at TIMESTAMPTZ,
+  added_count INTEGER NOT NULL DEFAULT 0,
+  updated_count INTEGER NOT NULL DEFAULT 0,
+  deactivated_count INTEGER NOT NULL DEFAULT 0,
+  error_message TEXT
+);

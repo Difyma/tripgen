@@ -77,7 +77,7 @@ export function encodeGuests(rooms?: RoomGuests[]): string | undefined {
     const adults = Math.max(1, Math.floor(r.adults || 1));
     const kids = (r.childrenAges || [])
       .map((a) => Math.floor(a))
-      .filter((a) => a >= 0)
+      .filter((a) => a >= 0 && a <= 17)
       .slice(0, 4); // soft limit
 
     if (kids.length === 0) return String(adults);

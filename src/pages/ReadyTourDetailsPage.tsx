@@ -70,10 +70,12 @@ export function ReadyTourDetailsPage() {
 
   const handleAskQuestion = () => {
     const query = `Вопрос организатору по туру "${tour.title}" в регионе ${tour.region}.`;
+    // Если у тура есть creatorId - создаём чат с создателем, иначе обычный ИИ-чат
+    const creatorParam = tour.creatorId ? `&creatorId=${encodeURIComponent(tour.creatorId)}` : '';
     navigate(
       `/chat?q=${encodeURIComponent(query)}&tourTitle=${encodeURIComponent(
         tour.title
-      )}&newTour=1`
+      )}&newTour=1${creatorParam}`
     );
   };
 

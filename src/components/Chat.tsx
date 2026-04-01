@@ -31,6 +31,7 @@ import {
   type ChatMessageDB
 } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import creatorChatApi from '../services/creatorChatApi';
 
 interface AssistantHotel {
   id: string;
@@ -636,6 +637,10 @@ const Chat = () => {
   const [userChats, setUserChats] = useState<Chat[]>([]);
   const isFirstMount = useRef(true);
   const lastSentText = useRef<string | null>(null);
+  
+  // Creator chat state (для чатов с организаторами туров)
+  const [creatorChatId, setCreatorChatId] = useState<string | null>(null);
+  const [isCreatorChat, setIsCreatorChat] = useState(false);
 
   // Функция для нормализации направления в именительный падеж
   const normalizeLocation = (word: string) => {
@@ -976,6 +981,32 @@ const Chat = () => {
       await saveMessageToCurrentChat(chatId, 'user', messageText);
     }
 
+    // Если это чат с создателем тура - отправляем напрямую, не через ИИ
+    if (isCreatorChat && creatorChatId && user) {
+      try {
+        const message = await creatorChatApi.sendMessage(creatorChatId, messageText);
+        // Добавляем сообщение в UI
+        setMessages(prev => [...prev, {
+          id: Date.now() + Math.random(),
+          text: message.content,
+          isUser: false,
+          role: 'assistant'
+        }]);
+        setIsLoading(false);
+        return;
+      } catch (err) {
+        console.error('Error sending message to creator:', err);
+        setMessages(prev => [...prev, {
+          id: Date.now() + Math.random(),
+          text: 'Не удалось отправить сообщение организатору. Попробуйте позже.',
+          isUser: false,
+          role: 'assistant'
+        }]);
+        setIsLoading(false);
+        return;
+      }
+    }
+
     try {
       // Извлекаем информацию о перелете из сообщения пользователя
       const flightInfo = extractFlightInfo(messageText);
@@ -1310,11 +1341,52 @@ const Chat = () => {
     }
   }, [initialQuery, messages, handleSendMessage, user, location.search]);
 
+  // Загрузка creator чата из URL (если есть)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const creatorChatIdFromUrl = params.get('creatorChat');
+    
+    if (creatorChatIdFromUrl && user) {
+      setCreatorChatId(creatorChatIdFromUrl);
+      setIsCreatorChat(true);
+      
+      // Загружаем сообщения creator чата
+      const loadCreatorMessages = async () => {
+        try {
+          const messages = await creatorChatApi.getMessages(creatorChatIdFromUrl);
+          const formattedMessages: Message[] = messages.map((msg: any) => ({
+            id: msg.id,
+            text: msg.content,
+            isUser: msg.sender_type === 'client',
+            role: msg.sender_type === 'client' ? 'user' : 'assistant'
+          }));
+          setMessages(formattedMessages.length > 0 ? formattedMessages : [{
+            id: Date.now(),
+            text: 'Чат с организатором тура. Задавайте ваши вопросы.',
+            isUser: false,
+            role: 'assistant' as const
+          }]);
+        } catch (err) {
+          console.error('Error loading creator chat messages:', err);
+        }
+      };
+      
+      loadCreatorMessages();
+      // Периодически обновляем сообщения
+      const interval = setInterval(loadCreatorMessages, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [location.search, user]);
+
   // Загрузка конкретного чата из URL параметра
   useEffect(() => {
     // Создаём новый URLSearchParams при каждом изменении URL
     const params = new URLSearchParams(location.search);
     const chatIdFromUrl = params.get('chat');
+    
+    // Если это creator чат - пропускаем обычную загрузку
+    if (params.get('creatorChat')) return;
+    
     console.log('URL changed, chatId:', chatIdFromUrl, 'currentChatId:', currentChatId);
     
     if (chatIdFromUrl && user && chatIdFromUrl !== currentChatId) {
@@ -1391,6 +1463,35 @@ const Chat = () => {
       // Пытаемся определить, что это чат по туру
       const params = new URLSearchParams(location.search);
       const tourTitleFromUrl = params.get('tourTitle');
+      const creatorIdFromUrl = params.get('creatorId');
+      
+      // Если есть creatorId - создаём чат с создателем тура
+      if (creatorIdFromUrl) {
+        try {
+          const creatorChat = await creatorChatApi.createChat(creatorIdFromUrl);
+          setCreatorChatId(creatorChat.chat_id);
+          setIsCreatorChat(true);
+          
+          // Добавляем системное сообщение о начале чата
+          setMessages([{
+            id: Date.now(),
+            text: `Вы начали чат с организатором тура "${tourTitleFromUrl || ''}". Задавайте ваши вопросы напрямую организатору.`,
+            isUser: false,
+            role: 'assistant'
+          }]);
+          
+          // Обновляем URL
+          const newParams = new URLSearchParams(location.search);
+          newParams.set('creatorChat', creatorChat.chat_id);
+          newParams.delete('newTour');
+          navigate({ pathname: location.pathname, search: newParams.toString() }, { replace: true });
+          
+          return creatorChat.chat_id;
+        } catch (err) {
+          console.error('Error creating creator chat:', err);
+          // Fallback к обычному чату если не удалось создать creator чат
+        }
+      }
 
       let title: string;
       if (tourTitleFromUrl) {

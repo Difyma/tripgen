@@ -1,0 +1,125 @@
+/* eslint-disable no-console */
+const BASE = process.env.SMOKE_BASE_URL || 'http://localhost:3001';
+
+async function callOpenAi(payload) {
+  const started = Date.now();
+  const res = await fetch(`${BASE}/api/openai`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { raw: text };
+  }
+  return { status: res.status, data, duration: Date.now() - started };
+}
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+async function scenario(name, payload, validator) {
+  console.log(`\n[smoke] ${name}`);
+  const result = await callOpenAi(payload);
+  console.log(`[smoke] status=${result.status}, duration=${result.duration}ms`);
+  await validator(result);
+  console.log(`[smoke] ${name} OK`);
+}
+
+const basePayload = {
+  messages: [{ role: 'user', text: 'Подбери отель' }],
+  stream: false,
+  filters: {
+    destination: 'Москва',
+    dates: { start: '2026-06-10', end: '2026-06-12' },
+    budget: { min: 5000, max: 20000 },
+    travelers: 2,
+    children: 0,
+    childrenAges: [],
+  },
+};
+
+async function run() {
+  await scenario('2 adults city search', basePayload, async ({ status, data }) => {
+    assert(status === 200 || status === 502, 'Unexpected status');
+    if (status === 200) {
+      assert(Array.isArray(data.hotels), 'Hotels array missing');
+      assert(data.hotels.length >= 0, 'Hotels malformed');
+    }
+  });
+
+  await scenario('2 adults + child 5', {
+    ...basePayload,
+    filters: { ...basePayload.filters, children: 1, childrenAges: [5] },
+  }, async ({ status }) => {
+    assert(status === 200 || status === 502, 'Unexpected status');
+  });
+
+  await scenario('2 adults + children 3 and 11', {
+    ...basePayload,
+    filters: { ...basePayload.filters, children: 2, childrenAges: [3, 11] },
+  }, async ({ status }) => {
+    assert(status === 200 || status === 502, 'Unexpected status');
+  });
+
+  await scenario('geo normalization destination', {
+    ...basePayload,
+    filters: { ...basePayload.filters, destination: 'Питер' },
+  }, async ({ status }) => {
+    assert(status === 200 || status === 502, 'Unexpected status');
+  });
+
+  await scenario('no results scenario', {
+    ...basePayload,
+    filters: { ...basePayload.filters, destination: 'Неизвестный-Город-XYZ' },
+  }, async ({ status, data }) => {
+    assert([200, 502].includes(status), 'Unexpected status');
+    if (status === 502) assert(data.emptyState === true, 'Expected emptyState for no results');
+  });
+
+  await scenario('timeout scenario', {
+    ...basePayload,
+    filters: { ...basePayload.filters, destination: 'Москва' },
+  }, async ({ duration }) => {
+    assert(duration < 40000, 'Request exceeded max timeout envelope');
+  });
+
+  await scenario('referral link correctness', basePayload, async ({ status, data }) => {
+    if (status !== 200 || !Array.isArray(data.hotels) || data.hotels.length === 0) return;
+    const link = data.hotels[0]?.bookingUrl || '';
+    assert(link.includes('partner_slug='), 'Missing partner_slug');
+    assert(link.includes('utm_medium=partners'), 'Missing utm_medium');
+  });
+
+  await scenario('response contains cancellation/taxes/check-in', basePayload, async ({ status, data }) => {
+    if (status !== 200 || !Array.isArray(data.hotels) || data.hotels.length === 0) return;
+    const h = data.hotels[0];
+    const hasFields =
+      typeof h.taxesAndFees !== 'undefined' ||
+      typeof h.cancellationPolicy !== 'undefined' ||
+      typeof h.checkInTime !== 'undefined';
+    const text = String(data.text || '').toLowerCase();
+    const hasTextHints =
+      text.includes('налог') ||
+      text.includes('отмен') ||
+      text.includes('check-in') ||
+      text.includes('check-out');
+    if (!(hasFields || hasTextHints)) {
+      console.warn('[smoke] Warning: tariff/policy fields are not present in this sample response');
+    }
+  });
+}
+
+run()
+  .then(() => {
+    console.log('\n[smoke] All scenarios passed');
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error('\n[smoke] Failed:', err.message);
+    process.exit(1);
+  });

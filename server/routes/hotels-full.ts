@@ -14,6 +14,8 @@ import {
   buildSerpLink, 
   generatePartnerLinkLegacy
 } from '../lib/ostrovok-links.cjs';
+import { getTrace, listRecentTraces } from '../src/diagnostics/searchLogger.js';
+import { getPgPool } from '../src/storage/postgres.js';
 
 dotenv.config();
 
@@ -26,6 +28,7 @@ const OSTROVOK_API_URL = process.env.OSTROVOK_API_URL || 'https://api.worldota.n
 const OSTROVOK_API_KEY = process.env.OSTROVOK_API_KEY;
 const OSTROVOK_API_SECRET = process.env.OSTROVOK_API_SECRET;
 const PARTNER_SLUG = process.env.OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
+const ALLOW_TEST_DATA = process.env.ETG_ENABLE_TEST_FALLBACK === 'true' && process.env.NODE_ENV !== 'production';
 
 // Default request timeout (30 seconds as per ETG recommendations)
 const DEFAULT_TIMEOUT = 30000;
@@ -208,8 +211,8 @@ const generatePartnerLink = (
     const isTestHotel = hotelIdStr === 'test_hotel' || hotelIdStr === 'test_hotel_do_not_book' || 
                         hotelIdStr === '8526976' || hotelIdStr === '1' || hotelIdStr === '2';
     
-    // For test hotels — используем правильные slug
-    if (hotelIdStr === '1' || hotelIdStr === 'test_hotel') {
+    // Test-only IDs are available only in dev/test mode.
+    if (ALLOW_TEST_DATA && (hotelIdStr === '1' || hotelIdStr === 'test_hotel')) {
       return buildHotelPageLink('test_hotel', {
         checkIn: params.checkIn,
         checkOut: params.checkOut,
@@ -219,7 +222,7 @@ const generatePartnerLink = (
       });
     }
     
-    if (hotelIdStr === '2' || hotelIdStr === 'test_hotel_do_not_book') {
+    if (ALLOW_TEST_DATA && (hotelIdStr === '2' || hotelIdStr === 'test_hotel_do_not_book')) {
       return buildHotelPageLink('test_hotel_do_not_book', {
         checkIn: params.checkIn,
         checkOut: params.checkOut,
@@ -233,7 +236,7 @@ const generatePartnerLink = (
     if (!/^\d+$/.test(hotelIdStr)) {
       // Только test_hotel и test_hotel_do_not_book — валидные slug для Ostrovok
       // Все остальные (moscow_ritz, spb_astoria и т.д.) — наши demo ID
-      if (hotelIdStr === 'test_hotel' || hotelIdStr === 'test_hotel_do_not_book') {
+      if (ALLOW_TEST_DATA && (hotelIdStr === 'test_hotel' || hotelIdStr === 'test_hotel_do_not_book')) {
         return buildHotelPageLink(hotelIdStr, {
           checkIn: params.checkIn,
           checkOut: params.checkOut,
@@ -243,8 +246,7 @@ const generatePartnerLink = (
         });
       }
       // Для всех остальных строковых ID (demo отели) — используем тестовый отель
-      console.warn(`[generatePartnerLink] Demo hotel ID=${hotelId}, using test_hotel fallback`);
-      return buildHotelPageLink('test_hotel', {
+      return buildSerpLink(1, {
         checkIn: params.checkIn,
         checkOut: params.checkOut,
         rooms: [{ adults: params.guests, childrenAges: params.children }],
@@ -302,8 +304,7 @@ const generatePartnerLink = (
     
     // Для любого другого числового hid (включая 126001 и др.) — используем тестовый отель
     // Это нужно для демо-режима, когда API возвращает числовые hid вместо slug
-    console.warn(`[generatePartnerLink] Unknown hid=${hotelId}, using test_hotel fallback`);
-    return buildHotelPageLink('test_hotel', {
+    return buildSerpLink(1, {
       checkIn: params.checkIn,
       checkOut: params.checkOut,
       rooms: [{ adults: params.guests, childrenAges: params.children }],
@@ -581,7 +582,7 @@ router.post('/search', validateCredentials, async (req: Request, res: Response):
     } else {
       // Search by hotel IDs from demoHotels for known cities
       // This allows getting real rates from API while using known hotel IDs
-      const demoHotelsForCity = getDemoHotels(query);
+      const demoHotelsForCity = ALLOW_TEST_DATA ? getDemoHotels(query) : [];
       
       if (demoHotelsForCity.length === 0) {
         console.log('[Hotels API] Unknown city, returning empty result:', query);
@@ -639,7 +640,7 @@ router.post('/search', validateCredentials, async (req: Request, res: Response):
     console.log(`[Hotels API] Found ${apiHotels.length} hotels from API`);
     
     // Get demo hotels for the city
-    const demoHotelsForCity = getDemoHotels(query);
+    const demoHotelsForCity = ALLOW_TEST_DATA ? getDemoHotels(query) : [];
     
     // Merge API data with demo data
     // For hotels found in API - use API data (with real rates)
@@ -684,18 +685,26 @@ router.post('/search', validateCredentials, async (req: Request, res: Response):
     console.error('[Hotels API] Search error:', axiosError.message);
     console.log('[Hotels API] Returning demo data as fallback');
     
-    // Return demo data as fallback
-    const demoHotels = getDemoHotels(query).map((hotel: any) => ({
-      ...transformHotelData(hotel, { checkIn, checkOut, guests }),
-      bookingUrl: generatePartnerLink(hotel.id || hotel.hid, { checkIn, checkOut, guests }, hotel.name, query)
-    }));
-    
-    res.json({
-      success: true,
-      hotels: demoHotels,
-      total: demoHotels.length,
-      searchParams: { query, checkIn, checkOut, guests },
-      demo: true
+    if (ALLOW_TEST_DATA) {
+      const demoHotels = getDemoHotels(query).map((hotel: any) => ({
+        ...transformHotelData(hotel, { checkIn, checkOut, guests }),
+        bookingUrl: generatePartnerLink(hotel.id || hotel.hid, { checkIn, checkOut, guests }, hotel.name, query)
+      }));
+      res.json({
+        success: true,
+        hotels: demoHotels,
+        total: demoHotels.length,
+        searchParams: { query, checkIn, checkOut, guests },
+        demo: true
+      });
+      return;
+    }
+    res.status(502).json({
+      success: false,
+      error: 'Hotel search failed',
+      hotels: [],
+      total: 0,
+      searchParams: { query, checkIn, checkOut, guests }
     });
   }
 });
@@ -1049,6 +1058,42 @@ router.get('/config', (req: Request, res: Response) => {
     partnerId: 'deprecated_use_partner_slug',
     apiUrl: OSTROVOK_API_URL
   });
+});
+
+router.get('/debug/last', (req: Request, res: Response) => {
+  const traceId = typeof req.query.traceId === 'string' ? req.query.traceId : undefined;
+  if (traceId) {
+    const trace = getTrace(traceId);
+    if (!trace) {
+      res.status(404).json({ error: 'Trace not found' });
+      return;
+    }
+    res.json({ trace });
+    return;
+  }
+  res.json({ traces: listRecentTraces(20) });
+});
+
+router.get('/sync/status', async (_req: Request, res: Response) => {
+  try {
+    const pool = getPgPool();
+    const [stateRows, runRows, hotelsRows, regionsRows] = await Promise.all([
+      pool.query(`SELECT key, value, updated_at FROM etg_sync_state ORDER BY updated_at DESC`),
+      pool.query(`SELECT job_name, status, started_at, finished_at, added_count, updated_count, deactivated_count, error_message
+                  FROM etg_sync_runs ORDER BY id DESC LIMIT 20`),
+      pool.query(`SELECT COUNT(*)::int AS count FROM etg_hotels_static`),
+      pool.query(`SELECT COUNT(*)::int AS count FROM etg_regions`),
+    ]);
+    res.json({
+      hotelRecords: hotelsRows.rows[0]?.count || 0,
+      regionsRecords: regionsRows.rows[0]?.count || 0,
+      syncState: stateRows.rows,
+      recentRuns: runRows.rows,
+    });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'sync_status_error';
+    res.status(500).json({ error: 'Failed to load sync status', message: msg });
+  }
 });
 
 /**

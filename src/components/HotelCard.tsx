@@ -13,6 +13,15 @@ interface HotelCardProps {
   imageUrl?: string;
   bookingUrl: string;
   amenities?: string[];
+  roomAmenities?: string[];
+  taxesAndFees?: string;
+  mealType?: string;
+  cancellationPolicy?: string;
+  cancellationDeadline?: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  metapolicyHighlights?: string[];
+  roomName?: string;
   isTop?: boolean;
   /** Краткое описание (для мини-карточки) */
   description?: string;
@@ -33,6 +42,15 @@ export const HotelCard = ({
   imageUrl,
   bookingUrl,
   amenities = [],
+  roomAmenities = [],
+  taxesAndFees,
+  mealType,
+  cancellationPolicy,
+  cancellationDeadline,
+  checkInTime,
+  checkOutTime,
+  metapolicyHighlights = [],
+  roomName,
   isTop = false,
   description,
   variant = 'default',
@@ -78,6 +96,19 @@ export const HotelCard = ({
             >
               Забронировать
             </a>
+          </div>
+          <div className="mt-2 space-y-1 text-[11px] text-gray-600">
+            {taxesAndFees && <div><strong>Налоги/сборы:</strong> {taxesAndFees}</div>}
+            {mealType && <div><strong>Питание:</strong> {mealType}</div>}
+            {cancellationPolicy && <div><strong>Отмена:</strong> {cancellationPolicy}</div>}
+            {cancellationDeadline && <div><strong>Дедлайн отмены:</strong> {cancellationDeadline}</div>}
+            {(checkInTime || checkOutTime) && (
+              <div><strong>Check-in/out:</strong> {checkInTime || '-'} / {checkOutTime || '-'}</div>
+            )}
+            {roomName && <div><strong>Номер:</strong> {roomName}</div>}
+            {roomAmenities.length > 0 && <div><strong>Удобства номера:</strong> {roomAmenities.slice(0, 6).join(', ')}</div>}
+            {amenities.length > 0 && <div><strong>Удобства отеля:</strong> {amenities.slice(0, 6).join(', ')}</div>}
+            {metapolicyHighlights.length > 0 && <div><strong>Ограничения:</strong> {metapolicyHighlights.slice(0, 2).join('; ')}</div>}
           </div>
         </div>
       </div>
@@ -189,6 +220,16 @@ export const HotelCard = ({
 
           {/* Amenities */}
           {amenities.length > 0 ? renderAmenities() : null}
+          <div className="mt-2 space-y-1 text-xs text-gray-600">
+            {taxesAndFees && <div><strong>Налоги/сборы:</strong> {taxesAndFees}</div>}
+            {mealType && <div><strong>Питание:</strong> {mealType}</div>}
+            {cancellationPolicy && <div><strong>Политика отмены:</strong> {cancellationPolicy}</div>}
+            {cancellationDeadline && <div><strong>Дедлайн отмены:</strong> {cancellationDeadline}</div>}
+            {(checkInTime || checkOutTime) && <div><strong>Check-in/out:</strong> {checkInTime || '-'} / {checkOutTime || '-'}</div>}
+            {roomName && <div><strong>Номер:</strong> {roomName}</div>}
+            {roomAmenities.length > 0 && <div><strong>Удобства номера:</strong> {roomAmenities.slice(0, 8).join(', ')}</div>}
+            {metapolicyHighlights.length > 0 && <div><strong>Ограничения:</strong> {metapolicyHighlights.slice(0, 3).join('; ')}</div>}
+          </div>
 
           {/* Price and Button */}
           <div className="mt-auto pt-4 flex items-end justify-between">
