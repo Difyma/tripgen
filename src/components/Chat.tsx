@@ -1395,6 +1395,17 @@ const Chat = () => {
     }
   }, [location.search, user]);
 
+  // Автоматическое создание чата при входе с creatorId
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const creatorIdFromUrl = params.get('creatorId');
+    
+    if (creatorIdFromUrl && user && !creatorChatId) {
+      // Автоматически создаём чат с организатором
+      startNewChat();
+    }
+  }, [location.search, user]);
+
   // Загрузка конкретного чата из URL параметра
   useEffect(() => {
     // Создаём новый URLSearchParams при каждом изменении URL
@@ -1424,7 +1435,7 @@ const Chat = () => {
       
       console.log('Loading regular chat:', chatIdFromUrl);
       loadChat(chatIdFromUrl);
-    } else if (!chatIdFromUrl && currentChatId) {
+    } else if (!chatIdFromUrl && !creatorChatId && currentChatId) {
       // Сбрасываем текущий чат если нет параметра в URL
       console.log('Resetting chat');
       setCurrentChatId(null);
@@ -1437,7 +1448,7 @@ const Chat = () => {
         role: 'assistant'
       }]);
     }
-  }, [location.search, user, userChats]);
+  }, [location.search, user, userChats, creatorChatId]);
 
   // Загрузка списка чатов при входе пользователя
   useEffect(() => {
