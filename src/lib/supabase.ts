@@ -175,7 +175,9 @@ export const auth = {
 
   // Legacy method - kept for compatibility
   signInOrSignUp: async (email: string, password: string): Promise<AuthResponse> => {
-    // ... existing code ...
+    // Placeholder - use sendOTP and verifyOTP instead
+    throw new Error('Use sendOTP and verifyOTP instead');
+  },
 
   signOut: async () => {
     const { error } = await supabase.auth.signOut();
