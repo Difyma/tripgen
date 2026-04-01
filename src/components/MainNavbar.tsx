@@ -32,7 +32,7 @@ export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
           <div className="hidden md:flex items-center gap-8">
             <Link to="/" className="text-sm text-gray-600 hover:text-black transition-colors">Как это работает</Link>
             <Link to="/about" className="text-sm text-gray-600 hover:text-black transition-colors">О нас</Link>
-            <Link to="/creators" className="text-sm text-gray-600 hover:text-black transition-colors">Наши креаторы</Link>
+            <Link to="/#tours" className="text-sm text-gray-600 hover:text-black transition-colors">Туры</Link>
             <div className="flex items-center gap-4">
               {user ? (
                 <Link 
