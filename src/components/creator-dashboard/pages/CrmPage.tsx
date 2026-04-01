@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+// import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { SimpleModal, SimpleConfirm } from '@/components/ui/simple-modal';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -391,173 +392,173 @@ export default function CrmPage() {
                     className="pl-10"
                   />
                 </div>
-                <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="gap-2 bg-gray-900 hover:bg-gray-800">
-                      <Plus className="w-4 h-4" />
-                      Создать тур
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>Создание нового тура</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Название тура *</Label>
-                          <Input
-                            value={formData.title}
-                            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                            placeholder="Например: Тайга и водопады Алтая"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Локация *</Label>
-                          <Input
-                            value={formData.location}
-                            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                            placeholder="Например: Горный Алтай"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Регион *</Label>
-                          <Input
-                            value={formData.region}
-                            onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-                            placeholder="Например: Республика Алтай"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Категория *</Label>
-                          <Select
-                            value={formData.category}
-                            onValueChange={(value) => setFormData({ ...formData, category: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {categories.map(cat => (
-                                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label>Длительность *</Label>
-                          <Input
-                            value={formData.duration}
-                            onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                            placeholder="Например: 7 дней"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Дней (число) *</Label>
-                          <Input
-                            type="number"
-                            value={formData.durationDays}
-                            onChange={(e) => setFormData({ ...formData, durationDays: parseInt(e.target.value) || 0 })}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Размер группы *</Label>
-                          <Input
-                            value={formData.groupSize}
-                            onChange={(e) => setFormData({ ...formData, groupSize: e.target.value })}
-                            placeholder="Например: до 12 человек"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Цена (текст) *</Label>
-                          <Input
-                            value={formData.price}
-                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                            placeholder="Например: 85 000 ₽"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Цена (число) *</Label>
-                          <Input
-                            type="number"
-                            value={formData.priceValue}
-                            onChange={(e) => setFormData({ ...formData, priceValue: parseInt(e.target.value) || 0 })}
-                          />
-                        </div>
+                <Button 
+                  className="gap-2 bg-gray-900 hover:bg-gray-800"
+                  onClick={() => setIsCreateDialogOpen(true)}
+                >
+                  <Plus className="w-4 h-4" />
+                  Создать тур
+                </Button>
+                <SimpleModal
+                  isOpen={isCreateDialogOpen}
+                  onClose={() => setIsCreateDialogOpen(false)}
+                  title="Создание нового тура"
+                >
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Название тура *</Label>
+                        <Input
+                          value={formData.title}
+                          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                          placeholder="Например: Тайга и водопады Алтая"
+                        />
                       </div>
                       <div className="space-y-2">
-                        <Label>Сложность *</Label>
+                        <Label>Локация *</Label>
+                        <Input
+                          value={formData.location}
+                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                          placeholder="Например: Горный Алтай"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Регион *</Label>
+                        <Input
+                          value={formData.region}
+                          onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                          placeholder="Например: Республика Алтай"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Категория *</Label>
                         <Select
-                          value={formData.difficulty}
-                          onValueChange={(value: 'easy' | 'medium' | 'hard') => setFormData({ ...formData, difficulty: value })}
+                          value={formData.category}
+                          onValueChange={(value) => setFormData({ ...formData, category: value })}
                         >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="easy">Лёгкий</SelectItem>
-                            <SelectItem value="medium">Средний</SelectItem>
-                            <SelectItem value="hard">Сложный</SelectItem>
+                            {categories.map(cat => (
+                              <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <Label>Краткое описание *</Label>
-                        <Textarea
-                          value={formData.shortDescription}
-                          onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
-                          placeholder="Краткое описание тура для карточки..."
-                          rows={2}
+                        <Label>Длительность *</Label>
+                        <Input
+                          value={formData.duration}
+                          onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                          placeholder="Например: 7 дней"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Полное описание</Label>
-                        <Textarea
-                          value={formData.description}
-                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                          placeholder="Подробное описание тура..."
-                          rows={4}
+                        <Label>Дней (число) *</Label>
+                        <Input
+                          type="number"
+                          value={formData.durationDays}
+                          onChange={(e) => setFormData({ ...formData, durationDays: parseInt(e.target.value) || 0 })}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Что включено</Label>
-                        <Textarea
-                          value={formData.includes}
-                          onChange={(e) => setFormData({ ...formData, includes: e.target.value })}
-                          placeholder="Перечислите через запятую, например: Проживание, Питание, Трансфер..."
-                          rows={2}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Что не включено</Label>
-                        <Textarea
-                          value={formData.excludes}
-                          onChange={(e) => setFormData({ ...formData, excludes: e.target.value })}
-                          placeholder="Перечислите через запятую, например: Перелёт, Страховка..."
-                          rows={2}
+                        <Label>Размер группы *</Label>
+                        <Input
+                          value={formData.groupSize}
+                          onChange={(e) => setFormData({ ...formData, groupSize: e.target.value })}
+                          placeholder="Например: до 12 человек"
                         />
                       </div>
                     </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                        Отмена
-                      </Button>
-                      <Button 
-                        className="bg-gray-900 hover:bg-gray-800"
-                        onClick={handleCreateTour}
-                        disabled={!formData.title || !formData.location || !formData.region}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Цена (текст) *</Label>
+                        <Input
+                          value={formData.price}
+                          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                          placeholder="Например: 85 000 ₽"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Цена (число) *</Label>
+                        <Input
+                          type="number"
+                          value={formData.priceValue}
+                          onChange={(e) => setFormData({ ...formData, priceValue: parseInt(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Сложность *</Label>
+                      <Select
+                        value={formData.difficulty}
+                        onValueChange={(value: 'easy' | 'medium' | 'hard') => setFormData({ ...formData, difficulty: value })}
                       >
-                        Сохранить черновик
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="easy">Лёгкий</SelectItem>
+                          <SelectItem value="medium">Средний</SelectItem>
+                          <SelectItem value="hard">Сложный</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Краткое описание *</Label>
+                      <Textarea
+                        value={formData.shortDescription}
+                        onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
+                        placeholder="Краткое описание тура для карточки..."
+                        rows={2}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Полное описание</Label>
+                      <Textarea
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        placeholder="Подробное описание тура..."
+                        rows={4}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Что включено</Label>
+                      <Textarea
+                        value={formData.includes}
+                        onChange={(e) => setFormData({ ...formData, includes: e.target.value })}
+                        placeholder="Перечислите через запятую, например: Проживание, Питание, Трансфер..."
+                        rows={2}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Что не включено</Label>
+                      <Textarea
+                        value={formData.excludes}
+                        onChange={(e) => setFormData({ ...formData, excludes: e.target.value })}
+                        placeholder="Перечислите через запятую, например: Перелёт, Страховка..."
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 mt-6">
+                    <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                      Отмена
+                    </Button>
+                    <Button 
+                      className="bg-gray-900 hover:bg-gray-800"
+                      onClick={handleCreateTour}
+                      disabled={!formData.title || !formData.location || !formData.region}
+                    >
+                      Сохранить черновик
+                    </Button>
+                  </div>
+                </SimpleModal>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -609,38 +610,31 @@ export default function CrmPage() {
                             </Button>
                             
                             {tour.status === 'draft' && (
-                              <Dialog open={isSubmitDialogOpen && selectedTour?.id === tour.id} onOpenChange={(open) => {
-                                setIsSubmitDialogOpen(open);
-                                if (open) setSelectedTour(tour);
-                                else setSelectedTour(null);
-                              }}>
-                                <DialogTrigger asChild>
-                                  <Button size="sm" className="h-8 gap-1 bg-green-600 hover:bg-green-700">
-                                    <Send className="w-3 h-3" />
-                                    На модерацию
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader>
-                                    <DialogTitle>Отправить тур на модерацию?</DialogTitle>
-                                    <DialogDescription>
-                                      После отправки тур будет проверен администратором сервиса. 
-                                      Обычно проверка занимает 1-2 рабочих дня.
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <DialogFooter className="mt-4">
-                                    <Button variant="outline" onClick={() => setIsSubmitDialogOpen(false)}>
-                                      Отмена
-                                    </Button>
-                                    <Button 
-                                      className="bg-green-600 hover:bg-green-700"
-                                      onClick={() => handleSubmitForModeration(tour)}
-                                    >
-                                      Отправить
-                                    </Button>
-                                  </DialogFooter>
-                                </DialogContent>
-                              </Dialog>
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  className="h-8 gap-1 bg-green-600 hover:bg-green-700"
+                                  onClick={() => {
+                                    setSelectedTour(tour);
+                                    setIsSubmitDialogOpen(true);
+                                  }}
+                                >
+                                  <Send className="w-3 h-3" />
+                                  На модерацию
+                                </Button>
+                                <SimpleConfirm
+                                  isOpen={isSubmitDialogOpen && selectedTour?.id === tour.id}
+                                  onClose={() => {
+                                    setIsSubmitDialogOpen(false);
+                                    setSelectedTour(null);
+                                  }}
+                                  onConfirm={() => handleSubmitForModeration(tour)}
+                                  title="Отправить тур на модерацию?"
+                                  description="После отправки тур будет проверен администратором сервиса. Обычно проверка занимает 1-2 рабочих дня."
+                                  confirmText="Отправить"
+                                  cancelText="Отмена"
+                                />
+                              </>
                             )}
                             
                             {tour.status === 'pending' && (
