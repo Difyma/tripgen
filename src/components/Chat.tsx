@@ -981,24 +981,20 @@ const Chat = () => {
       await saveMessageToCurrentChat(chatId, 'user', messageText);
     }
 
-    // Если это чат с создателем тура - отправляем напрямую, не через ИИ
+    // Если это чат с создателем тура - отправляем напрямую через WebSocket
     if (isCreatorChat && creatorChatId && user) {
       try {
-        const message = await creatorChatApi.sendMessage(creatorChatId, messageText);
-        // Добавляем сообщение в UI
-        setMessages(prev => [...prev, {
-          id: Date.now() + Math.random(),
-          text: message.content,
-          isUser: false,
-          role: 'assistant'
-        }]);
+        // Сообщение пользователя уже добавлено в UI выше (newMessage)
+        // Отправляем через WebSocket
+        await creatorChatApi.sendMessage(creatorChatId, messageText);
+        // Ответ от организатора придёт через onMessage подписку
         setIsLoading(false);
         return;
       } catch (err) {
         console.error('Error sending message to creator:', err);
         setMessages(prev => [...prev, {
           id: Date.now() + Math.random(),
-          text: 'Не удалось отправить сообщение организатору. Попробуйте позже.',
+          text: 'Не удалось отправить сообщение организатору. Проверьте подключение и попробуйте снова.',
           isUser: false,
           role: 'assistant'
         }]);
@@ -1355,6 +1351,25 @@ const Chat = () => {
       setCreatorChatId(creatorChatIdFromUrl);
       setIsCreatorChat(true);
       
+      // Подключаемся к WebSocket
+      creatorChatApi.connect().then(() => {
+        // Подписываемся на новые сообщения
+        const unsubscribe = creatorChatApi.onMessage((message: any) => {
+          setMessages(prev => {
+            // Avoid duplicates
+            if (prev.some(m => String(m.id) === String(message.id))) return prev;
+            return [...prev, {
+              id: message.id,
+              text: message.content,
+              isUser: message.sender_type === 'client',
+              role: message.sender_type === 'client' ? 'user' : 'assistant'
+            }];
+          });
+        });
+        
+        return () => unsubscribe();
+      });
+      
       // Загружаем сообщения creator чата
       const loadCreatorMessages = async () => {
         try {
@@ -1377,9 +1392,6 @@ const Chat = () => {
       };
       
       loadCreatorMessages();
-      // Периодически обновляем сообщения
-      const interval = setInterval(loadCreatorMessages, 5000);
-      return () => clearInterval(interval);
     }
   }, [location.search, user]);
 
