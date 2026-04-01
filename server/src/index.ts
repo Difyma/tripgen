@@ -1,6 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 import gptRouter from './gptProxy.js';
 import flightsRouter from './routes/flights.js';
@@ -27,26 +29,41 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 console.log('Initializing server...');
 
-// Log raw body before JSON parsing
-app.use((req: Request, res: Response, next: NextFunction) => {
-  let data = '';
-  req.on('data', chunk => {
-    data += chunk;
-  });
-  req.on('end', () => {
-    console.log('[RAW BODY]', req.method, req.url, data.substring(0, 1000));
-  });
-  next();
-});
+// Security: Raw body logging disabled to prevent sensitive data leaks
+// app.use((req: Request, res: Response, next: NextFunction) => {
+//   let data = '';
+//   req.on('data', chunk => {
+//     data += chunk;
+//   });
+//   req.on('end', () => {
+//     console.log('[RAW BODY]', req.method, req.url, data.substring(0, 1000));
+//   });
+//   next();
+// });
 
 // Basic middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 console.log('JSON middleware configured');
 
-// Configure CORS
+// Configure CORS - restrict in production
+const ALLOWED_ORIGINS = [
+  process.env.FRONTEND_URL || 'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
+
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`🚫 Blocked CORS request from: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
   credentials: true
@@ -54,12 +71,42 @@ app.use(cors({
 
 console.log('CORS middleware configured');
 
-// Middleware для логирования запросов
+// Security headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'", 'https://api.worldota.net', 'https://api.openai.com', 'https://openrouter.ai'],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+console.log('Helmet security headers configured');
+
+// Rate limiting - 100 requests per 15 minutes per IP
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: {
+    error: 'Too many requests',
+    message: 'Please try again later',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', limiter);
+console.log('Rate limiting configured');
+
+// Middleware для логирования запросов (без чувствительных данных)
 app.use((req: Request, res: Response, next: NextFunction) => {
+  // Don't log request body or headers that may contain secrets
   console.log(`${req.method} ${req.url}`, {
-    body: req.body,
     query: req.query,
-    headers: req.headers
+    userAgent: req.headers['user-agent'],
+    contentType: req.headers['content-type']
   });
   next();
 });
