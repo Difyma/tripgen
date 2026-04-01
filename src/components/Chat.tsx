@@ -302,7 +302,10 @@ const SUGGESTED_QUESTIONS = [
 ];
 
 // Компонент для отображения подсказок
-const SuggestedQuestions = ({ onSelectQuestion }: { onSelectQuestion: (text: string) => void }) => {
+const SuggestedQuestions = ({ onSelectQuestion, isCreatorChat }: { onSelectQuestion: (text: string) => void; isCreatorChat?: boolean }) => {
+  // Не показываем популярные вопросы в чатах с организаторами
+  if (isCreatorChat) return null;
+  
   return (
     <div className="max-w-3xl md:max-w-4xl w-full mx-auto mb-6">
       <h3 className="text-sm font-medium text-gray-500 mb-3">Популярные вопросы:</h3>
@@ -2882,7 +2885,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.3 }}
                     >
-                      <SuggestedQuestions onSelectQuestion={handleSelectQuestion} />
+                      <SuggestedQuestions onSelectQuestion={handleSelectQuestion} isCreatorChat={isCreatorChat} />
                     </motion.div>
                   </>
                 )}
@@ -2919,8 +2922,8 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                       `}
                     >
                       {renderMessage(message)}
-                      {/* Кнопка 'Сохранить маршрут' только для ассистента, не для приветственного сообщения и только на десктопе */}
-                      {!message.isUser && message.id !== messages[0].id && (
+                      {/* Кнопка 'Сохранить маршрут' только для ассистента, не для приветственного сообщения, только на десктопе и не для чатов с организаторами */}
+                      {!isCreatorChat && !message.isUser && message.id !== messages[0].id && (
                         <div className="mt-3 flex md:justify-end justify-center">
                           <button
                             className="hidden md:flex items-center gap-2 px-5 py-2 bg-black text-white rounded-full font-medium hover:bg-gray-900 transition-colors shadow"
