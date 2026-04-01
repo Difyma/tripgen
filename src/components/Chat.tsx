@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { 
   Send, 
   MapPin, 
@@ -596,6 +596,9 @@ const Chat = () => {
   const searchParams = new URLSearchParams(location.search);
   const initialQuery = searchParams.get('q');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const isUserScrollingRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: Date.now() + Math.random(),
@@ -2054,11 +2057,11 @@ const Chat = () => {
             background: #374151;
           }
         `}</style>
-        <div className="space-y-4">
-          {(() => {
+        <div className="space-y-4" style={{ contain: 'layout style paint' }}>
+          {useMemo(() => {
             const parsedHotels = hotelsFromApi ?? parseHotelsFromText(message.text);
 
-            // Всегда убираем из текста блоки с деталями отелей (даже если парсер не нашёл список — напр. формат «Главные рекомендации» / «Оптимальный вариант»)
+            // Всегда убираем из текста блоки с деталями отелей
             const isHotelDetailBlock = (s: string) =>
               /Адрес:|Цена:|Описание:/i.test(s) && (/Цена:/i.test(s) || /Описание:/i.test(s));
             let textWithoutHotels = message.text;
@@ -2082,12 +2085,12 @@ const Chat = () => {
               /(?:^|\n)((?:###\s*\d+\.\s*[^\n]+|##\s[^\n]+)\n[\s\S]*?)(?=\n(?:###\s*\d+\.|##\s|\n---\s*\n)|$)/gim,
               (fullMatch, block) => (isHotelDetailBlock(block) ? '\n' : fullMatch)
             );
-            // Блоки без заголовка: начинаются с картинки ![...](...) и содержат детали отеля
+            // Блоки без заголовка
             textWithoutHotels = textWithoutHotels.replace(
               /(?:^|\n)((!\[[^\]]*\]\([^)]+\)\s*\n[\s\S]*?))(?=\n\n|(?:\n###|\n##)\s|\n---\s*\n|$)/gim,
               (fullMatch, block) => (isHotelDetailBlock(block) ? '\n' : fullMatch)
             );
-            // Блоки с произвольным заголовком (Главные рекомендации, Оптимальный вариант и т.д.)
+            // Блоки с произвольным заголовком
             textWithoutHotels = textWithoutHotels.replace(
               /(?:^|\n\n)([\s\S]*?)(?=\n\n|\n(?:###|##)\s|\n---\s*\n|$)/gim,
               (fullMatch, segment) => (isHotelDetailBlock(segment) ? '\n\n' : fullMatch)
@@ -2097,6 +2100,7 @@ const Chat = () => {
               return (
                 <div
                   className="prose prose-sm max-w-none text-gray-900"
+                  style={{ contain: 'content' }}
                   dangerouslySetInnerHTML={{ __html: formatMessage(textWithoutHotels) }}
                 />
               );
@@ -2114,50 +2118,53 @@ const Chat = () => {
               <>
                 <div
                   className="prose prose-sm max-w-none text-gray-900"
+                  style={{ contain: 'content' }}
                   dangerouslySetInnerHTML={{ __html: formatMessage(textWithoutHotels) }}
                 />
-                <div className="mt-4">
+                <div className="mt-4" style={{ contain: 'layout' }}>
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">🏨 Рекомендуемые отели</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {uniqueHotels.map((hotel, index) => {
-                      return (
-                        <HotelCard
-                          key={index}
-                          variant="mini"
-                          name={hotel.name}
-                          stars={hotel.stars}
-                          rating={hotel.rating}
-                          reviewCount={hotel.reviewCount}
-                          address={hotel.address}
-                          price={hotel.price}
-                          currency={hotel.currency}
-                          imageUrl={hotel.imageUrl}
-                          bookingUrl={hotel.bookingUrl}
-                          distanceToCenter={hotel.distanceToCenter}
-                          distanceToMetro={hotel.distanceToMetro}
-                          amenities={hotel.amenities}
-                          roomAmenities={('roomAmenities' in hotel ? hotel.roomAmenities : undefined)}
-                          taxesAndFees={('taxesAndFees' in hotel ? hotel.taxesAndFees : undefined)}
-                          mealType={('mealType' in hotel ? hotel.mealType : undefined)}
-                          cancellationPolicy={('cancellationPolicy' in hotel ? hotel.cancellationPolicy : undefined)}
-                          cancellationDeadline={('cancellationDeadline' in hotel ? hotel.cancellationDeadline : undefined)}
-                          checkInTime={('checkInTime' in hotel ? hotel.checkInTime : undefined)}
-                          checkOutTime={('checkOutTime' in hotel ? hotel.checkOutTime : undefined)}
-                          metapolicyHighlights={('metapolicyHighlights' in hotel ? hotel.metapolicyHighlights : undefined)}
-                          roomName={('roomName' in hotel ? hotel.roomName : undefined)}
-                          isTop={hotel.isTop}
-                          description={'description' in hotel ? hotel.description : undefined}
-                        />
-                      );
-                    })}
+                    {uniqueHotels.map((hotel, index) => (
+                      <HotelCard
+                        key={`${hotel.name}-${index}`}
+                        variant="mini"
+                        name={hotel.name}
+                        stars={hotel.stars}
+                        rating={hotel.rating}
+                        reviewCount={hotel.reviewCount}
+                        address={hotel.address}
+                        price={hotel.price}
+                        currency={hotel.currency}
+                        imageUrl={hotel.imageUrl}
+                        bookingUrl={hotel.bookingUrl}
+                        distanceToCenter={hotel.distanceToCenter}
+                        distanceToMetro={hotel.distanceToMetro}
+                        amenities={hotel.amenities}
+                        roomAmenities={('roomAmenities' in hotel ? hotel.roomAmenities : undefined)}
+                        taxesAndFees={('taxesAndFees' in hotel ? hotel.taxesAndFees : undefined)}
+                        mealType={('mealType' in hotel ? hotel.mealType : undefined)}
+                        cancellationPolicy={('cancellationPolicy' in hotel ? hotel.cancellationPolicy : undefined)}
+                        cancellationDeadline={('cancellationDeadline' in hotel ? hotel.cancellationDeadline : undefined)}
+                        checkInTime={('checkInTime' in hotel ? hotel.checkInTime : undefined)}
+                        checkOutTime={('checkOutTime' in hotel ? hotel.checkOutTime : undefined)}
+                        metapolicyHighlights={('metapolicyHighlights' in hotel ? hotel.metapolicyHighlights : undefined)}
+                        roomName={('roomName' in hotel ? hotel.roomName : undefined)}
+                        isTop={hotel.isTop}
+                        description={'description' in hotel ? hotel.description : undefined}
+                      />
+                    ))}
                   </div>
                 </div>
               </>
             );
-          })()}
+          }, [message.text, hotelsFromApi, formatMessage, parseHotelsFromText])}
         </div>
         {streamingMessageId === message.id && (
-          <span className="inline-block w-2 h-4 ml-0.5 bg-gray-800 animate-pulse rounded-sm align-text-bottom" aria-hidden />
+          <span 
+            className="inline-block w-2 h-4 ml-0.5 bg-gray-800 animate-pulse rounded-sm align-text-bottom" 
+            style={{ willChange: 'opacity' }}
+            aria-hidden 
+          />
         )}
       </div>
     );
@@ -2300,9 +2307,27 @@ const Chat = () => {
     return '';
   };
 
-  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
-    messagesEndRef.current?.scrollIntoView({ behavior });
+  // Smart scroll: only auto-scroll if user is near bottom
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth', force = false) => {
+    if (!chatContainerRef.current) return;
+    
+    const container = chatContainerRef.current;
+    const scrollBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isNearBottom = scrollBottom < 100; // Within 100px of bottom
+    
+    // Only scroll if forced, user is near bottom, or not streaming
+    if (force || isNearBottom || !streamingMessageId) {
+      messagesEndRef.current?.scrollIntoView({ behavior });
+    }
   };
+  
+  // Track user scrolling
+  const handleScroll = useCallback(() => {
+    if (!chatContainerRef.current) return;
+    const currentScrollTop = chatContainerRef.current.scrollTop;
+    isUserScrollingRef.current = currentScrollTop < lastScrollTopRef.current;
+    lastScrollTopRef.current = currentScrollTop;
+  }, []);
 
   useEffect(() => {
     scrollToBottom(streamingMessageId != null ? 'auto' : 'smooth');
@@ -2610,7 +2635,12 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
 
           {/* Chat Area */}
           <div className="flex-1 flex flex-col min-h-0 pt-[56px] pb-0 md:pt-0 md:pb-0 w-full">
-            <div className="flex-1 p-6 overflow-y-auto pb-32 md:pb-24 w-full">
+            <div 
+              ref={chatContainerRef}
+              onScroll={handleScroll}
+              className="flex-1 p-6 overflow-y-auto pb-32 md:pb-24 w-full"
+              style={{ scrollBehavior: 'smooth' }}
+            >
               <div className="max-w-3xl md:max-w-4xl md:ml-12 md:mr-auto space-y-6">
                 {/* Показываем приветственное сообщение и подсказки до взаимодействия */}
                 {!hasInteracted && (
@@ -2652,9 +2682,14 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                 {(hasInteracted || currentChatId) && messages.map((message) => (
                   <motion.div
                     key={message.id}
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={streamingMessageId === message.id ? false : { opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className={`flex ${message.isUser ? 'justify-end' : 'justify-start'} items-end gap-3`}
+                    style={{ 
+                      willChange: 'transform, opacity',
+                      contain: 'layout style paint'
+                    }}
+                    layout={false}
                   >
                     {!message.isUser && (
                       <div className="flex-shrink-0">
