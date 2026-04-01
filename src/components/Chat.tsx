@@ -2159,7 +2159,8 @@ const Chat = () => {
           }
         `}</style>
         <div className="space-y-4" style={{ contain: 'layout style paint' }}>
-          {useMemo(() => {
+          {/* Обработка отелей и текста без useMemo */}
+          {(() => {
             const parsedHotels = hotelsFromApi ?? parseHotelsFromText(message.text);
 
             // Всегда убираем из текста блоки с деталями отелей
@@ -2258,7 +2259,7 @@ const Chat = () => {
                 </div>
               </>
             );
-          }, [message.text, hotelsFromApi, formatMessage, parseHotelsFromText])}
+          })()}
         </div>
         {streamingMessageId === message.id && (
           <span 
