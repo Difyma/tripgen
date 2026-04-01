@@ -28,6 +28,7 @@ interface AuthContextType {
   error: Error | null;
   signInOrSignUp: (email: string, password: string) => Promise<AuthResponse>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -157,6 +158,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isCreator 
   });
 
+  // Refresh user data
+  const refreshUser = async () => {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      setUser(currentUser);
+      if (currentUser) {
+        await loadCreatorData(currentUser.id);
+      }
+    } catch (err) {
+      console.error('Error refreshing user:', err);
+    }
+  };
+
   const value = {
     user,
     creator,
@@ -165,6 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     error,
     signInOrSignUp,
     signOut,
+    refreshUser,
   };
 
   return (

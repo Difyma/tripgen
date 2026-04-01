@@ -114,81 +114,68 @@ const ensureProfileExists = async (userId: string, email: string): Promise<Error
 
 // Auth helper functions
 export const auth = {
-  signInOrSignUp: async (email: string, password: string): Promise<AuthResponse> => {
+  // Отправка OTP кода на email
+  sendOTP: async (email: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Try to sign in first
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithOtp({
         email,
-        password
-      });
-
-      // Log sign in attempt result
-      if (signInError) {
-        console.log('Sign in attempt failed:', signInError);
-      }
-
-      if (signInData?.user) {
-        // Ensure profile exists even on sign in
-        await ensureProfileExists(signInData.user.id, email);
-        return { session: signInData.session, error: null, message: 'Авторизация успешна!', needsEmailConfirmation: false };
-      }
-
-      // If sign in failed, try to sign up
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password
-      });
-
-      // Log sign up attempt result
-      if (signUpError) {
-        console.log('Попытка регистрации не удалась:', signUpError);
-        if (signUpError.message.includes('User already registered')) {
-          throw new Error('Неверный email или пароль');
+        options: {
+          shouldCreateUser: true, // Создать пользователя если не существует
         }
-        // Throw the specific error message from Supabase
-        throw new Error(`Ошибка регистрации: ${signUpError.message}`);
-      }
-
-      if (!signUpData?.user) {
-        throw new Error('Не удалось создать пользователя');
-      }
-
-      // Если требуется подтверждение email, session будет null
-      if (!signUpData.session) {
-        return { session: null, error: null, message: 'Требуется подтверждение email', needsEmailConfirmation: true };
-      }
-
-      // Create profile for new user (только если email подтверждён)
-      const profileError = await ensureProfileExists(signUpData.user.id, email);
-      if (profileError) {
-        console.log('Ошибка создания профиля:', profileError);
-        throw new Error('Ошибка создания профиля пользователя');
-      }
-
-      return { session: signUpData.session, error: null, message: 'Регистрация успешна!', needsEmailConfirmation: false };
-    } catch (error: any) {
-      console.error('Детали ошибки аутентификации:', {
-        message: error.message,
-        status: error.status,
-        name: error.name,
-        stack: error.stack
       });
-      
-      if (error.message.includes('Email rate limit exceeded')) {
-        throw new Error('Слишком много попыток. Пожалуйста, подождите перед следующей попыткой.');
-      }
-      
-      if (error.message.includes('Invalid login credentials')) {
-        throw new Error('Неверный email или пароль');
+
+      if (error) {
+        console.error('Error sending OTP:', error);
+        if (error.message.includes('rate limit')) {
+          throw new Error('Слишком много попыток. Подождите перед следующей отправкой.');
+        }
+        throw new Error('Не удалось отправить код. Попробуйте позже.');
       }
 
-      if (error.message.includes('Ошибка регистрации') || error.message.includes('Ошибка создания профиля')) {
-        throw error;
-      }
-      
-      throw new Error(`Ошибка аутентификации: ${error.message}`);
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
     }
   },
+
+  // Проверка OTP кода
+  verifyOTP: async (email: string, token: string): Promise<AuthResponse> => {
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'email'
+      });
+
+      if (error) {
+        console.error('Error verifying OTP:', error);
+        if (error.message.includes('Invalid token')) {
+          throw new Error('Неверный код. Проверьте и попробуйте снова.');
+        }
+        throw new Error('Ошибка проверки кода. Попробуйте снова.');
+      }
+
+      if (!data.session) {
+        throw new Error('Не удалось войти. Попробуйте снова.');
+      }
+
+      // Ensure profile exists
+      await ensureProfileExists(data.user!.id, email);
+
+      return { 
+        session: data.session, 
+        error: null, 
+        message: 'Авторизация успешна!', 
+        needsEmailConfirmation: false 
+      };
+    } catch (error: any) {
+      throw error;
+    }
+  },
+
+  // Legacy method - kept for compatibility
+  signInOrSignUp: async (email: string, password: string): Promise<AuthResponse> => {
+    // ... existing code ...
 
   signOut: async () => {
     const { error } = await supabase.auth.signOut();

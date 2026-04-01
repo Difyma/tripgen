@@ -1,27 +1,26 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, Lock, Loader2 } from 'lucide-react';
-import { useRateLimitStore } from '../lib/rateLimit';
+import { X, Mail, Loader2, ArrowLeft, Shield } from 'lucide-react';
+import { auth } from '../lib/supabase';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+type AuthStep = 'email' | 'otp';
+
 export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState<AuthStep>('email');
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const [isWaiting, setIsWaiting] = useState(false);
-  const [waitTime, setWaitTime] = useState(0);
-  const [initialWaitTime, setInitialWaitTime] = useState(0);
-  const { signInOrSignUp, loading } = useAuth();
-  const { isLimited, limitExpiry, clearRateLimit } = useRateLimitStore();
-  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
-  const [pendingEmail, setPendingEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const { refreshUser } = useAuth();
 
   // Handle click outside
   useEffect(() => {
@@ -33,7 +32,6 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-      // Add escape key handler
       document.addEventListener('keydown', handleEscapeKey);
     }
 
@@ -42,6 +40,19 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       document.removeEventListener('keydown', handleEscapeKey);
     };
   }, [isOpen]);
+
+  // Handle countdown for resend
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown(prev => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [countdown]);
 
   // Handle escape key
   const handleEscapeKey = (e: KeyboardEvent) => {
@@ -52,96 +63,106 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
   // Handle modal closing
   const handleClose = () => {
-    if (!loading) {
-      // Reset form state
-      setEmail('');
-      setPassword('');
-      setErrorMessage('');
-      setSuccessMessage('');
+    if (!isLoading) {
+      resetForm();
       onClose();
     }
   };
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    
-    if (isLimited && limitExpiry) {
-      const updateTimeRemaining = () => {
-        const remaining = Math.max(0, Math.ceil((limitExpiry - Date.now()) / 1000));
-        setWaitTime(remaining);
-        
-        if (remaining === 0) {
-          clearRateLimit();
-        }
-      };
-      
-      updateTimeRemaining();
-      timer = setInterval(updateTimeRemaining, 1000);
-    } else {
-      setWaitTime(0);
-    }
+  const resetForm = () => {
+    setEmail('');
+    setOtp('');
+    setStep('email');
+    setErrorMessage('');
+    setSuccessMessage('');
+    setCountdown(0);
+  };
 
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [isLimited, limitExpiry, clearRateLimit]);
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (waitTime > 0) {
-      timer = setInterval(() => {
-        setWaitTime(prev => {
-          const newTime = prev - 1;
-          if (newTime <= 0) {
-            setIsWaiting(false);
-          }
-          return newTime;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [waitTime]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Send OTP
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isWaiting || loading) return;
+    if (isLoading) return;
 
     setErrorMessage('');
     setSuccessMessage('');
-    
+    setIsLoading(true);
+
     try {
-      const result = await signInOrSignUp(email, password);
-      if ((result as any).needsEmailConfirmation) {
-        setNeedsEmailConfirmation(true);
-        setPendingEmail(email);
-        setErrorMessage('');
-        return;
-      }
-      // Показываем сообщение об успехе
-      setSuccessMessage('Авторизация успешна!');
-      // Закрываем модальное окно через 1.5 секунды
-      setTimeout(() => {
-        setEmail('');
-        setPassword('');
-        setErrorMessage('');
-        setSuccessMessage('');
-        onClose();
-      }, 1500);
-    } catch (err: any) {
-      console.error('Error during authentication:', err);
-      setErrorMessage(err.message);
+      const result = await auth.sendOTP(email);
       
-      // Check if error message contains waiting time
-      const waitTimeMatch = err.message.match(/подождите (\d+) секунд/);
-      if (waitTimeMatch) {
-        const seconds = parseInt(waitTimeMatch[1]);
-        setIsWaiting(true);
-        setWaitTime(seconds);
-        setInitialWaitTime(seconds);
+      if (!result.success) {
+        throw new Error(result.error || 'Не удалось отправить код');
       }
+
+      setSuccessMessage('Код отправлен на вашу почту!');
+      setStep('otp');
+      setCountdown(60); // 60 seconds cooldown
+    } catch (err: any) {
+      console.error('Error sending OTP:', err);
+      setErrorMessage(err.message);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // Verify OTP
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLoading || otp.length !== 6) return;
+
+    setErrorMessage('');
+    setSuccessMessage('');
+    setIsLoading(true);
+
+    try {
+      const result = await auth.verifyOTP(email, otp);
+      
+      if (result.session) {
+        setSuccessMessage('Вход выполнен успешно!');
+        await refreshUser();
+        
+        // Close modal after success
+        setTimeout(() => {
+          resetForm();
+          onClose();
+        }, 1500);
+      }
+    } catch (err: any) {
+      console.error('Error verifying OTP:', err);
+      setErrorMessage(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Resend OTP
+  const handleResendOTP = async () => {
+    if (countdown > 0 || isLoading) return;
+
+    setErrorMessage('');
+    setSuccessMessage('');
+    setIsLoading(true);
+
+    try {
+      const result = await auth.sendOTP(email);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Не удалось отправить код');
+      }
+
+      setSuccessMessage('Новый код отправлен!');
+      setCountdown(60);
+    } catch (err: any) {
+      setErrorMessage(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle OTP input change
+  const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setOtp(value);
   };
 
   return (
@@ -165,83 +186,122 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             <div className="relative bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-8 text-white">
               <button
                 onClick={handleClose}
-                disabled={loading}
+                disabled={isLoading}
                 className="absolute right-4 top-4 text-white/80 hover:text-white transition-colors disabled:opacity-50"
                 aria-label="Закрыть"
               >
                 <X className="w-5 h-5" />
               </button>
+
+              {step === 'otp' && (
+                <button
+                  onClick={() => setStep('email')}
+                  disabled={isLoading}
+                  className="absolute left-4 top-4 text-white/80 hover:text-white transition-colors disabled:opacity-50"
+                  aria-label="Назад"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+              )}
+
               <h2 className="text-2xl font-bold mb-2">
-                Добро пожаловать
+                {step === 'email' ? 'Добро пожаловать' : 'Подтверждение'}
               </h2>
               <p className="text-white/80 text-sm">
-                Войдите в существующий аккаунт или создайте новый для доступа к путешествиям
+                {step === 'email' 
+                  ? 'Войдите или зарегистрируйтесь для доступа к путешествиям'
+                  : `Введите код из письма, отправленного на ${email}`
+                }
               </p>
             </div>
 
             {/* Form */}
             <div className="p-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                    Электронная почта
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="email"
-                      id="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                      placeholder="ваша@почта.com"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                    Пароль
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="password"
-                      id="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                      placeholder="Минимум 6 символов"
-                      required
-                      minLength={6}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2 pt-2">
-                  <button
-                    type="submit"
-                    disabled={loading || isWaiting}
-                    className="relative w-full bg-black text-white py-2.5 rounded-xl hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group overflow-hidden"
-                  >
-                    <span className="relative z-10 flex items-center justify-center gap-2">
-                      {loading && <Loader2 className="w-5 h-5 animate-spin" />}
-                      {loading ? 'Подождите...' : 
-                       isWaiting ? `Попробуйте через ${waitTime} сек` :
-                       'Войти / Зарегистрироваться'}
-                    </span>
-                    {isWaiting && (
-                      <div 
-                        className="absolute inset-0 bg-gray-900 transition-all duration-1000 ease-linear"
-                        style={{ 
-                          width: `${(waitTime / initialWaitTime) * 100}%` 
-                        }}
+              {step === 'email' ? (
+                <form onSubmit={handleSendOTP} className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                      Электронная почта
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="email"
+                        id="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                        placeholder="ваша@почта.com"
+                        required
+                        autoFocus
                       />
-                    )}
-                  </button>
-                </div>
-              </form>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="relative w-full bg-black text-white py-2.5 rounded-xl hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="flex items-center justify-center gap-2">
+                        {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+                        {isLoading ? 'Отправка...' : 'Получить код'}
+                      </span>
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOTP} className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="otp" className="block text-sm font-medium text-gray-700">
+                      Код подтверждения
+                    </label>
+                    <div className="relative">
+                      <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="text"
+                        id="otp"
+                        value={otp}
+                        onChange={handleOtpChange}
+                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all text-center text-2xl tracking-widest font-mono"
+                        placeholder="000000"
+                        required
+                        maxLength={6}
+                        autoFocus
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 text-center">
+                      Введите 6-значный код из письма
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <button
+                      type="submit"
+                      disabled={isLoading || otp.length !== 6}
+                      className="relative w-full bg-black text-white py-2.5 rounded-xl hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="flex items-center justify-center gap-2">
+                        {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+                        {isLoading ? 'Проверка...' : 'Войти'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleResendOTP}
+                      disabled={countdown > 0 || isLoading}
+                      className="w-full text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {countdown > 0 
+                        ? `Отправить код повторно через ${countdown} сек` 
+                        : 'Отправить код повторно'
+                      }
+                    </button>
+                  </div>
+                </form>
+              )}
 
               {/* Messages */}
               <div className="mt-4 space-y-3">
@@ -255,26 +315,23 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   </motion.div>
                 )}
 
-                {errorMessage && !needsEmailConfirmation && (
+                {errorMessage && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="p-3 bg-red-50 border border-red-100 text-red-700 rounded-xl text-sm"
                   >
-                    <div>{errorMessage}</div>
-                    {isLimited && (
-                      <div className="mt-1 font-medium">
-                        Осталось времени: {Math.floor(waitTime / 60)}:{(waitTime % 60).toString().padStart(2, '0')}
-                      </div>
-                    )}
+                    {errorMessage}
                   </motion.div>
                 )}
+              </div>
 
-                {needsEmailConfirmation && (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800 text-center mt-4">
-                    Для входа на сайт подтвердите ваш email.<br />
-                    Для этого перейдите в почту: <b>{pendingEmail}</b>
-                  </div>
+              {/* Info text */}
+              <div className="mt-6 text-center text-xs text-gray-500">
+                {step === 'email' && (
+                  <p>
+                    Нажимая «Получить код», вы соглашаетесь с условиями использования и политикой конфиденциальности
+                  </p>
                 )}
               </div>
             </div>
@@ -283,4 +340,4 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       )}
     </AnimatePresence>
   );
-} 
+}
