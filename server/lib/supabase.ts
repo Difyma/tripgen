@@ -13,7 +13,7 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.warn('Supabase credentials not found, creator chat will not work');
+  console.warn('Supabase credentials not found');
 }
 
 export const supabase = supabaseUrl && supabaseServiceKey 

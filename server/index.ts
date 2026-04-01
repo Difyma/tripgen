@@ -8,6 +8,7 @@ import flightsRouter from './routes/flights.js';
 import creatorRouter from './routes/creatorApplication.js';
 import hotelsRouter from './routes/hotels-full.js';
 import creatorChatRouter from './routes/creator-chat.js';
+import authRouter from './routes/auth.js';
 import { initChatWebSocket } from './lib/chat-ws.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -65,13 +66,15 @@ app.use('/api/flights', flightsRouter);
 app.use('/api/creators', creatorRouter);
 app.use('/api/hotels', hotelsRouter);
 app.use('/api/creator-chat', creatorChatRouter);
+app.use('/api/auth', authRouter);
 
 console.log('Routes configured:', {
   gpt: '/api',
   flights: '/api/flights',
   creators: '/api/creators',
   hotels: '/api/hotels',
-  creatorChat: '/api/creator-chat'
+  creatorChat: '/api/creator-chat',
+  auth: '/api/auth'
 });
 
 // Error handling middleware - MUST be last

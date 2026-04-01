@@ -114,33 +114,34 @@ const ensureProfileExists = async (userId: string, email: string): Promise<Error
 
 // Auth helper functions
 export const auth = {
-  // Отправка OTP кода на email
+  // Отправка OTP кода на email через Supabase
   sendOTP: async (email: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      console.log('[Auth] Sending OTP to:', email);
+      console.log('[Auth] Sending OTP via Supabase to:', email);
       
-      const { data, error } = await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           shouldCreateUser: true,
         }
       });
 
-      console.log('[Auth] OTP response:', { data, error });
-
       if (error) {
-        console.error('[Auth] Error sending OTP:', error);
-        throw error;
+        console.error('[Auth] Supabase error:', error);
+        if (error.message.includes('rate limit')) {
+          throw new Error('Слишком много попыток. Подождите 1 минуту перед следующей отправкой.');
+        }
+        throw new Error('Не удалось отправить код. Попробуйте позже.');
       }
 
       return { success: true };
     } catch (error: any) {
-      console.error('[Auth] Catch error:', error);
+      console.error('[Auth] Error:', error);
       return { success: false, error: error.message || 'Не удалось отправить код' };
     }
   },
 
-  // Проверка OTP кода
+  // Проверка OTP кода через Supabase
   verifyOTP: async (email: string, token: string): Promise<AuthResponse> => {
     try {
       const { data, error } = await supabase.auth.verifyOtp({
@@ -150,7 +151,7 @@ export const auth = {
       });
 
       if (error) {
-        console.error('Error verifying OTP:', error);
+        console.error('[Auth] Verify error:', error);
         if (error.message.includes('Invalid token')) {
           throw new Error('Неверный код. Проверьте и попробуйте снова.');
         }
