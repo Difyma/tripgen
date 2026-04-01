@@ -7,6 +7,18 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# 🔒 Security: Environment files
+.env
+.env.local
+.env.*.local
+server/.env
+uploads/.env
+api/.env
+
+# 🔒 Security: Backup files
+*.backup.*
+*.bak
+
 node_modules
 dist
 dist-ssr

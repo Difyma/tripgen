@@ -24,6 +24,11 @@ import { parseTripPlanResponse } from './lib/parseTripPlanResponse.js';
 import { formatTripPlanToMarkdown } from './lib/formatTripPlanToMarkdown.js';
 import { mergeHotelRecommendationsWithSource } from './lib/mergeHotelRecommendationsWithSource.js';
 import type { SourceHotelForWhitelist } from './types/tripPlan.js';
+import { ETG_ENABLE_TEST_FALLBACK, FORCE_TEST_HOTELS, hasEtgCredentials } from './config/etg.js';
+import { normalizeDestination } from './etg/destinationNormalizer.js';
+import { resolveSearchEndpoint } from './etg/endpointResolver.js';
+import { searchSerpGeo, searchSerpRegion } from './etg/searchClient.js';
+import { createTraceId, logSearchStep, upsertTrace } from './diagnostics/searchLogger.js';
 
 dotenv.config();
 
@@ -42,7 +47,10 @@ router.use(cors(corsOptions));
 router.use(express.json());
 
 // Environment variables
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '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';
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+if (!OPENROUTER_API_KEY) {
+  throw new Error('OPENROUTER_API_KEY environment variable is required');
+}
 // ETG API Configuration
 // Key ID (Login) and API Token (Password) from contract settings
 const OSTROVOK_KEY_ID = process.env.OSTROVOK_KEY_ID;           // e.g., '12984'
@@ -69,6 +77,7 @@ interface FilterState {
   preferences: string[];
   travelers?: number;
   children?: number;
+  childrenAges?: number[];
 }
 
 interface Hotel {
@@ -86,6 +95,16 @@ interface Hotel {
   bookingUrl?: string;
   distanceToCenter?: number;
   rates?: OstrovokRate[];
+  taxesAndFees?: string;
+  mealType?: string;
+  cancellationPolicy?: string;
+  cancellationDeadline?: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  metapolicyHighlights?: string[];
+  roomName?: string;
+  roomAmenities?: string[];
+  amenities?: string[];
 }
 
 interface OstrovokRate {
@@ -243,56 +262,23 @@ const generatePartnerLink = (hotelId: string | number, params: {
   checkIn: string;
   checkOut: string;
   guests: number;
+  childrenAges?: number[];
 }, hotelName?: string, city?: string): string => {
   const hotelIdStr = String(hotelId);
-  
-  // Для тестовых отелей — используем правильные slug
-  if (hotelIdStr === '1' || hotelIdStr === 'test_hotel') {
-    return buildHotelPageLink('test_hotel', {
-      checkIn: params.checkIn,
-      checkOut: params.checkOut,
-      rooms: [{ adults: params.guests }],
-      currency: 'RUB',
-      lang: 'ru',
-    });
-  }
-  
-  if (hotelIdStr === '2' || hotelIdStr === 'test_hotel_do_not_book') {
-    return buildHotelPageLink('test_hotel_do_not_book', {
-      checkIn: params.checkIn,
-      checkOut: params.checkOut,
-      rooms: [{ adults: params.guests }],
-      currency: 'RUB',
-      lang: 'ru',
-    });
-  }
-  
-  // Для строковых slug (не чисел) — строим HP
+
+  // Для строковых slug (не чисел) — строим HP без подмены на тестовый отель.
   if (!/^\d+$/.test(hotelIdStr)) {
-    // Только test_hotel и test_hotel_do_not_book — валидные slug для Ostrovok
-    // Все остальные (moscow_ritz, spb_astoria и т.д.) — наши demo ID
-    if (hotelIdStr === 'test_hotel' || hotelIdStr === 'test_hotel_do_not_book') {
-      try {
-        return buildHotelPageLink(hotelIdStr, {
-          checkIn: params.checkIn,
-          checkOut: params.checkOut,
-          rooms: [{ adults: params.guests }],
-          currency: 'RUB',
-          lang: 'ru',
-        });
-      } catch (e) {
-        // Если slug не валиден — fallback к тестовому отелю
-      }
+    try {
+      return buildHotelPageLink(hotelIdStr, {
+        checkIn: params.checkIn,
+        checkOut: params.checkOut,
+        rooms: [{ adults: params.guests, childrenAges: params.childrenAges }],
+        currency: 'RUB',
+        lang: 'ru',
+      });
+    } catch (e) {
+      // Fall through to SERP link for malformed slug.
     }
-    // Для всех остальных строковых ID (demo отели) — используем тестовый отель
-    console.warn(`[generatePartnerLink] Demo hotel ID=${hotelId}, using test_hotel fallback`);
-    return buildHotelPageLink('test_hotel', {
-      checkIn: params.checkIn,
-      checkOut: params.checkOut,
-      rooms: [{ adults: params.guests }],
-      currency: 'RUB',
-      lang: 'ru',
-    });
   }
   
   // Для числовых hid — используем SERP с region_id
@@ -322,19 +308,18 @@ const generatePartnerLink = (hotelId: string | number, params: {
     return buildSerpLink(regionId, {
       checkIn: params.checkIn,
       checkOut: params.checkOut,
-      rooms: [{ adults: params.guests }],
+      rooms: [{ adults: params.guests, childrenAges: params.childrenAges }],
       currency: 'RUB',
       lang: 'ru',
     });
   }
   
-  // Для любого другого числового hid (включая 126001 и др.) — используем тестовый отель
-  // Это нужно для демо-режима, когда API возвращает числовые hid вместо slug
-  console.warn(`[generatePartnerLink] Unknown hid=${hotelId}, using test_hotel fallback`);
-  return buildHotelPageLink('test_hotel', {
+  // Без тестового fallback: дефолтная SERP Москва.
+  console.warn(`[generatePartnerLink] Unknown region for hotel=${hotelId}, using SERP fallback`);
+  return buildSerpLink(1, {
     checkIn: params.checkIn,
     checkOut: params.checkOut,
-    rooms: [{ adults: params.guests }],
+    rooms: [{ adults: params.guests, childrenAges: params.childrenAges }],
     currency: 'RUB',
     lang: 'ru',
   });
@@ -350,6 +335,7 @@ const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
   checkIn: string;
   checkOut: string;
   guests: number;
+  childrenAges?: number[];
 }, city?: string): Hotel => {
   const getThumbnail = () => {
     if (hotel.images_ext && hotel.images_ext.length > 0) {
@@ -381,18 +367,35 @@ const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
     images: hotel.images_ext,
     description: hotel.description_struct?.map(p => p.text).join('\n\n'),
     hotelType: hotel.hotel_type,
-    // Пока всегда открываем только тестовый отель (по запросу)
     bookingUrl: searchParams
-      ? buildHotelPageLink('test_hotel', {
-          partnerSlug: PARTNER_SLUG,
+      ? generatePartnerLink(hotel.id || hotel.hid || '', {
           checkIn: searchParams.checkIn,
           checkOut: searchParams.checkOut,
-          rooms: [{ adults: searchParams.guests }],
-          currency: 'RUB',
-          lang: 'ru',
-        })
+          guests: searchParams.guests,
+          childrenAges: searchParams.childrenAges,
+        }, hotel.name, city)
       : undefined,
-    distanceToCenter: hotel.distance_center
+    distanceToCenter: hotel.distance_center,
+    taxesAndFees:
+      typeof (hotel as any)?.rates?.[0]?.payment_options?.payment_types?.[0]?.tax_data?.taxes === 'string'
+        ? (hotel as any).rates[0].payment_options.payment_types[0].tax_data.taxes
+        : 'Не указано',
+    mealType: (hotel as any)?.rates?.[0]?.meal || (hotel as any)?.rates?.[0]?.meal_data?.value || 'Не указано',
+    cancellationPolicy: Array.isArray((hotel as any)?.rates?.[0]?.cancellation_penalties)
+      ? JSON.stringify((hotel as any).rates[0].cancellation_penalties[0])
+      : 'Не указано',
+    cancellationDeadline:
+      (hotel as any)?.rates?.[0]?.cancellation_penalties?.[0]?.start_at ||
+      (hotel as any)?.rates?.[0]?.cancellation_penalties?.[0]?.free_cancellation_before ||
+      'Не указано',
+    checkInTime: (hotel as any).check_in_time || 'Не указано',
+    checkOutTime: (hotel as any).check_out_time || 'Не указано',
+    metapolicyHighlights: (hotel as any).metapolicy_struct ? [JSON.stringify((hotel as any).metapolicy_struct)] : undefined,
+    roomName: (hotel as any)?.rates?.[0]?.room_name,
+    roomAmenities: Array.isArray((hotel as any)?.rates?.[0]?.amenities)
+      ? (hotel as any).rates[0].amenities.map((a: any) => String(a))
+      : undefined,
+    amenities: Array.isArray((hotel as any).amenities) ? (hotel as any).amenities.map((a: any) => String(a)) : undefined,
   };
 };
 
@@ -454,112 +457,98 @@ DEMO_HOTELS['test_hotel_do_not_book'] = TEST_HOTELS.filter((h: DemoHotel) => h.i
 
 // Search hotels via Ostrovok API (with demo fallback)
 async function searchOstrovokHotels(filters: FilterState): Promise<Hotel[]> {
+  const checkIn = filters.dates.start || new Date().toISOString().split('T')[0];
+  const checkOut = filters.dates.end || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const guests = filters.travelers || 2;
+  const traceId = createTraceId();
+  const normalized = normalizeDestination(filters.destination || 'Москва');
+  logSearchStep('info', traceId, 'search_start', {
+    destination: filters.destination,
+    normalizedDestination: normalized.regionHint,
+    checkIn,
+    checkOut,
+    guests,
+  });
+  upsertTrace({ traceId, rawUserQuery: filters.destination, normalizedDestination: normalized.regionHint });
+
   try {
-    // Default dates
-    const checkIn = filters.dates.start || new Date().toISOString().split('T')[0];
-    const checkOut = filters.dates.end || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const guests = filters.travelers || 2;
-    
-    console.log('[Ostrovok] Searching hotels:', {
-      destination: filters.destination,
+    if (FORCE_TEST_HOTELS) {
+      logSearchStep('warn', traceId, 'cert_mode_test_hotels_enabled');
+      return getDemoHotels(filters.destination, checkIn, checkOut, guests);
+    }
+    if (!hasEtgCredentials()) {
+      throw new Error('ETG credentials are not configured');
+    }
+    const endpoint = resolveSearchEndpoint({ hasCoordinates: Boolean(normalized.latitude && normalized.longitude) });
+    upsertTrace({ traceId, endpoint: endpoint.endpoint });
+    logSearchStep('info', traceId, 'endpoint_selected', endpoint);
+
+    const childrenAges = Array.isArray(filters.childrenAges)
+      ? filters.childrenAges.filter((age) => Number.isFinite(age) && age >= 0 && age <= 17)
+      : [];
+    let apiHotels = await searchSerpRegion(normalized.regionHint || 'Москва', {
       checkIn,
       checkOut,
-      guests,
-      mode: OSTROVOK_API_KEY ? 'api' : 'demo'
+      adults: guests,
+      childrenAges,
     });
-
-    // Check if API credentials are configured (Key ID + API Token OR legacy API Key + Secret)
-    const hasApiCredentials = !!(OSTROVOK_KEY_ID && OSTROVOK_API_TOKEN) || !!(OSTROVOK_API_KEY && OSTROVOK_API_SECRET);
-    
-    // If API key is not configured or API is unavailable, use demo data
-    if (!hasApiCredentials) {
-      console.log('[Ostrovok] Using demo data (no API credentials). Key ID:', !!OSTROVOK_KEY_ID, 'API Token:', !!OSTROVOK_API_TOKEN);
-      return getDemoHotels(filters.destination, checkIn, checkOut, guests);
-    }
-
-    // Try to call real API
-    try {
-      // Test hotels by slug (per Ostrovok support: ID = test_hotel, ID = test_hotel_do_not_book)
-      const testHotelIds = ['test_hotel', 'test_hotel_do_not_book'];
-      
-      let response;
-      
-      console.log('[Ostrovok] ========== TEST HOTELS SEARCH ==========');
-      console.log('[Ostrovok] Destination:', filters.destination);
-      console.log('[Ostrovok] Using test hotel IDs (slug):', testHotelIds);
-      console.log('[Ostrovok] Endpoint:', `${OSTROVOK_API_URL}/api/b2b/v3/search/serp/hotels/`);
-      
-      response = await axios.post(
-        `${OSTROVOK_API_URL}/api/b2b/v3/search/serp/hotels/`,
-        {
-          ids: testHotelIds,
+    upsertTrace({
+      traceId,
+      parsedIntent: {
+        destination: filters.destination,
+        checkIn,
+        checkOut,
+        adults: guests,
+        children: childrenAges.length,
+        childrenAges,
+      },
+      requestPayload: {
+        endpoint: '/api/b2b/v3/search/serp/region/',
+        region: normalized.regionHint || 'Москва',
+        checkin: checkIn,
+        checkout: checkOut,
+        guests: [{ adults: guests, children: childrenAges }],
+      },
+    });
+    if (apiHotels.length === 0 && normalized.latitude && normalized.longitude) {
+      apiHotels = await searchSerpGeo(normalized.latitude, normalized.longitude, normalized.radiusKm || 10, {
+        checkIn,
+        checkOut,
+        adults: guests,
+        childrenAges,
+      });
+      upsertTrace({
+        traceId,
+        requestPayload: {
+          endpoint: '/api/b2b/v3/search/serp/geo/',
+          latitude: normalized.latitude,
+          longitude: normalized.longitude,
+          radius: normalized.radiusKm || 10,
           checkin: checkIn,
           checkout: checkOut,
-          guests: [{ adults: guests, children: [] }],
-          language: 'ru',
-          currency: 'RUB',
-          residency: 'ru'
+          guests: [{ adults: guests, children: childrenAges }],
         },
-        {
-          headers: getOstrovokAuthHeaders(),
-          timeout: 30000
-        }
-      );
-      
-      console.log('[Ostrovok] Response status:', response.status);
-      console.log('[Ostrovok] Response data:', JSON.stringify(response.data, null, 2).substring(0, 2000));
-
-      // API returns data in data.data.hotels structure
-      console.log('[Ostrovok] Response structure:', Object.keys(response.data));
-      console.log('[Ostrovok] Response data.data:', response.data.data ? Object.keys(response.data.data) : 'no data.data');
-      const apiHotels: OstrovokHotel[] = response.data.data?.hotels || response.data.hotels || [];
-      console.log(`[Ostrovok] Found ${apiHotels.length} hotels from API with real rates`);
-      if (apiHotels.length > 0) {
-        console.log('[Ostrovok] First hotel:', { id: apiHotels[0].id, name: apiHotels[0].name, hid: apiHotels[0].hid });
-      }
-      
-      if (apiHotels.length === 0) {
-        console.log('[Ostrovok] No hotels from API, returning demo data');
-        return getDemoHotels(filters.destination, checkIn, checkOut, guests);
-      }
-      
-      // Transform API hotels
-      console.log('[Ostrovok] Using real API hotels');
-      let transformedHotels = apiHotels.map((apiHotel: OstrovokHotel) => {
-        return transformHotelData(apiHotel, { checkIn, checkOut, guests }, filters.destination);
       });
-      
-      // Filter to only include hotels with rates
-      transformedHotels = transformedHotels.filter((h: Hotel) => h.rates && h.rates.length > 0);
-      
-      // Only use test hotels by slug (per Ostrovok support)
-      const validTestHotelSlugs = ['test_hotel', 'test_hotel_do_not_book'];
-      const validHotels = transformedHotels.filter((h: Hotel) => 
-        validTestHotelSlugs.includes(String(h.id))
-      );
-      
-      if (validHotels.length > 0) {
-        console.log(`[Ostrovok] Found ${validHotels.length} test hotels with valid public links`);
-        return validHotels;
-      }
-      
-      // If no test hotels found, return demo hotels with warning
-      console.log('[Ostrovok] No test hotels found in API response, using demo fallback');
-      return getDemoHotels(filters.destination, checkIn, checkOut, guests);
-
-    } catch (apiError: any) {
-      console.error('[Ostrovok] ========== API ERROR ==========');
-      console.error('[Ostrovok] Error message:', apiError.message);
-      console.error('[Ostrovok] Error status:', apiError.response?.status);
-      console.error('[Ostrovok] Error statusText:', apiError.response?.statusText);
-      console.error('[Ostrovok] Error data:', JSON.stringify(apiError.response?.data, null, 2));
-      console.error('[Ostrovok] Using demo data as fallback');
-      console.error('[Ostrovok] ==================================');
+    }
+    const transformed = apiHotels.map((apiHotel: OstrovokHotel) =>
+      transformHotelData(apiHotel, { checkIn, checkOut, guests, childrenAges }, filters.destination)
+    );
+    upsertTrace({
+      traceId,
+      responseStatus: 200,
+      hotelsFound: transformed.length,
+      responseTimeMs: Date.now(),
+    });
+    logSearchStep('info', traceId, 'search_success', { hotelsFound: transformed.length });
+    return transformed;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'search_failed';
+    upsertTrace({ traceId, responseStatus: 500, hotelsFound: 0, errorReason: reason });
+    logSearchStep('error', traceId, 'search_failed', { reason });
+    const canUseFallback = FORCE_TEST_HOTELS || (ETG_ENABLE_TEST_FALLBACK && process.env.NODE_ENV !== 'production');
+    if (canUseFallback) {
       return getDemoHotels(filters.destination, checkIn, checkOut, guests);
     }
-
-  } catch (error) {
-    console.error('[Ostrovok] Search error:', (error as Error).message);
     return [];
   }
 }
@@ -581,8 +570,8 @@ function getDemoHotels(destination: string, checkIn: string, checkOut: string, g
     hotels = DEMO_HOTELS['Италия'] || [];
   }
   
-  // Пока всегда ведём на тестовый отель
-  const testHotelUrl = buildHotelPageLink('test_hotel', {
+  // Dev/test-only fallback URL for demo mode.
+  const testHotelUrl = buildSerpLink(1, {
     partnerSlug: PARTNER_SLUG,
     checkIn,
     checkOut,
@@ -934,7 +923,8 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
       },
       preferences: filters?.preferences || [],
       travelers: filters?.travelers || 2,
-      children: filters?.children || 0
+      children: filters?.children || 0,
+      childrenAges: Array.isArray(filters?.childrenAges) ? filters.childrenAges : []
     };
 
     console.log('[GPT Proxy] Merged filters:', JSON.stringify(defaultFilters, null, 2));
