@@ -1400,19 +1400,36 @@ const Chat = () => {
     // Создаём новый URLSearchParams при каждом изменении URL
     const params = new URLSearchParams(location.search);
     const chatIdFromUrl = params.get('chat');
+    const creatorChatIdFromUrl = params.get('creatorChat');
     
-    // Если это creator чат - пропускаем обычную загрузку
-    if (params.get('creatorChat')) return;
+    // Если это creator чат по URL параметру
+    if (creatorChatIdFromUrl) {
+      setCreatorChatId(creatorChatIdFromUrl);
+      setIsCreatorChat(true);
+      return;
+    }
     
     console.log('URL changed, chatId:', chatIdFromUrl, 'currentChatId:', currentChatId);
     
+    // Проверяем, не является ли этот чат creator чатом из списка
     if (chatIdFromUrl && user && chatIdFromUrl !== currentChatId) {
-      console.log('Loading chat:', chatIdFromUrl);
+      const chat = userChats.find(c => c.id === chatIdFromUrl);
+      if (chat && (chat as any).isCreatorChat) {
+        console.log('Loading creator chat from list:', chatIdFromUrl);
+        setCreatorChatId((chat as any).creatorChatId || chatIdFromUrl);
+        setIsCreatorChat(true);
+        setCurrentChatId(chatIdFromUrl);
+        return;
+      }
+      
+      console.log('Loading regular chat:', chatIdFromUrl);
       loadChat(chatIdFromUrl);
     } else if (!chatIdFromUrl && currentChatId) {
       // Сбрасываем текущий чат если нет параметра в URL
       console.log('Resetting chat');
       setCurrentChatId(null);
+      setIsCreatorChat(false);
+      setCreatorChatId(null);
       setMessages([{
         id: Date.now() + Math.random(),
         text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
@@ -1420,7 +1437,7 @@ const Chat = () => {
         role: 'assistant'
       }]);
     }
-  }, [location.search, user]);
+  }, [location.search, user, userChats]);
 
   // Загрузка списка чатов при входе пользователя
   useEffect(() => {
