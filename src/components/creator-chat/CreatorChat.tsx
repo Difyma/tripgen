@@ -32,29 +32,42 @@ export const CreatorChat: React.FC<CreatorChatProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [connected, setConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Загрузка списка чатов
+  // Connect to WebSocket on mount
   useEffect(() => {
-    loadChats();
-    const interval = setInterval(loadChats, 30000);
-    return () => clearInterval(interval);
+    const connect = async () => {
+      try {
+        await creatorChatApi.connect();
+        setConnected(true);
+        
+        // Subscribe to new messages
+        creatorChatApi.onMessage((message) => {
+          setMessages(prev => {
+            // Avoid duplicates
+            if (prev.some(m => m.id === message.id)) return prev;
+            return [...prev, message].sort((a, b) => 
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+          });
+        });
+
+        // Load initial chats
+        await loadChats();
+      } catch (err) {
+        console.error('Error connecting to chat:', err);
+      }
+    };
+
+    connect();
+
+    return () => {
+      creatorChatApi.disconnect();
+    };
   }, []);
 
-  // Загрузка сообщений при выборе чата
-  useEffect(() => {
-    if (selectedChat) {
-      loadMessages(selectedChat.chat_id);
-      const interval = setInterval(() => loadMessages(selectedChat.chat_id), 5000);
-      return () => clearInterval(interval);
-    }
-  }, [selectedChat]);
-
-  // Автоскролл к новым сообщениям
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
+  // Load chats list
   const loadChats = async () => {
     try {
       const data = await creatorChatApi.getChats();
@@ -62,7 +75,7 @@ export const CreatorChat: React.FC<CreatorChatProps> = ({
       
       if (initialChatId && !selectedChat) {
         const chat = data.find(c => c.chat_id === initialChatId);
-        if (chat) setSelectedChat(chat);
+        if (chat) handleChatSelect(chat);
       }
     } catch (err) {
       console.error('Error loading chats:', err);
@@ -71,20 +84,10 @@ export const CreatorChat: React.FC<CreatorChatProps> = ({
     }
   };
 
-  const loadMessages = async (chatId: string) => {
-    try {
-      const data = await creatorChatApi.getMessages(chatId);
-      setMessages(prev => {
-        const existingIds = new Set(prev.map(m => m.id));
-        const newMessages = data.filter(m => !existingIds.has(m.id));
-        return [...prev, ...newMessages].sort((a, b) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        );
-      });
-    } catch (err) {
-      console.error('Error loading messages:', err);
-    }
-  };
+  // Auto-scroll to new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,6 +102,7 @@ export const CreatorChat: React.FC<CreatorChatProps> = ({
       setMessages(prev => [...prev, message]);
       setNewMessage('');
       
+      // Update chat list with new message
       setChats(prev => prev.map(chat => 
         chat.chat_id === selectedChat.chat_id 
           ? { ...chat, last_message_at: new Date().toISOString() }
@@ -113,32 +117,44 @@ export const CreatorChat: React.FC<CreatorChatProps> = ({
     }
   };
 
-  const handleChatSelect = (chat: Chat) => {
+  const handleChatSelect = async (chat: Chat) => {
     setSelectedChat(chat);
     setMessages([]);
-    if (chat.unread_count > 0) {
-      creatorChatApi.markAsRead(chat.chat_id).then(() => {
+    
+    try {
+      // Join chat and get messages
+      const { messages: chatMessages } = await creatorChatApi.joinChat(
+        chat.creator_id, 
+        chat.tourTitle
+      );
+      setMessages(chatMessages);
+      
+      // Mark as read
+      if (chat.unread_count > 0) {
+        await creatorChatApi.markAsRead(chat.chat_id);
         setChats(prev => prev.map(c => 
           c.chat_id === chat.chat_id ? { ...c, unread_count: 0 } : c
         ));
-      });
+      }
+    } catch (err) {
+      console.error('Error loading chat:', err);
     }
   };
 
   const isOwnMessage = (msg: Message) => msg.sender_id === user?.id;
 
   const getChatName = (chat: Chat) => {
-    if (isCreator) {
-      return chat.client_name || chat.client_email || 'Клиент';
+    if (chat.tourTitle) {
+      return `Тур: ${chat.tourTitle}`;
     }
-    return chat.creator_name || chat.creator_email || 'Креатор';
+    return isCreator ? 'Клиент' : 'Организатор';
   };
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  // Список чатов
+  // Chat list view
   if (!selectedChat) {
     return (
       <div className={`bg-white rounded-2xl shadow-lg overflow-hidden ${embedded ? 'h-full' : 'h-[600px]'}`}>
@@ -147,8 +163,8 @@ export const CreatorChat: React.FC<CreatorChatProps> = ({
             {isCreator ? 'Чаты с клиентами' : 'Мои чаты'}
           </h2>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-sm text-gray-500">Онлайн</span>
+            <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></div>
+            <span className="text-sm text-gray-500">{connected ? 'Онлайн' : 'Подключение...'}</span>
           </div>
         </div>
 
@@ -163,7 +179,7 @@ export const CreatorChat: React.FC<CreatorChatProps> = ({
               <p className="text-center">
                 {isCreator 
                   ? 'У вас пока нет чатов с клиентами' 
-                  : 'У вас пока нет чатов с креаторами'}
+                  : 'У вас пока нет чатов с организаторами'}
               </p>
             </div>
           ) : (
@@ -192,12 +208,12 @@ export const CreatorChat: React.FC<CreatorChatProps> = ({
                       )}
                     </div>
                     <p className="text-sm text-gray-500 truncate">
-                      {isCreator ? 'Клиент' : 'Креатор'}
+                      {isCreator ? 'Клиент' : 'Организатор тура'}
                     </p>
                   </div>
                   {chat.unread_count > 0 && (
                     <span className="bg-red-500 text-white text-xs font-medium px-2 py-1 rounded-full min-w-[20px] text-center">
-                      {chat.unread_count}
+                      {chat.unread_count > 99 ? '99+' : chat.unread_count}
                     </span>
                   )}
                 </button>
@@ -209,7 +225,7 @@ export const CreatorChat: React.FC<CreatorChatProps> = ({
     );
   }
 
-  // Окно чата
+  // Chat window
   return (
     <div className={`bg-white rounded-2xl shadow-lg overflow-hidden ${embedded ? 'h-full' : 'h-[600px]'}`}>
       {/* Header */}

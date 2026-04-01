@@ -8,6 +8,7 @@ import flightsRouter from './routes/flights.js';
 import creatorRouter from './routes/creatorApplication.js';
 import hotelsRouter from './routes/hotels-full.js';
 import creatorChatRouter from './routes/creator-chat.js';
+import { initChatWebSocket } from './lib/chat-ws.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -109,7 +110,11 @@ const server = app.listen(PORT, () => {
   console.log('- POST /api/hotels/hotelpage -> Hotel details endpoint');
   console.log('- POST /api/hotels/content -> Hotel static content endpoint');
   console.log('- GET  /api/hotels/suggest -> Hotel/region autocomplete');
+  console.log('- WS   /socket.io/chat -> Creator chat WebSocket');
 });
+
+// Initialize WebSocket server for creator chats
+initChatWebSocket(server);
 
 server.on('error', (error) => {
   console.error('Server error:', error);

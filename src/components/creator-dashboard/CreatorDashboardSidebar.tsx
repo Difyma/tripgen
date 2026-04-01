@@ -50,24 +50,33 @@ export function CreatorDashboardSidebar({ className }: CreatorDashboardSidebarPr
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Загрузка количества непрочитанных сообщений
+  // Подключение к WebSocket для real-time unread count
   useEffect(() => {
-    const loadUnreadCount = async () => {
+    let unsubscribe: (() => void) | null = null;
+    
+    const connect = async () => {
       try {
+        await creatorChatApi.connect();
+        
+        // Получаем начальное количество
         const count = await creatorChatApi.getUnreadCount();
         setUnreadCount(count);
-      } catch (err: any) {
-        // API может быть недоступен - молча игнорируем
-        if (err?.response?.status !== 404) {
-          console.error('Error loading unread count:', err);
-        }
-        setUnreadCount(0);
+        
+        // Подписываемся на изменения
+        unsubscribe = creatorChatApi.onUnreadCount((count) => {
+          setUnreadCount(count);
+        });
+      } catch (err) {
+        console.error('Error connecting to chat:', err);
       }
     };
 
-    loadUnreadCount();
-    const interval = setInterval(loadUnreadCount, 30000); // Обновление каждые 30 сек
-    return () => clearInterval(interval);
+    connect();
+    
+    return () => {
+      unsubscribe?.();
+      creatorChatApi.disconnect();
+    };
   }, []);
 
   const isActivePath = (path: string) => {
