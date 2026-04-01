@@ -151,12 +151,12 @@ export const creatorChatApi = {
     });
   },
 
-  // Получить сообщения чата
+  // Получить сообщения чата (по chatId)
   async getMessages(chatId: string): Promise<Message[]> {
     const s = await getSocket();
     if (!s) throw new Error('Not connected');
 
-    // Join chat room first
+    // Join existing chat by chatId
     s.emit('join_chat', { chatId });
     
     return new Promise((resolve, reject) => {

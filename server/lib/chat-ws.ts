@@ -78,15 +78,35 @@ export function initChatWebSocket(httpServer: HttpServer) {
       });
 
       // Create or join chat
-      socket.on('join_chat', (data: { creatorId: string; clientId?: string; tourTitle?: string }) => {
+      socket.on('join_chat', (data: { creatorId?: string; chatId?: string; clientId?: string; tourTitle?: string }) => {
         try {
-          const { creatorId, clientId = userId, tourTitle } = data;
+          let chat: Chat | undefined;
           
-          // Find existing chat or create new
-          let chat = findChat(creatorId, clientId);
+          // If chatId provided - join existing chat
+          if (data.chatId) {
+            chat = chats.get(data.chatId);
+            if (chat) {
+              // Verify user has access
+              if (chat.creatorId !== userId && chat.clientId !== userId) {
+                socket.emit('error', { message: 'Access denied' });
+                return;
+              }
+            }
+          }
+          
+          // If creatorId provided - find or create chat
+          if (!chat && data.creatorId) {
+            const clientId = data.clientId || userId;
+            chat = findChat(data.creatorId, clientId);
+            
+            if (!chat) {
+              chat = createChat(data.creatorId, clientId, data.tourTitle);
+            }
+          }
           
           if (!chat) {
-            chat = createChat(creatorId, clientId, tourTitle);
+            socket.emit('error', { message: 'Chat not found' });
+            return;
           }
           
           socket.join(chat.id);
