@@ -5,10 +5,20 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
 
+// Check if we're in production
+const isProduction = import.meta.env.PROD;
+
 const createMockSupabase = (): SupabaseClient => {
   console.warn(
     'Supabase environment variables are missing. Falling back to a mock client so the UI can render.'
   );
+  
+  // In production, throw error instead of mock
+  if (isProduction) {
+    throw new Error(
+      'Supabase configuration is missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.'
+    );
+  }
 
   const mockResponse = {
     select: () => mockResponse,
