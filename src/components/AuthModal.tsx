@@ -114,21 +114,28 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setSuccessMessage('');
     setIsLoading(true);
 
+    console.log('[AuthModal] Starting OTP verification...');
+    const startTime = Date.now();
+    
     try {
       const result = await auth.verifyOTP(email, otp);
       
+      console.log('[AuthModal] Verify completed in', Date.now() - startTime, 'ms');
+      
       if (result.session) {
         setSuccessMessage('Вход выполнен успешно!');
-        await refreshUser();
         
-        // Close modal after success
+        // Refresh user in background
+        refreshUser().catch(console.error);
+        
+        // Close modal immediately
         setTimeout(() => {
           resetForm();
           onClose();
-        }, 1500);
+        }, 800);
       }
     } catch (err: any) {
-      console.error('Error verifying OTP:', err);
+      console.error('[AuthModal] Error verifying OTP:', err);
       setErrorMessage(err.message);
     } finally {
       setIsLoading(false);

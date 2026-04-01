@@ -144,16 +144,20 @@ export const auth = {
   // Проверка OTP кода через Supabase
   verifyOTP: async (email: string, token: string): Promise<AuthResponse> => {
     try {
+      console.log('[Auth] Verifying OTP for:', email);
+      
       const { data, error } = await supabase.auth.verifyOtp({
         email,
         token,
         type: 'email'
       });
 
+      console.log('[Auth] Verify result:', { hasSession: !!data.session, error: error?.message });
+
       if (error) {
         console.error('[Auth] Verify error:', error);
-        if (error.message.includes('Invalid token')) {
-          throw new Error('Неверный код. Проверьте и попробуйте снова.');
+        if (error.message.includes('Invalid token') || error.message.includes('Token has expired')) {
+          throw new Error('Неверный или устаревший код. Запросите новый.');
         }
         throw new Error('Ошибка проверки кода. Попробуйте снова.');
       }
@@ -162,8 +166,8 @@ export const auth = {
         throw new Error('Не удалось войти. Попробуйте снова.');
       }
 
-      // Ensure profile exists
-      await ensureProfileExists(data.user!.id, email);
+      // Ensure profile exists (в фоне, не блокируем)
+      ensureProfileExists(data.user!.id, email).catch(console.error);
 
       return { 
         session: data.session, 
