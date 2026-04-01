@@ -1395,60 +1395,79 @@ const Chat = () => {
     }
   }, [location.search, user]);
 
-  // Автоматическое создание чата при входе с creatorId
+  // Загрузка/создание чата при входе
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const creatorIdFromUrl = params.get('creatorId');
-    
-    if (creatorIdFromUrl && user && !creatorChatId) {
-      // Автоматически создаём чат с организатором
-      startNewChat();
-    }
-  }, [location.search, user]);
-
-  // Загрузка конкретного чата из URL параметра
-  useEffect(() => {
-    // Создаём новый URLSearchParams при каждом изменении URL
     const params = new URLSearchParams(location.search);
     const chatIdFromUrl = params.get('chat');
     const creatorChatIdFromUrl = params.get('creatorChat');
+    const creatorIdFromUrl = params.get('creatorId');
+    const tourTitleFromUrl = params.get('tourTitle');
     
-    // Если это creator чат по URL параметру
-    if (creatorChatIdFromUrl) {
+    // Если есть creatorId - создаём чат с организатором
+    if (creatorIdFromUrl && user && !isCreatorChat) {
+      console.log('Creating creator chat with:', creatorIdFromUrl);
+      
+      const createChat = async () => {
+        try {
+          await creatorChatApi.connect();
+          const { chatId } = await creatorChatApi.joinChat(creatorIdFromUrl, tourTitleFromUrl || undefined);
+          
+          setCreatorChatId(chatId);
+          setIsCreatorChat(true);
+          setMessages([{
+            id: Date.now(),
+            text: `Вы начали чат с организатором тура "${tourTitleFromUrl || ''}". Задавайте ваши вопросы напрямую организатору.`,
+            isUser: false,
+            role: 'assistant'
+          }]);
+          
+          // Добавляем в список чатов
+          const newChat: Chat = {
+            id: chatId,
+            title: tourTitleFromUrl ? `Тур: ${tourTitleFromUrl}` : 'Чат с организатором',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            user_id: user.id,
+            isCreatorChat: true,
+            creatorChatId: chatId,
+            unread_count: 0
+          };
+          setUserChats(prev => [newChat, ...prev]);
+          
+          // Обновляем URL
+          const newParams = new URLSearchParams(location.search);
+          newParams.set('creatorChat', chatId);
+          newParams.delete('creatorId');
+          navigate({ pathname: location.pathname, search: newParams.toString() }, { replace: true });
+          
+        } catch (err) {
+          console.error('Error creating chat:', err);
+        }
+      };
+      
+      createChat();
+      return;
+    }
+    
+    // Если есть creatorChat в URL - загружаем существующий
+    if (creatorChatIdFromUrl && user) {
       setCreatorChatId(creatorChatIdFromUrl);
       setIsCreatorChat(true);
       return;
     }
     
-    console.log('URL changed, chatId:', chatIdFromUrl, 'currentChatId:', currentChatId);
-    
-    // Проверяем, не является ли этот чат creator чатом из списка
+    // Обычный чат
     if (chatIdFromUrl && user && chatIdFromUrl !== currentChatId) {
       const chat = userChats.find(c => c.id === chatIdFromUrl);
       if (chat && (chat as any).isCreatorChat) {
-        console.log('Loading creator chat from list:', chatIdFromUrl);
         setCreatorChatId((chat as any).creatorChatId || chatIdFromUrl);
         setIsCreatorChat(true);
         setCurrentChatId(chatIdFromUrl);
         return;
       }
-      
-      console.log('Loading regular chat:', chatIdFromUrl);
       loadChat(chatIdFromUrl);
-    } else if (!chatIdFromUrl && !creatorChatId && currentChatId) {
-      // Сбрасываем текущий чат если нет параметра в URL
-      console.log('Resetting chat');
-      setCurrentChatId(null);
-      setIsCreatorChat(false);
-      setCreatorChatId(null);
-      setMessages([{
-        id: Date.now() + Math.random(),
-        text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
-        isUser: false,
-        role: 'assistant'
-      }]);
     }
-  }, [location.search, user, userChats, creatorChatId]);
+  }, [location.search, user]);
 
   // Загрузка списка чатов при входе пользователя
   useEffect(() => {
