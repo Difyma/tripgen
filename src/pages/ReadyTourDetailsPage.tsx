@@ -69,14 +69,20 @@ export function ReadyTourDetailsPage() {
   };
 
   const handleAskQuestion = () => {
-    const query = `Вопрос организатору по туру "${tour.title}" в регионе ${tour.region}.`;
-    // Если у тура есть creatorId - создаём чат с создателем, иначе обычный ИИ-чат
-    const creatorParam = tour.creatorId ? `&creatorId=${encodeURIComponent(tour.creatorId)}` : '';
-    navigate(
-      `/chat?q=${encodeURIComponent(query)}&tourTitle=${encodeURIComponent(
-        tour.title
-      )}&newTour=1${creatorParam}`
-    );
+    // Если у тура есть creatorId - создаём чат с организатором напрямую
+    if (tour.creatorId) {
+      navigate(
+        `/chat?creatorId=${encodeURIComponent(tour.creatorId)}&creatorChat=1&tourTitle=${encodeURIComponent(tour.title)}`
+      );
+    } else {
+      // Иначе - обычный ИИ-чат с вопросом
+      const query = `Вопрос организатору по туру "${tour.title}" в регионе ${tour.region}.`;
+      navigate(
+        `/chat?q=${encodeURIComponent(query)}&tourTitle=${encodeURIComponent(
+          tour.title
+        )}&newTour=1`
+      );
+    }
   };
 
   const handleStartAiChat = () => {

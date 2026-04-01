@@ -1312,6 +1312,11 @@ const Chat = () => {
     // - для "Задать вопрос" по туру (newTour=1) ждём user, чтобы создать и сохранить отдельный тур-чат
     const params = new URLSearchParams(location.search);
     const isNewTourChat = params.get('newTour') === '1' || Boolean(params.get('tourTitle'));
+    
+    // Если это чат с организатором тура - не отправляем запрос к AI
+    const isCreatorChatMode = Boolean(params.get('creatorChat')) || Boolean(params.get('creatorId'));
+    if (isCreatorChatMode) return;
+    
     if (isNewTourChat && !user) return;
 
     if (
