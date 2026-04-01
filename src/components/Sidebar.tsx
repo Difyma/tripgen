@@ -78,9 +78,11 @@ export function Sidebar({ className }: SidebarProps) {
     // Исторически тур-чаты могли называться по-разному:
     // - "Тур: <название тура>" — новая схема
     // - "Я перешёл из детальной страницы тура…" — старая схема
+    // - Чаты с организаторами (creator chats)
     return (
       title.startsWith('тур:') ||
-      title.startsWith('я перешёл из детальной страницы тура')
+      title.startsWith('я перешёл из детальной страницы тура') ||
+      (chat as any).isCreatorChat === true
     );
   };
 
@@ -282,34 +284,44 @@ export function Sidebar({ className }: SidebarProps) {
                       </div>
                       {userChats
                         .filter(isTourChat)
-                        .map(chat => (
-                          <Link
-                            key={chat.id}
-                            to={`/chat?chat=${chat.id}`}
-                            className={
-                              'group flex items-center gap-3 px-3 py-2 rounded-xl ml-2 transition-colors duration-200 ' +
-                              (location.search.includes('chat=' + chat.id)
-                                ? 'bg-gray-100 text-gray-900'
-                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')
-                            }
-                          >
-                            <Mountain className="w-4 h-4 shrink-0" />
-                            <span className="font-medium truncate flex-1">{chat.title}</span>
-                            <button
-                              onClick={(e) => handleDeleteChat(e, chat.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 hover:text-red-600 rounded transition-all"
-                              title="Удалить чат"
+                        .map(chat => {
+                          // Для чатов с организаторами используем creatorChat параметр
+                          const isCreatorChat = (chat as any).isCreatorChat;
+                          const chatUrl = isCreatorChat 
+                            ? `/chat?creatorChat=${(chat as any).creatorChatId || chat.id}`
+                            : `/chat?chat=${chat.id}`;
+                          
+                          return (
+                            <Link
+                              key={chat.id}
+                              to={chatUrl}
+                              className={
+                                'group flex items-center gap-3 px-3 py-2 rounded-xl ml-2 transition-colors duration-200 ' +
+                                (location.search.includes('chat=' + chat.id) || location.search.includes('creatorChat=' + chat.id)
+                                  ? 'bg-gray-100 text-gray-900'
+                                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')
+                              }
                             >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                            <span className="text-xs text-gray-400 whitespace-nowrap">
-                              {new Date(chat.updated_at).toLocaleDateString('ru-RU', {
-                                day: 'numeric',
-                                month: 'short'
-                              })}
-                            </span>
-                          </Link>
-                        ))}
+                              <Mountain className="w-4 h-4 shrink-0" />
+                              <span className="font-medium truncate flex-1">{chat.title}</span>
+                              {!isCreatorChat && (
+                                <button
+                                  onClick={(e) => handleDeleteChat(e, chat.id)}
+                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 hover:text-red-600 rounded transition-all"
+                                  title="Удалить чат"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                              <span className="text-xs text-gray-400 whitespace-nowrap">
+                                {new Date(chat.updated_at).toLocaleDateString('ru-RU', {
+                                  day: 'numeric',
+                                  month: 'short'
+                                })}
+                              </span>
+                            </Link>
+                          );
+                        })}
                     </div>
                   )}
                 </div>

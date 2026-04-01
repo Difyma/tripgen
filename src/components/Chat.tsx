@@ -1415,8 +1415,32 @@ const Chat = () => {
     const loadUserChats = async () => {
       if (user) {
         try {
+          // Загружаем обычные AI чаты
           const chats = await getUserChats();
-          setUserChats(chats);
+          
+          // Подключаемся к WebSocket и загружаем чаты с организаторами
+          try {
+            await creatorChatApi.connect();
+            const creatorChats = await creatorChatApi.getChats();
+            
+            // Преобразуем чаты с организаторами в формат Chat
+            const formattedCreatorChats: Chat[] = creatorChats.map((c: any) => ({
+              id: c.chat_id,
+              title: c.tourTitle ? `Тур: ${c.tourTitle}` : 'Чат с организатором',
+              created_at: c.created_at || new Date().toISOString(),
+              updated_at: c.last_message_at || new Date().toISOString(),
+              user_id: user.id,
+              isCreatorChat: true,
+              creatorChatId: c.chat_id,
+              unread_count: c.unread_count || 0
+            }));
+            
+            // Объединяем чаты
+            setUserChats([...formattedCreatorChats, ...chats]);
+          } catch (wsError) {
+            console.error('Error loading creator chats:', wsError);
+            setUserChats(chats);
+          }
         } catch (error) {
           console.error('Error loading user chats:', error);
         }
@@ -1470,11 +1494,15 @@ const Chat = () => {
       const tourTitleFromUrl = params.get('tourTitle');
       const creatorIdFromUrl = params.get('creatorId');
       
-      // Если есть creatorId - создаём чат с создателем тура
+      // Если есть creatorId - создаём чат с создателем тура через WebSocket
       if (creatorIdFromUrl) {
         try {
-          const creatorChat = await creatorChatApi.createChat(creatorIdFromUrl);
-          setCreatorChatId(creatorChat.chat_id);
+          // Подключаемся к WebSocket
+          await creatorChatApi.connect();
+          
+          // Создаём/присоединяемся к чату
+          const { chatId } = await creatorChatApi.joinChat(creatorIdFromUrl, tourTitleFromUrl || undefined);
+          setCreatorChatId(chatId);
           setIsCreatorChat(true);
           
           // Добавляем системное сообщение о начале чата
@@ -1485,13 +1513,28 @@ const Chat = () => {
             role: 'assistant'
           }]);
           
+          // Добавляем чат в список (чтобы он появился в левой панели)
+          const newChat: Chat = {
+            id: chatId,
+            title: tourTitleFromUrl ? `Тур: ${tourTitleFromUrl}` : 'Чат с организатором',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            user_id: user.id,
+            isCreatorChat: true,
+            creatorChatId: chatId,
+            unread_count: 0
+          };
+          setUserChats(prev => [newChat, ...prev]);
+          
           // Обновляем URL
           const newParams = new URLSearchParams(location.search);
-          newParams.set('creatorChat', creatorChat.chat_id);
+          newParams.set('creatorChat', chatId);
+          newParams.delete('creatorId');
+          newParams.delete('creatorChat');
           newParams.delete('newTour');
           navigate({ pathname: location.pathname, search: newParams.toString() }, { replace: true });
           
-          return creatorChat.chat_id;
+          return chatId;
         } catch (err) {
           console.error('Error creating creator chat:', err);
           // Fallback к обычному чату если не удалось создать creator чат
