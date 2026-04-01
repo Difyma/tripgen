@@ -56,8 +56,12 @@ export function CreatorDashboardSidebar({ className }: CreatorDashboardSidebarPr
       try {
         const count = await creatorChatApi.getUnreadCount();
         setUnreadCount(count);
-      } catch (err) {
-        console.error('Error loading unread count:', err);
+      } catch (err: any) {
+        // API может быть недоступен - молча игнорируем
+        if (err?.response?.status !== 404) {
+          console.error('Error loading unread count:', err);
+        }
+        setUnreadCount(0);
       }
     };
 

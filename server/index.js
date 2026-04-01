@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import gptRouter from './gptProxy.js';
 import flightsRouter from './routes/flights.ts';
+import creatorChatRouter from './routes/creator-chat.js';
 
 // Load environment variables
 dotenv.config();
@@ -35,6 +36,7 @@ app.get('/', (req, res) => {
 // Routes
 app.use('/', gptRouter);
 app.use('/api/flights', flightsRouter);
+app.use('/api/creator-chat', creatorChatRouter);
 console.log('Routes configured');
 
 // Error handling middleware
