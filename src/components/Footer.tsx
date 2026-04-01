@@ -16,7 +16,7 @@ const footerLinks: Record<string, FooterLink[]> = {
   Компания: [
     { name: 'О нас', href: '/about', isRouterLink: true },
     { name: 'Для креаторов', href: '/creator', isRouterLink: true },
-    { name: 'Туры', href: '/#tours', isRouterLink: true }
+    { name: 'Туры', href: '/tours', isRouterLink: true }
   ],
   Поддержка: [
     { name: 'Связаться с нами', href: '#' },
