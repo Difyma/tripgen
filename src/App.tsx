@@ -27,6 +27,7 @@ import CreatorProfilePage from './components/creator-dashboard/pages/ProfilePage
 import OrdersPage from './components/creator-dashboard/pages/OrdersPage';
 import CalendarPage from './components/creator-dashboard/pages/CalendarPage';
 import CrmPage from './components/creator-dashboard/pages/CrmPage';
+import CreateTourPage from './components/creator-dashboard/pages/CreateTourPage';
 import FinancesPage from './components/creator-dashboard/pages/FinancesPage';
 import AnalyticsPage from './components/creator-dashboard/pages/AnalyticsPage';
 import ReviewsPage from './components/creator-dashboard/pages/ReviewsPage';
@@ -57,6 +58,7 @@ export function App() {
           <Route path="/creator-dashboard/orders" element={<OrdersPage />} />
           <Route path="/creator-dashboard/calendar" element={<CalendarPage />} />
           <Route path="/creator-dashboard/crm" element={<CrmPage />} />
+          <Route path="/creator-dashboard/create-tour" element={<CreateTourPage />} />
           <Route path="/creator-dashboard/finances" element={<FinancesPage />} />
           <Route path="/creator-dashboard/analytics" element={<AnalyticsPage />} />
           <Route path="/creator-dashboard/reviews" element={<ReviewsPage />} />

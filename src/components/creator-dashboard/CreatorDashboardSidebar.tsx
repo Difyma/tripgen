@@ -15,6 +15,7 @@ import {
   ChevronRight,
   X,
   Menu,
+  Plus,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -30,6 +31,7 @@ const menuItems = [
   { id: 'orders', label: 'Заказы', icon: ShoppingBag, path: '/creator-dashboard/orders' },
   { id: 'calendar', label: 'Календарь', icon: Calendar, path: '/creator-dashboard/calendar' },
   { id: 'crm', label: 'CRM', icon: ClipboardList, path: '/creator-dashboard/crm' },
+  { id: 'create-tour', label: 'Создать тур', icon: Plus, path: '/creator-dashboard/create-tour' },
   { id: 'finances', label: 'Финансы', icon: Wallet, path: '/creator-dashboard/finances' },
   { id: 'analytics', label: 'Аналитика', icon: BarChart3, path: '/creator-dashboard/analytics' },
   { id: 'reviews', label: 'Отзывы', icon: Star, path: '/creator-dashboard/reviews' },
