@@ -1,4 +1,4 @@
-import { Star, MapPin, Wifi, Car, Utensils, Lock, Dumbbell } from 'lucide-react';
+import { Star, MapPin, Wifi, Car, Utensils, Lock, Dumbbell, Info, Ban, Clock, Wallet } from 'lucide-react';
 
 interface HotelCardProps {
   name: string;
@@ -220,15 +220,87 @@ export const HotelCard = ({
 
           {/* Amenities */}
           {amenities.length > 0 ? renderAmenities() : null}
-          <div className="mt-2 space-y-1 text-xs text-gray-600">
-            {taxesAndFees && <div><strong>Налоги/сборы:</strong> {taxesAndFees}</div>}
-            {mealType && <div><strong>Питание:</strong> {mealType}</div>}
-            {cancellationPolicy && <div><strong>Политика отмены:</strong> {cancellationPolicy}</div>}
-            {cancellationDeadline && <div><strong>Дедлайн отмены:</strong> {cancellationDeadline}</div>}
-            {(checkInTime || checkOutTime) && <div><strong>Check-in/out:</strong> {checkInTime || '-'} / {checkOutTime || '-'}</div>}
-            {roomName && <div><strong>Номер:</strong> {roomName}</div>}
-            {roomAmenities.length > 0 && <div><strong>Удобства номера:</strong> {roomAmenities.slice(0, 8).join(', ')}</div>}
-            {metapolicyHighlights.length > 0 && <div><strong>Ограничения:</strong> {metapolicyHighlights.slice(0, 3).join('; ')}</div>}
+          {/* Tariff Info */}
+          <div className="mt-2 space-y-1.5 text-xs">
+            {/* Cancellation Policy */}
+            {cancellationPolicy && (
+              <div className="flex items-start gap-1.5">
+                <Ban className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <span className={cancellationPolicy.includes('Бесплатная') ? 'text-green-600 font-medium' : 'text-amber-600'}>
+                  {cancellationPolicy}
+                </span>
+              </div>
+            )}
+            
+            {/* Cancellation Deadline */}
+            {cancellationDeadline && cancellationDeadline !== 'Нет' && (
+              <div className="flex items-start gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-600">
+                  Дедлайн: {cancellationDeadline}
+                </span>
+              </div>
+            )}
+            
+            {/* Taxes */}
+            {taxesAndFees && (
+              <div className="flex items-start gap-1.5">
+                <Wallet className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-600">
+                  Налоги: {taxesAndFees}
+                </span>
+              </div>
+            )}
+            
+            {/* Meal */}
+            {mealType && mealType !== 'Не указано' && (
+              <div className="flex items-start gap-1.5">
+                <Utensils className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-600">
+                  {mealType}
+                </span>
+              </div>
+            )}
+            
+            {/* Check-in/out */}
+            {(checkInTime || checkOutTime) && (
+              <div className="flex items-start gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-600">
+                  Заезд: {checkInTime || '15:00'}, Выезд: {checkOutTime || '12:00'}
+                </span>
+              </div>
+            )}
+            
+            {/* Room Name */}
+            {roomName && (
+              <div className="flex items-start gap-1.5">
+                <Info className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-700 font-medium">
+                  {roomName}
+                </span>
+              </div>
+            )}
+            
+            {/* Room Amenities */}
+            {roomAmenities.length > 0 && (
+              <div className="flex items-start gap-1.5">
+                <Info className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                <span className="text-gray-600">
+                  {roomAmenities.slice(0, 6).join(', ')}
+                </span>
+              </div>
+            )}
+            
+            {/* Policy Highlights */}
+            {metapolicyHighlights.length > 0 && (
+              <div className="flex items-start gap-1.5">
+                <Info className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
+                <span className="text-amber-700">
+                  {metapolicyHighlights.slice(0, 3).join('; ')}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Price and Button */}

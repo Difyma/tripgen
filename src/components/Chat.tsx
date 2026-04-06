@@ -603,14 +603,26 @@ const Chat = () => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const isUserScrollingRef = useRef(false);
   const lastScrollTopRef = useRef(0);
-  const [messages, setMessages] = useState<Message[]>([
-    {
+  // Ленивая инициализация messages - проверяем URL параметры
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const params = new URLSearchParams(location.search);
+    const hasChatId = params.get('chat');
+    const creatorChatId = params.get('creatorChat');
+    const creatorId = params.get('creatorId');
+    
+    // Если есть параметры чата - начинаем с пустого массива (история загрузится)
+    if (hasChatId || creatorChatId || creatorId) {
+      return [];
+    }
+    
+    // Иначе - приветственное сообщение
+    return [{
       id: Date.now() + Math.random(),
       text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
       isUser: false,
       role: 'assistant'
-    }
-  ]);
+    }];
+  });
   
   const [filters, setFilters] = useState<FilterState>({
     location: '',
@@ -1277,8 +1289,14 @@ const Chat = () => {
   useEffect(() => {
     if (isFirstMount.current) {
       const hasChatId = new URLSearchParams(location.search).get('chat');
-      // Не сбрасываем сообщения если есть chatId — история загрузится отдельно
-      if (!hasChatId) {
+      const creatorChatId = new URLSearchParams(location.search).get('creatorChat');
+      const creatorId = new URLSearchParams(location.search).get('creatorId');
+      
+      // Не сбрасываем сообщения если есть chatId или creator чат — история загрузится отдельно
+      // Также не сбрасываем если messages уже содержат данные
+      const hasExistingMessages = messages.length > 0;
+      
+      if (!hasChatId && !creatorChatId && !creatorId && !hasExistingMessages) {
         setMessages([{
           id: Date.now() + Math.random(),
           text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
@@ -1396,7 +1414,7 @@ const Chat = () => {
       
       loadCreatorMessages();
     }
-  }, [location.search, user]);
+  }, [location.search, user, isCreatorChat]);
 
   // Загрузка/создание чата при входе
   useEffect(() => {

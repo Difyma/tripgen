@@ -330,6 +330,97 @@ const formatImageUrl = (url: string, size: string = '640x400'): string => {
   return url.replace('{size}', size);
 };
 
+// Format cancellation policy for display
+function formatCancellationPolicy(rate: any): string {
+  if (!rate?.cancellation_penalties) {
+    return 'Невозвратный тариф';
+  }
+  
+  const penalties = rate.cancellation_penalties;
+  
+  // Check for free cancellation
+  if (penalties.free_cancellation_before) {
+    const deadline = new Date(penalties.free_cancellation_before);
+    const now = new Date();
+    if (deadline > now) {
+      return `Бесплатная отмена до ${deadline.toLocaleDateString('ru-RU')}`;
+    }
+  }
+  
+  // Check policies array
+  if (Array.isArray(penalties.policies) && penalties.policies.length > 0) {
+    const policy = penalties.policies[0];
+    const amount = policy.amount_show || policy.amount_charge;
+    const currency = rate.currency || 'RUB';
+    
+    if (amount > 0) {
+      return `При отмене — штраф ${amount.toLocaleString('ru-RU')} ${currency}`;
+    }
+  }
+  
+  return 'Уточняйте политику отмены';
+}
+
+// Format cancellation deadline
+function formatCancellationDeadline(rate: any): string {
+  if (!rate?.cancellation_penalties) {
+    return 'Нет';
+  }
+  
+  const penalties = rate.cancellation_penalties;
+  
+  if (penalties.free_cancellation_before) {
+    const deadline = new Date(penalties.free_cancellation_before);
+    // Convert to UTC+0 (Moscow time)
+    return deadline.toLocaleString('ru-RU', { 
+      timeZone: 'Europe/Moscow',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }) + ' (UTC+0)';
+  }
+  
+  if (Array.isArray(penalties.policies) && penalties.policies.length > 0) {
+    const policy = penalties.policies[0];
+    if (policy.date_from) {
+      const date = new Date(policy.date_from);
+      return date.toLocaleString('ru-RU', {
+        timeZone: 'Europe/Moscow',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }) + ' (UTC+0)';
+    }
+  }
+  
+  return 'Нет';
+}
+
+// Calculate taxes and fees from payment options
+function formatTaxesAndFees(rate: any): string {
+  if (!rate?.payment_options?.payment_types?.[0]) {
+    return 'Включены в стоимость';
+  }
+  
+  const paymentType = rate.payment_options.payment_types[0];
+  const amount = paymentType.show_amount || paymentType.amount;
+  const currency = paymentType.show_currency_code || paymentType.currency_code || 'RUB';
+  
+  // If gross amount differs from net, show the difference as taxes
+  if (rate.show_amount && rate.amount && rate.show_amount !== rate.amount) {
+    const taxAmount = rate.show_amount - rate.amount;
+    if (taxAmount > 0) {
+      return `${taxAmount.toLocaleString('ru-RU')} ${currency} (вкл. в цену)`;
+    }
+  }
+  
+  return 'Включены в стоимость';
+}
+
 // Transform Ostrovok hotel to our format
 const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
   checkIn: string;
@@ -355,6 +446,8 @@ const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
     return hotel.min_price || 0;
   };
 
+  const firstRate = hotel.rates?.[0];
+
   return {
     id: hotel.id,
     hid: hotel.hid,
@@ -376,28 +469,105 @@ const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
         }, hotel.name, city)
       : undefined,
     distanceToCenter: hotel.distance_center,
-    taxesAndFees:
-      typeof (hotel as any)?.rates?.[0]?.payment_options?.payment_types?.[0]?.tax_data?.taxes === 'string'
-        ? (hotel as any).rates[0].payment_options.payment_types[0].tax_data.taxes
-        : 'Не указано',
-    mealType: (hotel as any)?.rates?.[0]?.meal || (hotel as any)?.rates?.[0]?.meal_data?.value || 'Не указано',
-    cancellationPolicy: Array.isArray((hotel as any)?.rates?.[0]?.cancellation_penalties)
-      ? JSON.stringify((hotel as any).rates[0].cancellation_penalties[0])
-      : 'Не указано',
-    cancellationDeadline:
-      (hotel as any)?.rates?.[0]?.cancellation_penalties?.[0]?.start_at ||
-      (hotel as any)?.rates?.[0]?.cancellation_penalties?.[0]?.free_cancellation_before ||
-      'Не указано',
-    checkInTime: (hotel as any).check_in_time || 'Не указано',
-    checkOutTime: (hotel as any).check_out_time || 'Не указано',
-    metapolicyHighlights: (hotel as any).metapolicy_struct ? [JSON.stringify((hotel as any).metapolicy_struct)] : undefined,
-    roomName: (hotel as any)?.rates?.[0]?.room_name,
-    roomAmenities: Array.isArray((hotel as any)?.rates?.[0]?.amenities)
-      ? (hotel as any).rates[0].amenities.map((a: any) => String(a))
-      : undefined,
-    amenities: Array.isArray((hotel as any).amenities) ? (hotel as any).amenities.map((a: any) => String(a)) : undefined,
+    taxesAndFees: formatTaxesAndFees(firstRate),
+    mealType: firstRate?.meal_data?.value || firstRate?.meal || 'Не указано',
+    cancellationPolicy: formatCancellationPolicy(firstRate),
+    cancellationDeadline: formatCancellationDeadline(firstRate),
+    checkInTime: (hotel as any).check_in_time || '15:00',
+    checkOutTime: (hotel as any).check_out_time || '12:00',
+    metapolicyHighlights: extractMetapolicyHighlights(hotel as any),
+    roomName: firstRate?.room_name,
+    roomAmenities: extractRoomAmenities(firstRate),
+    amenities: extractHotelAmenities(hotel as any),
   };
 };
+
+// Extract important policy highlights
+function extractMetapolicyHighlights(hotel: any): string[] {
+  const highlights: string[] = [];
+  
+  if (!hotel.metapolicy_struct) return highlights;
+  
+  const policy = hotel.metapolicy_struct;
+  
+  // Check-in/check-out policies
+  if (policy.check_in_check_out?.length > 0) {
+    const checkIn = policy.check_in_check_out.find((p: any) => p.type === 'check_in');
+    const checkOut = policy.check_in_check_out.find((p: any) => p.type === 'check_out');
+    if (checkIn?.inclusion === 'not_included' && checkIn.price > 0) {
+      highlights.push(`Ранний заезд: +${checkIn.price} ${checkIn.currency}`);
+    }
+    if (checkOut?.inclusion === 'not_included' && checkOut.price > 0) {
+      highlights.push(`Поздний выезд: +${checkOut.price} ${checkOut.currency}`);
+    }
+  }
+  
+  // Children policy
+  if (policy.children?.length > 0) {
+    const child = policy.children[0];
+    if (child.price > 0) {
+      highlights.push(`Дети ${child.min_age}-${child.max_age} лет: ${child.price} ${child.currency}`);
+    }
+  }
+  
+  // Pets policy
+  if (policy.pets?.length > 0) {
+    const pet = policy.pets[0];
+    if (pet.inclusion === 'not_included' && pet.price > 0) {
+      highlights.push(`Проживание с животными: ${pet.price} ${pet.currency}`);
+    } else if (pet.inclusion === 'included') {
+      highlights.push('Проживание с животными: бесплатно');
+    }
+  }
+  
+  // Internet policy
+  if (policy.internet?.length > 0) {
+    const internet = policy.internet[0];
+    if (internet.inclusion === 'included') {
+      highlights.push('Wi-Fi: бесплатно');
+    } else if (internet.price > 0) {
+      highlights.push(`Wi-Fi: ${internet.price} ${internet.currency}`);
+    }
+  }
+  
+  // Parking policy
+  if (policy.parking?.length > 0) {
+    const parking = policy.parking[0];
+    if (parking.inclusion === 'included') {
+      highlights.push('Парковка: бесплатно');
+    } else if (parking.price > 0) {
+      highlights.push(`Парковка: ${parking.price} ${parking.currency}`);
+    }
+  }
+  
+  return highlights.slice(0, 4); // Limit to 4 items
+}
+
+// Extract room amenities from rate
+function extractRoomAmenities(rate: any): string[] {
+  if (!rate?.room_data) return [];
+  
+  const amenities: string[] = [];
+  const rd = rate.room_data;
+  
+  if (rd.balcony === 1) amenities.push('Балкон');
+  if (rd.bathroom === 2) amenities.push('Санузел в номере');
+  if (rd.bedding === 3) amenities.push('Двуспальная кровать');
+  if (rd.bedding === 4) amenities.push('2 односпальные кровати');
+  if (rd.area && rd.area > 0) amenities.push(`${rd.area} м²`);
+  
+  return amenities;
+}
+
+// Extract hotel amenities
+function extractHotelAmenities(hotel: any): string[] {
+  if (!Array.isArray(hotel.amenities)) return [];
+  
+  return hotel.amenities
+    .flatMap((group: any) => group?.amenities || [])
+    .filter(Boolean)
+    .slice(0, 8);
+}
 
 // Use realistic demo hotels - they're used when API is unavailable
 const DEMO_HOTELS: Record<string, Hotel[]> = Object.entries(REALISTIC_DEMO_HOTELS).reduce(
@@ -582,6 +752,14 @@ function getDemoHotels(destination: string, checkIn: string, checkOut: string, g
   return hotels.map(h => ({
     ...h,
     bookingUrl: testHotelUrl,
+    taxesAndFees: h.taxesAndFees || 'Включены в стоимость',
+    cancellationPolicy: h.cancellationPolicy || 'Уточняйте политику отмены',
+    cancellationDeadline: h.cancellationDeadline,
+    checkInTime: h.checkInTime || '15:00',
+    checkOutTime: h.checkOutTime || '12:00',
+    mealType: h.mealType,
+    roomName: h.roomName,
+    metapolicyHighlights: h.amenities ? [h.amenities.slice(0, 3).join(', ')] : undefined,
   }));
 }
 

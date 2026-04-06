@@ -72,7 +72,7 @@ export function ReadyTourDetailsPage() {
     // Если у тура есть creatorId - создаём чат с организатором напрямую
     if (tour.creatorId) {
       navigate(
-        `/chat?creatorId=${encodeURIComponent(tour.creatorId)}&creatorChat=1&tourTitle=${encodeURIComponent(tour.title)}`
+        `/chat?creatorId=${encodeURIComponent(tour.creatorId)}&tourTitle=${encodeURIComponent(tour.title)}`
       );
     } else {
       // Иначе - обычный ИИ-чат с вопросом

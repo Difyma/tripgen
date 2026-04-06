@@ -18,6 +18,14 @@ export interface DemoHotel {
   description: string;
   images: { category: string; url: string }[];
   amenities?: string[];
+  // Tax and cancellation info (for certification compliance)
+  taxesAndFees?: string;
+  cancellationPolicy?: string;
+  cancellationDeadline?: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  mealType?: string;
+  roomName?: string;
 }
 
 // Unsplash image URLs for hotels
@@ -83,7 +91,14 @@ const moscowHotels: DemoHotel[] = [
     distanceToCenter: 500,
     description: 'Роскошный отель в центре Москвы с видом на Красную площадь. Роскошные номера, спа-центр, несколько ресторанов и безупречный сервис.',
     images: IMAGES.luxury.map((url, i) => ({ category: i === 0 ? 'exterior' : 'room', url })),
-    amenities: AMENITIES.luxury
+    amenities: AMENITIES.luxury,
+    taxesAndFees: 'Включены в стоимость',
+    cancellationPolicy: 'Бесплатная отмена за 24 часа',
+    cancellationDeadline: 'За 24 часа до заезда (UTC+0)',
+    checkInTime: '15:00',
+    checkOutTime: '12:00',
+    mealType: 'Завтрак включен',
+    roomName: 'Делюкс с видом на город'
   },
   {
     id: 'moscow_marriott',
