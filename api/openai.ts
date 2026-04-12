@@ -1,5 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import axios from 'axios';
+import {
+  extractCancellationDeadlineLine,
+  extractCancellationPolicyLine,
+  extractCheckInOut,
+  extractMealLine,
+  extractTaxesLine,
+} from './etgExtractCert';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const PARTNER_SLUG = process.env.OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
@@ -336,11 +343,12 @@ function getCertificationTestHotels(destination: string, checkIn: string, checkO
       currency: 'RUB',
       bookingUrl,
       images: [{ category: 'exterior', url: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&h=500&fit=crop' }],
-      mealType: 'Не указано',
-      cancellationPolicy: 'Не указано',
-      cancellationDeadline: 'Не указано',
-      checkInTime: 'Не указано',
-      checkOutTime: 'Не указано',
+      mealType: 'Режим CERT_MODE=test_hotels: для проверки полей сертификации включите CERT_MODE=real и live SERP.',
+      cancellationPolicy: 'Режим CERT_MODE=test_hotels: нет live cancellation_penalties.',
+      cancellationDeadline: '—',
+      checkInTime: '—',
+      checkOutTime: '—',
+      taxesAndFees: 'Режим CERT_MODE=test_hotels: нет live tax_data.',
     },
   ];
 }
@@ -353,15 +361,13 @@ function mapEtgHotelToApi(
   destination?: string,
   fallbackRegionId?: number | string
 ): HotelForApi {
+  const rate = hotel?.rates?.[0];
   const amount = Number(
-    hotel?.rates?.[0]?.payment_options?.payment_types?.[0]?.show_amount ??
-      hotel?.rates?.[0]?.amount ??
-      hotel?.min_price ??
-      0
+    rate?.payment_options?.payment_types?.[0]?.show_amount ?? rate?.amount ?? hotel?.min_price ?? 0
   );
   const bookingUrl =
-    typeof hotel?.rates?.[0]?.payment_options?.payment_types?.[0]?.link === 'string'
-      ? hotel.rates[0].payment_options.payment_types[0].link
+    typeof rate?.payment_options?.payment_types?.[0]?.link === 'string'
+      ? rate.payment_options.payment_types[0].link
       : buildSerpFallbackLink(
           checkIn,
           checkOut,
@@ -370,13 +376,7 @@ function mapEtgHotelToApi(
           hotel?.region?.id ?? hotel?.region_id ?? fallbackRegionId
         );
 
-  const taxText =
-    typeof hotel?.rates?.[0]?.payment_options?.payment_types?.[0]?.tax_data?.taxes === 'string'
-      ? hotel.rates[0].payment_options.payment_types[0].tax_data.taxes
-      : undefined;
-  const cancellationPenalty = Array.isArray(hotel?.rates?.[0]?.cancellation_penalties)
-    ? hotel.rates[0].cancellation_penalties[0]
-    : undefined;
+  const cinout = extractCheckInOut(hotel);
 
   return {
     id: String(hotel?.id || hotel?.hid || ''),
@@ -385,21 +385,21 @@ function mapEtgHotelToApi(
     rating: typeof hotel?.rating === 'number' ? hotel.rating : undefined,
     address: hotel?.address || '',
     price: Number.isFinite(amount) ? amount : 0,
-    currency: hotel?.rates?.[0]?.payment_options?.show_currency_code || hotel?.currency || 'RUB',
+    currency: rate?.payment_options?.show_currency_code || hotel?.currency || 'RUB',
     images: Array.isArray(hotel?.images_ext)
       ? hotel.images_ext.map((i: any) => ({ category: i?.category || 'exterior', url: i?.url || '' }))
       : undefined,
     bookingUrl,
     distanceToCenter: typeof hotel?.distance_center === 'number' ? hotel.distance_center : undefined,
-    taxesAndFees: taxText,
-    mealType: hotel?.rates?.[0]?.meal || hotel?.rates?.[0]?.meal_data?.value || 'Не указано',
-    cancellationPolicy: cancellationPenalty ? JSON.stringify(cancellationPenalty) : 'Не указано',
-    cancellationDeadline: cancellationPenalty?.start_at || cancellationPenalty?.free_cancellation_before || 'Не указано',
-    checkInTime: hotel?.check_in_time || 'Не указано',
-    checkOutTime: hotel?.check_out_time || 'Не указано',
+    taxesAndFees: extractTaxesLine(rate),
+    mealType: extractMealLine(rate),
+    cancellationPolicy: extractCancellationPolicyLine(rate),
+    cancellationDeadline: extractCancellationDeadlineLine(rate),
+    checkInTime: cinout.in,
+    checkOutTime: cinout.out,
     metapolicyHighlights: hotel?.metapolicy_struct ? [JSON.stringify(hotel.metapolicy_struct)] : undefined,
-    roomName: hotel?.rates?.[0]?.room_name,
-    roomAmenities: Array.isArray(hotel?.rates?.[0]?.amenities) ? hotel.rates[0].amenities.map((a: any) => String(a)) : undefined,
+    roomName: rate?.room_name,
+    roomAmenities: Array.isArray(rate?.amenities) ? rate.amenities.map((a: any) => String(a)) : undefined,
     amenities: Array.isArray(hotel?.amenities) ? hotel.amenities.map((a: any) => String(a)) : undefined,
   };
 }

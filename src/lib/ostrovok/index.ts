@@ -27,3 +27,4 @@
  */
 
 export * from './links';
+export * from './cityRegionMap';

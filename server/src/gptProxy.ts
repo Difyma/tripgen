@@ -29,6 +29,14 @@ import { normalizeDestination } from './etg/destinationNormalizer.js';
 import { resolveSearchEndpoint } from './etg/endpointResolver.js';
 import { searchSerpGeo, searchSerpRegion } from './etg/searchClient.js';
 import { createTraceId, logSearchStep, upsertTrace } from './diagnostics/searchLogger.js';
+import {
+  extractCancellationDeadlineLine,
+  extractCancellationPolicyLine,
+  extractCheckInOut,
+  extractMealLine,
+  extractTaxesLine,
+} from './etg/extractCertRateFields.js';
+import { hasPgConfig, getRoomGroupByRgExt } from './storage/etgContentRepository.js';
 
 dotenv.config();
 
@@ -330,96 +338,6 @@ const formatImageUrl = (url: string, size: string = '640x400'): string => {
   return url.replace('{size}', size);
 };
 
-// Format cancellation policy for display
-function formatCancellationPolicy(rate: any): string {
-  if (!rate?.cancellation_penalties) {
-    return 'Невозвратный тариф';
-  }
-  
-  const penalties = rate.cancellation_penalties;
-  
-  // Check for free cancellation
-  if (penalties.free_cancellation_before) {
-    const deadline = new Date(penalties.free_cancellation_before);
-    const now = new Date();
-    if (deadline > now) {
-      return `Бесплатная отмена до ${deadline.toLocaleDateString('ru-RU')}`;
-    }
-  }
-  
-  // Check policies array
-  if (Array.isArray(penalties.policies) && penalties.policies.length > 0) {
-    const policy = penalties.policies[0];
-    const amount = policy.amount_show || policy.amount_charge;
-    const currency = rate.currency || 'RUB';
-    
-    if (amount > 0) {
-      return `При отмене — штраф ${amount.toLocaleString('ru-RU')} ${currency}`;
-    }
-  }
-  
-  return 'Уточняйте политику отмены';
-}
-
-// Format cancellation deadline
-function formatCancellationDeadline(rate: any): string {
-  if (!rate?.cancellation_penalties) {
-    return 'Нет';
-  }
-  
-  const penalties = rate.cancellation_penalties;
-  
-  if (penalties.free_cancellation_before) {
-    const deadline = new Date(penalties.free_cancellation_before);
-    // Convert to UTC+0 (Moscow time)
-    return deadline.toLocaleString('ru-RU', { 
-      timeZone: 'Europe/Moscow',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }) + ' (UTC+0)';
-  }
-  
-  if (Array.isArray(penalties.policies) && penalties.policies.length > 0) {
-    const policy = penalties.policies[0];
-    if (policy.date_from) {
-      const date = new Date(policy.date_from);
-      return date.toLocaleString('ru-RU', {
-        timeZone: 'Europe/Moscow',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      }) + ' (UTC+0)';
-    }
-  }
-  
-  return 'Нет';
-}
-
-// Calculate taxes and fees from payment options
-function formatTaxesAndFees(rate: any): string {
-  if (!rate?.payment_options?.payment_types?.[0]) {
-    return 'Включены в стоимость';
-  }
-  
-  const paymentType = rate.payment_options.payment_types[0];
-  const amount = paymentType.show_amount || paymentType.amount;
-  const currency = paymentType.show_currency_code || paymentType.currency_code || 'RUB';
-  
-  // If gross amount differs from net, show the difference as taxes
-  if (rate.show_amount && rate.amount && rate.show_amount !== rate.amount) {
-    const taxAmount = rate.show_amount - rate.amount;
-    if (taxAmount > 0) {
-      return `${taxAmount.toLocaleString('ru-RU')} ${currency} (вкл. в цену)`;
-    }
-  }
-  
-  return 'Включены в стоимость';
-}
 
 // Transform Ostrovok hotel to our format
 const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
@@ -447,6 +365,7 @@ const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
   };
 
   const firstRate = hotel.rates?.[0];
+  const cinout = extractCheckInOut(hotel);
 
   return {
     id: hotel.id,
@@ -469,18 +388,60 @@ const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
         }, hotel.name, city)
       : undefined,
     distanceToCenter: hotel.distance_center,
-    taxesAndFees: formatTaxesAndFees(firstRate),
-    mealType: firstRate?.meal_data?.value || firstRate?.meal || 'Не указано',
-    cancellationPolicy: formatCancellationPolicy(firstRate),
-    cancellationDeadline: formatCancellationDeadline(firstRate),
-    checkInTime: (hotel as any).check_in_time || '15:00',
-    checkOutTime: (hotel as any).check_out_time || '12:00',
+    taxesAndFees: extractTaxesLine(firstRate),
+    mealType: extractMealLine(firstRate),
+    cancellationPolicy: extractCancellationPolicyLine(firstRate),
+    cancellationDeadline: extractCancellationDeadlineLine(firstRate),
+    checkInTime: cinout.in,
+    checkOutTime: cinout.out,
     metapolicyHighlights: extractMetapolicyHighlights(hotel as any),
     roomName: firstRate?.room_name,
     roomAmenities: extractRoomAmenities(firstRate),
     amenities: extractHotelAmenities(hotel as any),
   };
 };
+
+async function enrichHotelsWithRoomGroups(hotels: Hotel[], rawHotels: OstrovokHotel[]): Promise<Hotel[]> {
+  if (!hasPgConfig()) return hotels;
+  const out: Hotel[] = [];
+  for (let i = 0; i < hotels.length; i++) {
+    const h = hotels[i];
+    const raw = rawHotels[i];
+    const hid = String(raw?.hid ?? '');
+    const rate = raw?.rates?.[0] as any;
+    const rgExt = rate?.rg_ext;
+    if (!hid || !rgExt || typeof rgExt !== 'object') {
+      out.push(h);
+      continue;
+    }
+    try {
+      const row = await getRoomGroupByRgExt(hid, rgExt as Record<string, unknown>);
+      if (!row) {
+        out.push(h);
+        continue;
+      }
+      const staticAmenities = Array.isArray(row.room_amenities)
+        ? row.room_amenities.map((x: unknown) => String(x))
+        : [];
+      const imgs = Array.isArray(row.images) ? row.images : [];
+      const roomImages = imgs
+        .map((im: any) => im?.url)
+        .filter(Boolean)
+        .slice(0, 4)
+        .map((u: string) => ({ category: 'room', url: String(u) }));
+      const mergedImages = roomImages.length > 0 ? [...roomImages, ...(h.images || [])] : h.images;
+      out.push({
+        ...h,
+        roomAmenities: staticAmenities.length > 0 ? staticAmenities : h.roomAmenities,
+        roomName: typeof row.name === 'string' && row.name.trim() ? row.name : h.roomName,
+        images: mergedImages,
+      });
+    } catch {
+      out.push(h);
+    }
+  }
+  return out;
+}
 
 // Extract important policy highlights
 function extractMetapolicyHighlights(hotel: any): string[] {
@@ -700,9 +661,10 @@ async function searchOstrovokHotels(filters: FilterState): Promise<Hotel[]> {
         },
       });
     }
-    const transformed = apiHotels.map((apiHotel: OstrovokHotel) =>
+    let transformed = apiHotels.map((apiHotel: OstrovokHotel) =>
       transformHotelData(apiHotel, { checkIn, checkOut, guests, childrenAges }, filters.destination)
     );
+    transformed = await enrichHotelsWithRoomGroups(transformed, apiHotels);
     upsertTrace({
       traceId,
       responseStatus: 200,

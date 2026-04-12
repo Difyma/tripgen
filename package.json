@@ -14,6 +14,8 @@
     "sync:hotels:full": "npm run server:build && node server/dist/src/jobs/sync_hotels_full.js",
     "sync:hotels:incremental": "npm run server:build && node server/dist/src/jobs/sync_hotels_incremental.js",
     "sync:regions:full": "npm run server:build && node server/dist/src/jobs/sync_regions_full.js",
+    "sync:content:hotels": "npm run server:build && node server/dist/src/jobs/sync_hotel_content.js",
+    "db:migrate:002": "node scripts/pg-apply-migration.mjs db/migrations/002_etg_hotel_content_room_groups.sql",
     "smoke:etg": "node scripts/etg-cert-smoke.mjs",
     "lint": "eslint .",
     "preview": "vite preview",

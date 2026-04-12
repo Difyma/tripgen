@@ -1,3 +1,11 @@
+import {
+  extractCancellationDeadlineLine,
+  extractCancellationPolicyLine,
+  extractCheckInOut,
+  extractMealLine,
+  extractTaxesLine,
+} from './extractCertRateFields.js';
+
 export interface HotelRateViewModel {
   finalPrice: number;
   currency: string;
@@ -27,14 +35,7 @@ export interface HotelSearchViewModel {
 export function mapEtgHotelToViewModel(hotel: any): HotelSearchViewModel {
   const rate = hotel?.rates?.[0] || {};
   const paymentType = rate?.payment_options?.payment_types?.[0] || {};
-  const taxText =
-    typeof paymentType?.tax_data?.taxes === 'string'
-      ? paymentType.tax_data.taxes
-      : undefined;
-
-  const cancellationPenalty = Array.isArray(rate?.cancellation_penalties) ? rate.cancellation_penalties[0] : undefined;
-  const cancellationPolicy = cancellationPenalty ? JSON.stringify(cancellationPenalty) : undefined;
-  const cancellationDeadline = cancellationPenalty?.start_at || cancellationPenalty?.free_cancellation_before;
+  const cinout = extractCheckInOut(hotel);
 
   return {
     id: String(hotel?.id || hotel?.hid || ''),
@@ -51,12 +52,12 @@ export function mapEtgHotelToViewModel(hotel: any): HotelSearchViewModel {
     rate: {
       finalPrice: Number(paymentType?.show_amount || rate?.amount || hotel?.min_price || 0),
       currency: paymentType?.show_currency_code || rate?.payment_options?.show_currency_code || hotel?.currency || 'RUB',
-      taxesAndFees: taxText,
-      mealType: rate?.meal || rate?.meal_data?.value,
-      cancellationPolicy,
-      cancellationDeadline,
-      checkInTime: hotel?.check_in_time,
-      checkOutTime: hotel?.check_out_time,
+      taxesAndFees: extractTaxesLine(rate),
+      mealType: extractMealLine(rate),
+      cancellationPolicy: extractCancellationPolicyLine(rate),
+      cancellationDeadline: extractCancellationDeadlineLine(rate),
+      checkInTime: cinout.in,
+      checkOutTime: cinout.out,
       metapolicyHighlights: hotel?.metapolicy_struct ? [JSON.stringify(hotel.metapolicy_struct)] : undefined,
       roomName: rate?.room_name,
     },

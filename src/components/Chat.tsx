@@ -19,7 +19,7 @@ const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
 import { useFlightInfo } from '../hooks/useFlightInfo';
-import { buildHotelPageLink, buildSerpLink, looksLikeHid } from '@/lib/ostrovok';
+import { buildHotelPageLink, buildSerpLink, looksLikeHid, getRegionIdForCityName } from '@/lib/ostrovok';
 import { HotelCard } from './HotelCard';
 import { 
   getUserChats,
@@ -1753,23 +1753,145 @@ const Chat = () => {
     }
   };
 
-  // Fix booking URLs - convert to proper format with partner_slug and utm_*
+  // Fix booking URLs — партнёрская разметка + корректный HP/SERP (без принудительного test_hotel).
   const fixBookingUrl = (url: string, checkInDate?: string, checkOutDate?: string): string => {
-    // Обрабатываем все ostrovok.ru ссылки включая SERP (/hotels/)
-    if (!url || !url.includes('ostrovok.ru/')) {
+    if (!url || !url.includes('ostrovok.ru')) {
       return url;
     }
-    
-    // ВСЕГДА используем test_hotel для любых ostrovok ссылок
-    const checkIn = checkInDate || new Date().toISOString().split('T')[0];
-    const checkOut = checkOutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    
-    return buildHotelPageLink('test_hotel', {
-      partnerSlug: OSTROVOK_PARTNER_SLUG,
-      checkIn,
-      checkOut,
-      rooms: [{ adults: filters.travelers, childrenAges: filters.childrenAges }],
-    });
+
+    const resolveDates = (): { checkIn: string; checkOut: string } => {
+      if (checkInDate && checkOutDate) {
+        return { checkIn: checkInDate, checkOut: checkOutDate };
+      }
+      if (dateFilter.type === 'specific' && dateFilter.startDate) {
+        const s = dateFilter.startDate.toISOString().split('T')[0];
+        const e = (dateFilter.endDate || dateFilter.startDate).toISOString().split('T')[0];
+        return { checkIn: s, checkOut: e };
+      }
+      const today = new Date().toISOString().split('T')[0];
+      const week = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      return { checkIn: today, checkOut: week };
+    };
+
+    const { checkIn, checkOut } = resolveDates();
+    const roomsArg = [{ adults: filters.travelers, childrenAges: filters.childrenAges }];
+
+    if (FORCE_TEST_HOTELS) {
+      return buildHotelPageLink('test_hotel', {
+        partnerSlug: OSTROVOK_PARTNER_SLUG,
+        checkIn,
+        checkOut,
+        rooms: roomsArg,
+      });
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return url;
+    }
+
+    const withNorm = (u: string) => normalizeOstrovokQueryOrder(u);
+    const regionFromFilter = getRegionIdForCityName((filters.location || '').trim());
+
+    const buildGenericHotels = () => {
+      const u = new URL('https://www.ostrovok.ru/hotels/');
+      u.searchParams.set('utm_medium', 'partners');
+      u.searchParams.set('partner_slug', OSTROVOK_PARTNER_SLUG);
+      u.searchParams.set('utm_source', OSTROVOK_PARTNER_SLUG);
+      u.searchParams.set('dates', `${checkIn.split('-').reverse().join('.')}-${checkOut.split('-').reverse().join('.')}`);
+      u.searchParams.set('guests', String(filters.travelers));
+      u.searchParams.set('cur', 'RUB');
+      u.searchParams.set('lang', 'ru');
+      return withNorm(u.toString());
+    };
+
+    const qParam = parsed.searchParams.get('q');
+    if (qParam && /^\d+$/.test(qParam)) {
+      return withNorm(
+        buildSerpLink(qParam, {
+          partnerSlug: OSTROVOK_PARTNER_SLUG,
+          checkIn,
+          checkOut,
+          rooms: roomsArg,
+        })
+      );
+    }
+
+    const hotelSeg = parsed.pathname.match(/\/hotel\/([^/?]+)/)?.[1];
+    if (hotelSeg) {
+      if (looksLikeHid(hotelSeg)) {
+        if (regionFromFilter != null) {
+          return withNorm(
+            buildSerpLink(regionFromFilter, {
+              partnerSlug: OSTROVOK_PARTNER_SLUG,
+              checkIn,
+              checkOut,
+              rooms: roomsArg,
+            })
+          );
+        }
+        return withNorm(buildGenericHotels());
+      }
+      try {
+        return withNorm(
+          buildHotelPageLink(hotelSeg, {
+            partnerSlug: OSTROVOK_PARTNER_SLUG,
+            checkIn,
+            checkOut,
+            rooms: roomsArg,
+          })
+        );
+      } catch {
+        /* fallthrough */
+      }
+    }
+
+    const roomsSeg = parsed.pathname.match(/\/rooms\/([^/?]+)/)?.[1];
+    if (roomsSeg) {
+      if (looksLikeHid(roomsSeg)) {
+        if (regionFromFilter != null) {
+          return withNorm(
+            buildSerpLink(regionFromFilter, {
+              partnerSlug: OSTROVOK_PARTNER_SLUG,
+              checkIn,
+              checkOut,
+              rooms: roomsArg,
+            })
+          );
+        }
+        return withNorm(buildGenericHotels());
+      }
+      try {
+        return withNorm(
+          buildHotelPageLink(roomsSeg, {
+            partnerSlug: OSTROVOK_PARTNER_SLUG,
+            checkIn,
+            checkOut,
+            rooms: roomsArg,
+          })
+        );
+      } catch {
+        return withNorm(url);
+      }
+    }
+
+    if (parsed.pathname.endsWith('/hotels/') || parsed.pathname === '/hotels') {
+      if (regionFromFilter != null) {
+        return withNorm(
+          buildSerpLink(regionFromFilter, {
+            partnerSlug: OSTROVOK_PARTNER_SLUG,
+            checkIn,
+            checkOut,
+            rooms: roomsArg,
+          })
+        );
+      }
+      return withNorm(buildGenericHotels());
+    }
+
+    return withNorm(url);
   };
 
   const formatMessage = (text: string): string => {
