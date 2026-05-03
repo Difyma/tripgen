@@ -28,3 +28,4 @@
 
 export * from './links';
 export * from './cityRegionMap';
+export * from './images';

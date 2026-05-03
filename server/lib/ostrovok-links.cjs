@@ -4,6 +4,66 @@ function looksLikeHid(value) {
   return /^\d+$/.test(String(value));
 }
 
+/** /hotel/slug/?q=53 → /hotels/?q=53 (см. src/lib/ostrovok/links.ts) */
+function rewriteOstrovokHybridHotelPathToSerp(url) {
+  const raw = String(url).trim().replace(/&amp;/gi, '&');
+  if (!raw || !/ostrovok\.ru/i.test(raw)) return null;
+  let pathname;
+  try {
+    pathname = new URL(raw).pathname;
+  } catch {
+    return null;
+  }
+  if (!/^\/hotel\/[^/]+/i.test(pathname)) return null;
+  if (!/(?:[?&])q=(\d+)(?:&|#|$)/i.test(raw)) return null;
+  try {
+    const u = new URL(raw);
+    const serp = new URL('https://www.ostrovok.ru/hotels/');
+    u.searchParams.forEach((v, k) => serp.searchParams.set(k, v));
+    return serp.toString();
+  } catch {
+    return null;
+  }
+}
+
+function rewriteOstrovokHotelPathToRooms(url) {
+  const raw = String(url).trim().replace(/&amp;/gi, '&');
+  if (!raw || !/ostrovok\.ru/i.test(raw)) return null;
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (/^\/rooms\/[^/]+/i.test(parsed.pathname)) return raw;
+  if (!/^\/hotel\/[^/]+/i.test(parsed.pathname)) return null;
+
+  const parts = parsed.pathname.split('/').map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2 || String(parts[0]).toLowerCase() !== 'hotel') return null;
+
+  let slug;
+  if (parts.length === 2) {
+    const q = parsed.searchParams.get('q');
+    if (q && /^\d+$/.test(q)) return null;
+    slug = parts[1];
+  } else {
+    for (let i = parts.length - 1; i >= 1; i -= 1) {
+      const seg = parts[i];
+      if (!seg) continue;
+      if (/^mid\d+$/i.test(seg)) continue;
+      if (/^(hotel|hotels|rooms)$/i.test(seg)) continue;
+      slug = seg;
+      break;
+    }
+  }
+
+  if (!slug || looksLikeHid(slug)) return null;
+
+  const rooms = new URL('https://www.ostrovok.ru/rooms/' + encodeURIComponent(slug) + '/');
+  parsed.searchParams.forEach((v, k) => rooms.searchParams.set(k, v));
+  return rooms.toString();
+}
+
 function formatDates(checkIn, checkOut) {
   if (!checkIn || !checkOut) return undefined;
   const toDMY = (iso) => {
@@ -90,7 +150,16 @@ function validateAttribution(url) {
   }
 }
 
-module.exports = { PARTNER_SLUG, buildHotelPageLink, buildSerpLink, validateAttribution, encodeGuests, formatDates };
+module.exports = {
+  PARTNER_SLUG,
+  buildHotelPageLink,
+  buildSerpLink,
+  validateAttribution,
+  encodeGuests,
+  formatDates,
+  rewriteOstrovokHybridHotelPathToSerp,
+  rewriteOstrovokHotelPathToRooms,
+};
 
 // Legacy function for backward compatibility
 function generatePartnerLinkLegacy(hotelIdOrSlug, searchParams, hotelName, city) {

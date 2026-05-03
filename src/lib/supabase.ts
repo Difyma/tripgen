@@ -309,6 +309,10 @@ export interface Chat {
   title: string;
   created_at: string;
   updated_at: string;
+  /** Чат с организатором тура (WebSocket), не строка в Supabase */
+  isCreatorChat?: boolean;
+  creatorChatId?: string;
+  unread_count?: number;
 }
 
 export interface ChatMessageDB {

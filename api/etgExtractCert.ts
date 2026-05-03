@@ -16,29 +16,51 @@ export function extractTaxesLine(rate: any): string {
   if (td && typeof td === 'object') {
     const details = td.tax_details ?? td.items;
     if (Array.isArray(details) && details.length > 0) {
-      const parts = details
-        .map((t: any) => {
-          if (!t) return '';
-          if (typeof t === 'string') return t;
-          const name = t.name || t.title || t.type;
-          const amt = t.amount ?? t.amount_show ?? t.value;
-          const cur = t.currency || t.currency_code || '';
-          if (name && amt != null) return `${name}: ${amt} ${cur}`.trim();
-          return JSON.stringify(t);
-        })
-        .filter(Boolean);
-      if (parts.length) return parts.join('; ');
+      const names: string[] = [];
+      let included = 0;
+      let notIncluded = 0;
+      for (const t of details) {
+        if (!t || typeof t !== 'object') continue;
+        const n = String((t as any).name || (t as any).title || (t as any).type || '').trim();
+        if (n) names.push(n);
+        if ((t as any).included_by_supplier === true) included += 1;
+        if ((t as any).included_by_supplier === false) notIncluded += 1;
+      }
+      if (included > 0 || notIncluded > 0) {
+        const labels = names.slice(0, 2).join(', ');
+        const suffix = labels ? ` (${labels}${names.length > 2 ? '…' : ''})` : '';
+        if (included > 0 && notIncluded > 0) {
+          return `Налоги/сборы: включено ${included}, оплачивается отдельно ${notIncluded}${suffix}`;
+        }
+        if (included > 0) {
+          return `Налоги/сборы включены в тариф${suffix}`;
+        }
+        return `Есть дополнительные налоги/сборы${suffix}`;
+      }
+      if (names.length > 0) {
+        return `Налоги/сборы: ${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''}`;
+      }
+      return 'Налоги/сборы присутствуют (детали в тарифе)';
     }
-    const raw = JSON.stringify(td);
-    if (raw !== '{}') return raw;
+    if (td.tax_amount != null || td.total_taxes != null) {
+      const amount = Number(td.tax_amount ?? td.total_taxes);
+      const cur = pt?.show_currency_code || pt?.currency_code || rate?.currency || 'RUB';
+      if (Number.isFinite(amount) && amount > 0) {
+        return `Налоги/сборы: ${amount.toLocaleString('ru-RU')} ${cur}`;
+      }
+    }
   }
   const show = Number(pt?.show_amount);
   const net = Number(pt?.amount ?? rate?.amount);
   const cur = pt?.show_currency_code || pt?.currency_code || rate?.currency || 'RUB';
-  if (Number.isFinite(show) && Number.isFinite(net) && show > net) {
-    return `Доп. сборы/налоги к тарифу: ${(show - net).toLocaleString('ru-RU')} ${cur}`;
+  if (Number.isFinite(show) && Number.isFinite(net) && show > net && show > 0) {
+    const extra = show - net;
+    // Avoid misleading huge deltas on synthetic/test rates.
+    if (extra > 0 && extra <= show * 0.3) {
+      return `Доп. сборы/налоги к тарифу: ${extra.toLocaleString('ru-RU')} ${cur}`;
+    }
   }
-  return 'В ответе API налоги не переданы отдельной строкой';
+  return 'Налоги/сборы уточняются на шаге бронирования';
 }
 
 export function extractMealLine(rate: any): string {
@@ -48,7 +70,17 @@ export function extractMealLine(rate: any): string {
     rate?.meal ||
     firstPaymentType(rate)?.meal_data?.value ||
     firstPaymentType(rate)?.meal;
-  if (typeof v === 'string' && v.trim()) return v.trim();
+  if (typeof v === 'string' && v.trim()) {
+    const meal = v.trim().toLowerCase();
+    if (meal === 'breakfast') return 'Завтрак';
+    if (meal === 'lunch') return 'Обед';
+    if (meal === 'dinner') return 'Ужин';
+    if (meal === 'half board') return 'Полупансион';
+    if (meal === 'full board') return 'Полный пансион';
+    if (meal === 'all inclusive') return 'Все включено';
+    if (meal === 'no meals' || meal === 'without meals' || meal === 'nomeal' || meal === 'room only') return 'Без питания';
+    return v.trim();
+  }
   return 'Тип питания не указан в блоке тарифа';
 }
 
@@ -61,7 +93,7 @@ function firstCancellationBlock(rate: any): any {
 
 export function extractCancellationPolicyLine(rate: any): string {
   const pen = firstCancellationBlock(rate);
-  if (!pen) return 'Политика отмены: без блока cancellation_penalties в ответе';
+  if (!pen) return 'Условия отмены уточняются в тарифе';
 
   if (pen.free_cancellation_before) {
     try {
@@ -80,11 +112,9 @@ export function extractCancellationPolicyLine(rate: any): string {
     if (amt != null && Number(amt) > 0) {
       return `Отмена со штрафом от ${Number(amt).toLocaleString('ru-RU')} ${cur} (по данным API)`;
     }
-    return `Политика отмены: ${JSON.stringify(pen.policies[0])}`;
+    return 'Частично/условно возвратный тариф (см. условия бронирования)';
   }
-  const compact = JSON.stringify(pen);
-  if (compact && compact !== '{}') return `Политика отмены (сырой фрагмент): ${compact.slice(0, 500)}${compact.length > 500 ? '…' : ''}`;
-  return 'Политика отмены: пустой объект в API';
+  return 'Условия отмены доступны на шаге бронирования';
 }
 
 export function extractCancellationDeadlineLine(rate: any): string {

@@ -28,6 +28,46 @@ function block(lines: string[], prefix = '-'): string {
   return filtered.map((line) => `${prefix} ${line}`).join('\n') + '\n\n';
 }
 
+function mapsUrl(query: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function normalizeMapsQuery(line: string): string {
+  return line
+    .replace(/\[[^\]]+\]\((https?:\/\/[^)]+)\)/gi, '')
+    .replace(/^[\s\-•●\d.:()]+/g, '')
+    .replace(/\s*[—–-]\s.*$/g, '')
+    .replace(/\s*\([^)]*\)\s*$/g, '')
+    .replace(
+      /\b(посещение|экскурсия|прогулка|поездка|обед|ужин|завтрак|кофе-брейк|осмотр|визит)\b\s+/i,
+      ''
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function withMapsLink(line: string): string {
+  const value = safeStr(line);
+  if (!value) return '';
+  if (/^\s*#{1,6}\s*/.test(value)) return escapeMarkdownText(value);
+  if (value.length > 80) return escapeMarkdownText(value);
+  if (/\[[^\]]+\]\(https?:\/\/[^)]+\)/i.test(value)) return value;
+  const query = normalizeMapsQuery(value);
+  const weak = /^(адрес|рейтинг|цена|до центра|налоги|питание|отмена|дедлайн|номер|практические советы?)$/i;
+  if (!query || query.length < 3 || query.length > 90 || weak.test(query) || !/[A-Za-zА-Яа-яЁё]/.test(query)) {
+    return escapeMarkdownText(value);
+  }
+  return `[${escapeMarkdownText(value)}](${mapsUrl(query)})`;
+}
+
+function blockWithMaps(lines: string[], prefix = '-'): string {
+  const filtered = lines
+    .filter((s) => s != null && String(s).trim() !== '')
+    .map((s) => withMapsLink(String(s)));
+  if (filtered.length === 0) return '';
+  return filtered.map((line) => `${prefix} ${line}`).join('\n') + '\n\n';
+}
+
 function safeStr(s: string | null | undefined): string {
   if (s == null || typeof s !== 'string') return '';
   return s.trim();
@@ -53,52 +93,30 @@ export function formatTripPlanToMarkdown(plan: TripPlanResponse): string {
     if (valid.length > 0) {
       out.push('# 🗺 Рекомендуемые районы\n\n');
       valid.forEach((a) => {
-        const name = escapeMarkdownText(safeStr(a.name) || 'Район');
+        const name = withMapsLink(safeStr(a.name) || 'Район');
         const reason = escapeMarkdownText(safeStr(a.reason));
-        out.push(`**${name}** — ${reason}\n\n`);
+        out.push(`${name} — ${reason}\n\n`);
       });
     }
   }
 
   if (Array.isArray(plan.hotelRecommendations) && plan.hotelRecommendations.length > 0) {
     out.push('# 🏨 Где остановиться\n\n');
-    plan.hotelRecommendations.forEach((h) => {
-      const name = safeStr(h.name) || 'Отель';
-      const safeName = escapeMarkdownText(name);
-      out.push(`## ${safeName}\n\n`);
-
-      const photoUrl = escapeMarkdownUrl(h.photoUrl ?? '');
-      if (photoUrl) {
-        out.push(`![${safeName}](${photoUrl})\n\n`);
-      }
-
-      const details: string[] = [];
-      if (safeStr(h.address)) details.push(`Адрес: ${escapeMarkdownText(h.address?.trim())}`);
-      if (h.rating != null && String(h.rating).trim() !== '') details.push(`Рейтинг: ${String(h.rating)}`);
-      if (safeStr(h.price)) details.push(`Цена: ${escapeMarkdownText(h.price?.trim())}`);
-      if (h.stars != null && String(h.stars) !== '') details.push(`Звёздность: ${h.stars}`);
-      if (safeStr(h.distanceToCenter)) details.push(`До центра: ${escapeMarkdownText(h.distanceToCenter?.trim())}`);
-      if (details.length > 0) {
-        out.push(details.join(' • '), '\n\n');
-      }
-      if (safeStr(h.description)) {
-        out.push(escapeMarkdownText(h.description?.trim()), '\n\n');
-      }
-      if (safeStr(h.whyThisHotel)) {
-        out.push('*Почему этот отель:* ', escapeMarkdownText(h.whyThisHotel?.trim()), '\n\n');
-      }
-
-      const bookingUrl = escapeMarkdownUrl(h.bookingUrl ?? '');
-      if (bookingUrl) {
-        out.push(`[🛎️ Забронировать отель](${bookingUrl})\n\n`);
-      }
-    });
+    const topNames = plan.hotelRecommendations
+      .map((h) => safeStr(h.name))
+      .filter(Boolean)
+      .slice(0, 3)
+      .map((n) => `**${escapeMarkdownText(n)}**`);
+    if (topNames.length > 0) {
+      out.push(`Подобрал варианты размещения: ${topNames.join(', ')}.\n\n`);
+    }
+    out.push('Ниже в карточках показаны рекомендованные отели с актуальными ценами и ссылками на бронирование.\n\n');
   }
 
   if (Array.isArray(plan.highlights) && plan.highlights.length > 0) {
     const lines = plan.highlights.map((s) => safeStr(s)).filter(Boolean);
     if (lines.length > 0) {
-      out.push('# 🎯 Что посмотреть\n\n', block(lines), '\n');
+      out.push('# 🎯 Что посмотреть\n\n', blockWithMaps(lines), '\n');
     }
   }
 
@@ -116,13 +134,13 @@ export function formatTripPlanToMarkdown(plan: TripPlanResponse): string {
         const title = escapeMarkdownText(safeStr(day.title) || `День ${dayNum}`);
         out.push(`## ${title}\n\n`);
         if (Array.isArray(day.morning) && day.morning.length > 0) {
-          out.push('### ⏰ Утро\n\n', block(day.morning), '\n');
+          out.push('### ⏰ Утро\n\n', blockWithMaps(day.morning), '\n');
         }
         if (Array.isArray(day.daytime) && day.daytime.length > 0) {
-          out.push('### 🌞 День\n\n', block(day.daytime), '\n');
+          out.push('### 🌞 День\n\n', blockWithMaps(day.daytime), '\n');
         }
         if (Array.isArray(day.evening) && day.evening.length > 0) {
-          out.push('### 🌅 Вечер\n\n', block(day.evening), '\n');
+          out.push('### 🌅 Вечер\n\n', blockWithMaps(day.evening), '\n');
         }
       });
     }
@@ -131,7 +149,7 @@ export function formatTripPlanToMarkdown(plan: TripPlanResponse): string {
   if (Array.isArray(plan.foodRecommendations) && plan.foodRecommendations.length > 0) {
     const lines = plan.foodRecommendations.map((s) => safeStr(s)).filter(Boolean);
     if (lines.length > 0) {
-      out.push('# 🍽 Еда и рестораны\n\n', block(lines), '\n');
+      out.push('# 🍽 Еда и рестораны\n\n', blockWithMaps(lines), '\n');
     }
   }
 

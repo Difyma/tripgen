@@ -6,7 +6,14 @@
  */
 
 import axios from 'axios';
-import { buildHotelPageLink, buildSerpLink, encodeGuests, type RoomGuests } from '@/lib/ostrovok';
+import {
+  buildHotelPageLink,
+  buildSerpLink,
+  encodeGuests,
+  normalizeHotelPreviewImageUrl,
+  etgHotelImageOptionsFromImportMeta,
+  type RoomGuests,
+} from '@/lib/ostrovok';
 import type {
   Hotel,
   HotelSearchParams,
@@ -33,10 +40,13 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 const DEFAULT_IMAGE_SIZE: ImageSize = '640x400';
 
 /**
- * Format image URL with specific size
+ * Format image URL with specific size (ETG: `{size}` + опции VITE_ETG_* — см. .env.example)
  */
 export function formatImageUrl(url: string, size: ImageSize = DEFAULT_IMAGE_SIZE): string {
-  return url.replace('{size}', size);
+  return (
+    normalizeHotelPreviewImageUrl(url, size, etgHotelImageOptionsFromImportMeta()) ??
+    url.replace(/\{size\}/g, size)
+  );
 }
 
 /**

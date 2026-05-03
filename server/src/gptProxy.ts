@@ -16,19 +16,21 @@ import cors from 'cors';
 import { DEMO_HOTELS as REALISTIC_DEMO_HOTELS, TEST_HOTELS, DemoHotel } from './demoHotels.js';
 import { 
   buildHotelPageLink, 
-  buildSerpLink, 
-  generatePartnerLinkLegacy
+  buildSerpLink,
+  rewriteOstrovokHybridHotelPathToSerp,
+  rewriteOstrovokHotelPathToRooms,
 } from '../lib/ostrovok-links.cjs';
 import { TRAVEL_JSON_SYSTEM_PROMPT } from './prompts/travelJsonSystemPrompt.js';
 import { parseTripPlanResponse } from './lib/parseTripPlanResponse.js';
 import { formatTripPlanToMarkdown } from './lib/formatTripPlanToMarkdown.js';
 import { mergeHotelRecommendationsWithSource } from './lib/mergeHotelRecommendationsWithSource.js';
-import type { SourceHotelForWhitelist } from './types/tripPlan.js';
+import type { SourceHotelForWhitelist, TripPlanDay } from './types/tripPlan.js';
 import { ETG_ENABLE_TEST_FALLBACK, FORCE_TEST_HOTELS, hasEtgCredentials } from './config/etg.js';
 import { normalizeDestination } from './etg/destinationNormalizer.js';
 import { resolveSearchEndpoint } from './etg/endpointResolver.js';
-import { searchSerpGeo, searchSerpRegion } from './etg/searchClient.js';
+import { searchSerpGeo, searchSerpHotels, searchSerpRegion } from './etg/searchClient.js';
 import { createTraceId, logSearchStep, upsertTrace } from './diagnostics/searchLogger.js';
+import { formatEtgImageUrlForServer, normalizeHotelPreviewImageUrlForServer } from './lib/etgHotelImageUrl.js';
 import {
   extractCancellationDeadlineLine,
   extractCancellationPolicyLine,
@@ -78,6 +80,7 @@ interface FilterState {
     start: string;
     end: string;
   };
+  durationDays?: number;
   budget: {
     min: number;
     max: number;
@@ -151,6 +154,16 @@ interface OstrovokHotel {
   }>;
   distance_center?: number;
 }
+
+type HotelInfoBrief = {
+  name?: string;
+  address?: string;
+};
+
+const HOTEL_INFO_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const HOTEL_INFO_NEGATIVE_TTL_MS = 10 * 60 * 1000;
+const HOTEL_INFO_ENRICH_LIMIT = 6;
+const hotelInfoCache = new Map<string, { expiresAt: number; value: HotelInfoBrief | null }>();
 
 // Logger
 console.log('[GPT Proxy] Environment loaded:', {
@@ -264,6 +277,143 @@ function getCityCoordinates(cityName: string): { lat: number; lng: number; radiu
   return null;
 }
 
+function parseDurationDays(text: string): number | null {
+  if (!text) return null;
+  const m = text
+    .toLowerCase()
+    .match(/(?:^|\s)(\d{1,2})\s*(?:дн(?:я|ей)?|дня|дней|д\.?|day|days)(?:\s|$)/i);
+  if (!m?.[1]) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 && n <= 30 ? n : null;
+}
+
+function isDurationOnlyMessage(text: string): boolean {
+  if (!text) return false;
+  return /^\s*\d{1,2}\s*(?:дн(?:я|ей)?|дня|дней|д\.?|day|days)\s*$/i.test(text);
+}
+
+function parseIsoDate(value?: string): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const d = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+function formatIsoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function addDaysUtc(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function diffDaysUtc(start: Date, end: Date): number {
+  const diff = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  return Number.isFinite(diff) && diff > 0 ? diff : 1;
+}
+
+function hasItineraryContent(day: TripPlanDay | null | undefined): day is TripPlanDay {
+  if (!day) return false;
+  const blocks = [day.morning, day.daytime, day.evening];
+  return blocks.some((items) => Array.isArray(items) && items.some((item) => String(item || '').trim().length > 0));
+}
+
+function normalizeItineraryDays(itinerary: TripPlanDay[] | undefined, targetDays?: number): TripPlanDay[] {
+  if (!Array.isArray(itinerary) || itinerary.length === 0) return [];
+
+  const cleaned = itinerary.filter(hasItineraryContent).map((day, idx) => ({
+    day: typeof day.day === 'number' && Number.isFinite(day.day) ? day.day : idx + 1,
+    title: typeof day.title === 'string' && day.title.trim() ? day.title.trim() : undefined,
+    morning: Array.isArray(day.morning) ? day.morning.map((x) => String(x || '').trim()).filter(Boolean) : [],
+    daytime: Array.isArray(day.daytime) ? day.daytime.map((x) => String(x || '').trim()).filter(Boolean) : [],
+    evening: Array.isArray(day.evening) ? day.evening.map((x) => String(x || '').trim()).filter(Boolean) : [],
+  }));
+
+  const safeTarget =
+    Number.isFinite(targetDays) && Number(targetDays) > 0
+      ? Math.max(1, Math.min(30, Math.round(Number(targetDays))))
+      : null;
+  const limited = safeTarget ? cleaned.slice(0, safeTarget) : cleaned;
+
+  return limited.map((day, idx) => ({
+    ...day,
+    day: idx + 1,
+    title: day.title || `День ${idx + 1}`,
+  }));
+}
+
+function hasRouteIntent(text: string): boolean {
+  const t = String(text || '').toLowerCase().trim();
+  if (!t) return false;
+  return /(маршрут|по дням|спланиру|план поездки|itinerary|day by day)/i.test(t);
+}
+
+function isWeakItinerary(itinerary: TripPlanDay[] | undefined, targetDays: number): boolean {
+  if (!Array.isArray(itinerary) || itinerary.length === 0) return true;
+  if (targetDays > 0 && itinerary.length < Math.min(targetDays, 2)) return true;
+  if (itinerary.length < 3) return false;
+  const signatures = itinerary.map((day) =>
+    JSON.stringify({
+      morning: (day.morning || []).map((s) => String(s || '').toLowerCase()),
+      daytime: (day.daytime || []).map((s) => String(s || '').toLowerCase()),
+      evening: (day.evening || []).map((s) => String(s || '').toLowerCase()),
+    })
+  );
+  return new Set(signatures).size <= 1;
+}
+
+function buildFallbackItinerary(destination: string, targetDays: number): TripPlanDay[] {
+  const city = String(destination || 'городе').trim();
+  const templates: Array<{
+    title: string;
+    morning: string[];
+    daytime: string[];
+    evening: string[];
+  }> = [
+    {
+      title: 'Знакомство с городом',
+      morning: ['Завтрак в отеле', `Прогулка по центральным кварталам ${city}`],
+      daytime: ['Посещение ключевых достопримечательностей', 'Обед в локальном ресторане'],
+      evening: ['Неспешная прогулка по набережной/историческому району', 'Ужин и отдых'],
+    },
+    {
+      title: 'Культура и музеи',
+      morning: ['Завтрак и выезд к музейному району', 'Посещение одного из главных музеев'],
+      daytime: ['Обед рядом с музеями', 'Осмотр архитектурных локаций и площадей'],
+      evening: ['Культурная программа или вечерняя экскурсия', 'Ужин в районе отеля'],
+    },
+    {
+      title: 'Парки и локальная атмосфера',
+      morning: ['Завтрак в отеле', 'Прогулка по паркам и тихим улицам'],
+      daytime: ['Обед в авторском кафе', 'Посещение смотровой площадки или знакового места'],
+      evening: ['Свободное время для шопинга/кафе', 'Вечерний маршрут по подсвеченным локациям'],
+    },
+    {
+      title: 'Районы и гастрономия',
+      morning: ['Поздний завтрак и переезд в новый район', 'Исследование локальных маркетов/улочек'],
+      daytime: ['Гастрономический обед', 'Пеший маршрут по главным точкам района'],
+      evening: ['Ужин в популярном ресторане', 'Спокойная прогулка и отдых'],
+    },
+    {
+      title: 'Гибкий день',
+      morning: ['Завтрак в отеле', 'Свободное время под личные интересы'],
+      daytime: ['Точечные посещения оставшихся must-see мест', 'Обед в проверенном месте'],
+      evening: ['Покупка сувениров и финальные прогулки', 'Ужин и подготовка к следующему дню'],
+    },
+  ];
+
+  const days = Math.max(1, Math.min(30, Math.round(targetDays || 1)));
+  return Array.from({ length: days }, (_, idx) => {
+    const t = templates[idx % templates.length];
+    return {
+      day: idx + 1,
+      title: `День ${idx + 1}: ${t.title}`,
+      morning: t.morning,
+      daytime: t.daytime,
+      evening: t.evening,
+    };
+  });
+}
+
 // Generate partner booking link with correct attribution
 // Uses new LinkBuilder: partner_slug + utm_* + dates format
 const generatePartnerLink = (hotelId: string | number, params: {
@@ -333,9 +483,18 @@ const generatePartnerLink = (hotelId: string | number, params: {
   });
 };
 
-// Format image URL
+// Format image URL (ETG: cdn.worldota.net/t/{size}/…; легаси images.ostrovok.* — см. ETG_* env в .env.example)
 const formatImageUrl = (url: string, size: string = '640x400'): string => {
-  return url.replace('{size}', size);
+  return formatEtgImageUrlForServer(url, size);
+};
+
+const humanizeHotelId = (value: string): string => {
+  const cleaned = String(value || '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return '';
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 };
 
 
@@ -346,6 +505,17 @@ const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
   guests: number;
   childrenAges?: number[];
 }, city?: string): Hotel => {
+  const rawId = String(hotel.id || hotel.hid || '').trim();
+  const fallbackName =
+    rawId === 'test_hotel'
+      ? 'Test Hotel'
+      : rawId === 'test_hotel_do_not_book'
+      ? 'Test Hotel Do Not Book'
+      : rawId
+      ? humanizeHotelId(rawId)
+      : 'Hotel';
+  const fallbackAddress = rawId.startsWith('test_hotel') ? 'Test Address' : '';
+
   const getThumbnail = () => {
     if (hotel.images_ext && hotel.images_ext.length > 0) {
       const exterior = hotel.images_ext.find(img => img.category === 'exterior');
@@ -356,37 +526,78 @@ const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
     return null;
   };
 
+  const stayNights = (() => {
+    if (!searchParams) return 1;
+    const start = parseIsoDate(searchParams.checkIn);
+    const end = parseIsoDate(searchParams.checkOut);
+    if (!start || !end) return 1;
+    return diffDaysUtc(start, end);
+  })();
+
   const getMinPrice = () => {
     if (hotel.rates && hotel.rates.length > 0) {
-      const prices = hotel.rates.map(r => r.amount || 0);
-      return Math.min(...prices);
+      const prices = hotel.rates
+        .map((r: any) => {
+          const daily = Array.isArray(r?.daily_prices)
+            ? r.daily_prices
+                .map((p: unknown) => Number(p))
+                .filter((p: number) => Number.isFinite(p) && p > 0)
+            : [];
+          if (daily.length > 0) return Math.min(...daily);
+          const total = Number(
+            r?.payment_options?.payment_types?.[0]?.show_amount ??
+              r?.payment_options?.payment_types?.[0]?.amount ??
+              r?.amount ??
+              0
+          );
+          if (!Number.isFinite(total) || total <= 0) return 0;
+          return stayNights > 1 ? total / stayNights : total;
+        })
+        .filter((p: number) => Number.isFinite(p) && p > 0);
+      if (prices.length > 0) return Math.min(...prices);
     }
     return hotel.min_price || 0;
   };
 
   const firstRate = hotel.rates?.[0];
   const cinout = extractCheckInOut(hotel);
+  const directRateBookingLink = hotel.rates
+    ?.map((r: any) => r?.payment_options?.payment_types?.[0]?.link)
+    .find((link: unknown) => typeof link === 'string' && String(link).trim().length > 0);
+  const normalizedRateBookingLink =
+    typeof directRateBookingLink === 'string'
+      ? rewriteOstrovokHotelPathToRooms(directRateBookingLink.trim()) ||
+        rewriteOstrovokHybridHotelPathToSerp(directRateBookingLink.trim()) ||
+        directRateBookingLink.trim()
+      : undefined;
 
   return {
-    id: hotel.id,
+    id: rawId,
     hid: hotel.hid,
-    name: hotel.name,
+    name: hotel.name || fallbackName,
     stars: hotel.stars || 0,
     rating: hotel.rating,
-    address: hotel.address || '',
-    price: getMinPrice(),
+    address: hotel.address || fallbackAddress,
+    price: Math.round(getMinPrice()),
     currency: hotel.currency || 'RUB',
-    images: hotel.images_ext,
+    images: Array.isArray(hotel.images_ext)
+      ? hotel.images_ext
+          .map((i: any) => ({
+            category: i?.category || 'exterior',
+            url: formatImageUrl(String(i?.url || ''), '640x400'),
+          }))
+          .filter((i: { category: string; url: string }) => Boolean(i.url))
+      : undefined,
     description: hotel.description_struct?.map(p => p.text).join('\n\n'),
     hotelType: hotel.hotel_type,
-    bookingUrl: searchParams
+    bookingUrl: normalizedRateBookingLink || (searchParams
       ? generatePartnerLink(hotel.id || hotel.hid || '', {
           checkIn: searchParams.checkIn,
           checkOut: searchParams.checkOut,
           guests: searchParams.guests,
           childrenAges: searchParams.childrenAges,
         }, hotel.name, city)
-      : undefined,
+      : undefined),
     distanceToCenter: hotel.distance_center,
     taxesAndFees: extractTaxesLine(firstRate),
     mealType: extractMealLine(firstRate),
@@ -400,6 +611,89 @@ const transformHotelData = (hotel: OstrovokHotel, searchParams?: {
     amenities: extractHotelAmenities(hotel as any),
   };
 };
+
+function makeHotelInfoCacheKey(hotel: OstrovokHotel): string {
+  const byId = String(hotel?.id || '').trim();
+  if (byId) return `id:${byId}`;
+  const byHid = String(hotel?.hid ?? '').trim();
+  if (byHid) return `hid:${byHid}`;
+  return '';
+}
+
+async function fetchHotelInfoBrief(hotel: OstrovokHotel): Promise<HotelInfoBrief | null> {
+  const cacheKey = makeHotelInfoCacheKey(hotel);
+  if (!cacheKey) return null;
+  const now = Date.now();
+  const cached = hotelInfoCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const id = String(hotel?.id || '').trim();
+  const hid = Number(hotel?.hid);
+  const payload: Record<string, unknown> = { language: 'ru' };
+  if (id) payload.id = id;
+  else if (Number.isFinite(hid) && hid > 0) payload.hid = hid;
+  else return null;
+
+  try {
+    const response = await axios.post(
+      `${OSTROVOK_API_URL}/api/b2b/v3/hotel/info/`,
+      payload,
+      {
+        headers: getOstrovokAuthHeaders(),
+        timeout: 8000,
+      }
+    );
+    const data = response?.data?.data || response?.data || {};
+    const value: HotelInfoBrief = {
+      name: typeof data?.name === 'string' ? data.name.trim() : undefined,
+      address: typeof data?.address === 'string' ? data.address.trim() : undefined,
+    };
+    const effective = value.name || value.address ? value : null;
+    hotelInfoCache.set(cacheKey, {
+      value: effective,
+      expiresAt: now + (effective ? HOTEL_INFO_CACHE_TTL_MS : HOTEL_INFO_NEGATIVE_TTL_MS),
+    });
+    return effective;
+  } catch (error: any) {
+    const reason = error?.response?.data?.error || error?.message || 'hotel_info_failed';
+    console.warn('[hotel_info] lookup_failed', { cacheKey, reason });
+    hotelInfoCache.set(cacheKey, { value: null, expiresAt: now + HOTEL_INFO_NEGATIVE_TTL_MS });
+    return null;
+  }
+}
+
+async function enrichHotelsWithHotelInfo(hotels: Hotel[], rawHotels: OstrovokHotel[]): Promise<Hotel[]> {
+  if (!Array.isArray(hotels) || hotels.length === 0) return hotels;
+  const out = [...hotels];
+  const candidates: number[] = [];
+  for (let i = 0; i < out.length; i += 1) {
+    const raw = rawHotels[i];
+    const current = out[i];
+    const rawName = typeof raw?.name === 'string' ? raw.name.trim() : '';
+    const fallbackName = humanizeHotelId(String(raw?.id || raw?.hid || ''));
+    const nameLooksSynthetic =
+      !rawName || !current?.name || current.name.trim() === fallbackName;
+    const addressMissing = !current?.address || current.address.trim() === '' || current.address === 'Test Address';
+    if (nameLooksSynthetic || addressMissing) candidates.push(i);
+    if (candidates.length >= HOTEL_INFO_ENRICH_LIMIT) break;
+  }
+  if (candidates.length === 0) return out;
+
+  await Promise.all(
+    candidates.map(async (idx) => {
+      const raw = rawHotels[idx];
+      const info = await fetchHotelInfoBrief(raw);
+      if (!info) return;
+      out[idx] = {
+        ...out[idx],
+        name: info.name || out[idx].name,
+        address: info.address || out[idx].address,
+      };
+    })
+  );
+
+  return out;
+}
 
 async function enrichHotelsWithRoomGroups(hotels: Hotel[], rawHotels: OstrovokHotel[]): Promise<Hotel[]> {
   if (!hasPgConfig()) return hotels;
@@ -425,10 +719,16 @@ async function enrichHotelsWithRoomGroups(hotels: Hotel[], rawHotels: OstrovokHo
         : [];
       const imgs = Array.isArray(row.images) ? row.images : [];
       const roomImages = imgs
-        .map((im: any) => im?.url)
+        .map((im: any) => {
+          if (typeof im === 'string') return im;
+          if (im && typeof im === 'object') {
+            return typeof im.url === 'string' ? im.url : '';
+          }
+          return '';
+        })
         .filter(Boolean)
         .slice(0, 4)
-        .map((u: string) => ({ category: 'room', url: String(u) }));
+        .map((u: string) => ({ category: 'room', url: formatImageUrl(String(u), '640x400') }));
       const mergedImages = roomImages.length > 0 ? [...roomImages, ...(h.images || [])] : h.images;
       out.push({
         ...h,
@@ -588,6 +888,8 @@ DEMO_HOTELS['test_hotel_do_not_book'] = TEST_HOTELS.filter((h: DemoHotel) => h.i
 
 // Search hotels via Ostrovok API (with demo fallback)
 async function searchOstrovokHotels(filters: FilterState): Promise<Hotel[]> {
+  const HOTEL_RESULTS_LIMIT = 10;
+  const canUseTestIdFallback = ETG_ENABLE_TEST_FALLBACK && process.env.NODE_ENV !== 'production';
   const checkIn = filters.dates.start || new Date().toISOString().split('T')[0];
   const checkOut = filters.dates.end || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   const guests = filters.travelers || 2;
@@ -617,32 +919,11 @@ async function searchOstrovokHotels(filters: FilterState): Promise<Hotel[]> {
     const childrenAges = Array.isArray(filters.childrenAges)
       ? filters.childrenAges.filter((age) => Number.isFinite(age) && age >= 0 && age <= 17)
       : [];
-    let apiHotels = await searchSerpRegion(normalized.regionHint || 'Москва', {
-      checkIn,
-      checkOut,
-      adults: guests,
-      childrenAges,
-    });
-    upsertTrace({
-      traceId,
-      parsedIntent: {
-        destination: filters.destination,
-        checkIn,
-        checkOut,
-        adults: guests,
-        children: childrenAges.length,
-        childrenAges,
-      },
-      requestPayload: {
-        endpoint: '/api/b2b/v3/search/serp/region/',
-        region: normalized.regionHint || 'Москва',
-        checkin: checkIn,
-        checkout: checkOut,
-        guests: [{ adults: guests, children: childrenAges }],
-      },
-    });
-    if (apiHotels.length === 0 && normalized.latitude && normalized.longitude) {
-      apiHotels = await searchSerpGeo(normalized.latitude, normalized.longitude, normalized.radiusKm || 10, {
+    let apiHotels: any[] = [];
+    const stepErrors: string[] = [];
+
+    try {
+      apiHotels = await searchSerpRegion(normalized.regionHint || 'Москва', {
         checkIn,
         checkOut,
         adults: guests,
@@ -650,20 +931,90 @@ async function searchOstrovokHotels(filters: FilterState): Promise<Hotel[]> {
       });
       upsertTrace({
         traceId,
+        parsedIntent: {
+          destination: filters.destination,
+          checkIn,
+          checkOut,
+          adults: guests,
+          children: childrenAges.length,
+          childrenAges,
+        },
         requestPayload: {
-          endpoint: '/api/b2b/v3/search/serp/geo/',
-          latitude: normalized.latitude,
-          longitude: normalized.longitude,
-          radius: normalized.radiusKm || 10,
+          endpoint: '/api/b2b/v3/search/serp/region/',
+          region: normalized.regionHint || 'Москва',
           checkin: checkIn,
           checkout: checkOut,
           guests: [{ adults: guests, children: childrenAges }],
         },
       });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'serp_region_failed';
+      stepErrors.push(`serp_region:${msg}`);
+      logSearchStep('warn', traceId, 'serp_region_failed', { error: msg });
     }
+
+    if (apiHotels.length === 0 && normalized.latitude && normalized.longitude) {
+      try {
+        apiHotels = await searchSerpGeo(normalized.latitude, normalized.longitude, normalized.radiusKm || 10, {
+          checkIn,
+          checkOut,
+          adults: guests,
+          childrenAges,
+        });
+        upsertTrace({
+          traceId,
+          requestPayload: {
+            endpoint: '/api/b2b/v3/search/serp/geo/',
+            latitude: normalized.latitude,
+            longitude: normalized.longitude,
+            radius: normalized.radiusKm || 10,
+            checkin: checkIn,
+            checkout: checkOut,
+            guests: [{ adults: guests, children: childrenAges }],
+          },
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'serp_geo_failed';
+        stepErrors.push(`serp_geo:${msg}`);
+        logSearchStep('warn', traceId, 'serp_geo_failed', { error: msg });
+      }
+    }
+    if (apiHotels.length === 0 && canUseTestIdFallback) {
+      const certificationHotelIds = ['test_hotel', 'test_hotel_do_not_book'];
+      try {
+        logSearchStep('warn', traceId, 'primary_search_empty_use_test_hotel_ids', { certificationHotelIds });
+        apiHotels = await searchSerpHotels(certificationHotelIds, {
+          checkIn,
+          checkOut,
+          adults: guests,
+          childrenAges,
+        });
+        upsertTrace({
+          traceId,
+          requestPayload: {
+            endpoint: '/api/b2b/v3/search/serp/hotels/',
+            ids: certificationHotelIds,
+            checkin: checkIn,
+            checkout: checkOut,
+            guests: [{ adults: guests, children: childrenAges }],
+          },
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'serp_hotels_failed';
+        stepErrors.push(`serp_hotels:${msg}`);
+        logSearchStep('warn', traceId, 'serp_hotels_failed', { error: msg });
+      }
+    }
+    if (apiHotels.length === 0) {
+      throw new Error(
+        `No hotels returned from region/geo search${canUseTestIdFallback ? '/test-hotel fallback' : ''}${stepErrors.length ? ` (${stepErrors.join('; ')})` : ''}`
+      );
+    }
+    apiHotels = apiHotels.slice(0, HOTEL_RESULTS_LIMIT);
     let transformed = apiHotels.map((apiHotel: OstrovokHotel) =>
       transformHotelData(apiHotel, { checkIn, checkOut, guests, childrenAges }, filters.destination)
     );
+    transformed = await enrichHotelsWithHotelInfo(transformed, apiHotels);
     transformed = await enrichHotelsWithRoomGroups(transformed, apiHotels);
     upsertTrace({
       traceId,
@@ -677,7 +1028,7 @@ async function searchOstrovokHotels(filters: FilterState): Promise<Hotel[]> {
     const reason = error instanceof Error ? error.message : 'search_failed';
     upsertTrace({ traceId, responseStatus: 500, hotelsFound: 0, errorReason: reason });
     logSearchStep('error', traceId, 'search_failed', { reason });
-    const canUseFallback = FORCE_TEST_HOTELS || (ETG_ENABLE_TEST_FALLBACK && process.env.NODE_ENV !== 'production');
+    const canUseFallback = FORCE_TEST_HOTELS || canUseTestIdFallback;
     if (canUseFallback) {
       return getDemoHotels(filters.destination, checkIn, checkOut, guests);
     }
@@ -742,7 +1093,7 @@ function formatHotelsForGPT(hotels: Hotel[]): string {
       const mainImage = hotel.images.find((img: any) => 
         img.category === 'exterior' || img.category === 'hotel_front'
       ) || hotel.images[0];
-      photoUrl = mainImage.url ? mainImage.url.replace('{size}', '640x400') : '';
+      photoUrl = mainImage.url ? formatEtgImageUrlForServer(mainImage.url, '640x400') : '';
     }
     
     formatted += `### ${index + 1}. ${hotel.name} ${stars}\n\n`;
@@ -921,7 +1272,7 @@ router.get('/test/ostrovok', async (req: Request, res: Response) => {
       const regionResponse = await axios.post(
         `${OSTROVOK_API_URL}/api/b2b/v3/search/serp/region/`,
         {
-          region: 'Москва',
+          region_id: 1,
           checkin: today,
           checkout: tomorrow,
           guests: [{ adults: 2, children: [] }],
@@ -1051,12 +1402,38 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
     }
 
     // Default filter values with defensive programming
+    const normalizedMessages: any[] = Array.isArray(messages) ? messages : [];
+    const hasRouteIntentInThread = normalizedMessages.some((m: any) =>
+      (m?.role || 'user') === 'user' && hasRouteIntent(String(m?.text || m?.content || ''))
+    );
+    const lastUserText = [...normalizedMessages]
+      .reverse()
+      .find((m: any) => (m?.role || 'user') === 'user' && typeof (m?.text || m?.content) === 'string');
+    const lastUserContent = String(lastUserText?.text || lastUserText?.content || '').trim();
+    const durationFromLastUser = parseDurationDays(lastUserContent);
+    const durationFromFilters = Number(filters?.durationDays);
+    const requestedDurationDays = Number.isFinite(durationFromFilters) && durationFromFilters > 0
+      ? Math.max(1, Math.min(30, Math.round(durationFromFilters)))
+      : durationFromLastUser;
+
+    const rawStart = typeof filters?.dates?.start === 'string' ? filters.dates.start : '';
+    const rawEnd = typeof filters?.dates?.end === 'string' ? filters.dates.end : '';
+    const parsedStart = parseIsoDate(rawStart) || new Date();
+    let parsedEnd = parseIsoDate(rawEnd);
+    if (!parsedEnd || parsedEnd.getTime() <= parsedStart.getTime()) {
+      parsedEnd = addDaysUtc(parsedStart, requestedDurationDays || 7);
+    } else if (durationFromLastUser && isDurationOnlyMessage(lastUserContent)) {
+      // Если пользователь отдельным сообщением прислал только "3 дня", фиксируем новый диапазон.
+      parsedEnd = addDaysUtc(parsedStart, durationFromLastUser);
+    }
+
     const defaultFilters: FilterState = {
       destination: filters?.destination || 'Москва',
       dates: {
-        start: filters?.dates?.start || new Date().toISOString().split('T')[0],
-        end: filters?.dates?.end || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        start: formatIsoDate(parsedStart),
+        end: formatIsoDate(parsedEnd)
       },
+      durationDays: requestedDurationDays || diffDaysUtc(parsedStart, parsedEnd),
       budget: {
         min: filters?.budget?.min || 1000,
         max: filters?.budget?.max || 100000
@@ -1079,19 +1456,33 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
     console.log('[GPT Proxy] Hotels text for GPT (first 1000 chars):', hotelsText.substring(0, 1000));
 
     // Build conversation for OpenRouter
-    const conversationMessages = messages.map((msg: any) => ({
-      role: msg.role || 'user',
-      content: msg.text || msg.content || ''
-    }));
+    const conversationMessages = normalizedMessages
+      .map((msg: any) => ({
+        role: msg.role || 'user',
+        content: msg.text || msg.content || ''
+      }))
+      // Клиент присылает свой system prompt; оставляем только один серверный system.
+      .filter((msg: any) => msg.role !== 'system')
+      .filter((msg: any) => typeof msg.content === 'string' && msg.content.trim() !== '');
 
-    const contextBlock = `Контекст путешествия:\n- Направление: ${defaultFilters.destination}\n- Даты: с ${defaultFilters.dates.start} по ${defaultFilters.dates.end}\n- Бюджет: от ${defaultFilters.budget.min} до ${defaultFilters.budget.max} ₽\n- Путешественников: ${defaultFilters.travelers}${hotelsText}`;
+    if (durationFromLastUser && isDurationOnlyMessage(lastUserContent)) {
+      conversationMessages.push({
+        role: 'user',
+        content: `Составь детальный маршрут по ${defaultFilters.destination} на ${durationFromLastUser} дня по дням (утро/день/вечер), с практическими советами и логичной последовательностью.`
+      });
+    }
+
+    const contextBlock = `Контекст путешествия:\n- Направление: ${defaultFilters.destination}\n- Даты: с ${defaultFilters.dates.start} по ${defaultFilters.dates.end}\n- Длительность: ${defaultFilters.durationDays || diffDaysUtc(parsedStart, parsedEnd)} дней\n- Бюджет: от ${defaultFilters.budget.min} до ${defaultFilters.budget.max} ₽\n- Путешественников: ${defaultFilters.travelers}${hotelsText}`;
+    const durationInstruction = (defaultFilters.durationDays && defaultFilters.durationDays > 0)
+      ? `\n\nКРИТИЧНО: В поле itinerary верни РОВНО ${defaultFilters.durationDays} дней (day: 1..${defaultFilters.durationDays}), без пропусков и пустых дней.`
+      : '';
 
     // Non-streaming: use JSON system prompt so we can parse and format to markdown. Streaming: keep text prompt.
     const systemPromptForRequest = useStream ? SYSTEM_PROMPT : TRAVEL_JSON_SYSTEM_PROMPT;
     const fullMessages = [
       {
         role: 'system',
-        content: `${systemPromptForRequest}\n\n${contextBlock}`
+        content: `${systemPromptForRequest}${durationInstruction}\n\n${contextBlock}`
       },
       ...conversationMessages
     ];
@@ -1184,7 +1575,9 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
     if (parsed) {
       const sourceHotels: SourceHotelForWhitelist[] = hotels.map((h) => {
         const mainImg = h.images?.find((img: any) => img.category === 'exterior' || img.category === 'hotel_front') || h.images?.[0];
-        const photoUrl = mainImg?.url ? String(mainImg.url).replace('{size}', '640x400') : undefined;
+        const photoUrl = mainImg?.url
+          ? normalizeHotelPreviewImageUrlForServer(String(mainImg.url), '640x400')
+          : undefined;
         return {
           name: h.name,
           bookingUrl: h.bookingUrl,
@@ -1199,11 +1592,44 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
         };
       });
       const merged = mergeHotelRecommendationsWithSource(parsed, sourceHotels);
+      const targetDays = Math.max(1, Number(defaultFilters.durationDays || 0));
+      merged.itinerary = normalizeItineraryDays(
+        Array.isArray(merged.itinerary) ? merged.itinerary : [],
+        targetDays
+      );
+      const shouldUseFallbackItinerary =
+        (durationFromLastUser && isDurationOnlyMessage(lastUserContent)) || hasRouteIntentInThread;
+      if (shouldUseFallbackItinerary && isWeakItinerary(merged.itinerary, targetDays)) {
+        merged.itinerary = buildFallbackItinerary(defaultFilters.destination, targetDays);
+      }
       textToSend = formatTripPlanToMarkdown(merged);
       if (!textToSend) textToSend = assistantMessage;
       if (merged.itinerary?.length) itineraryToSend = merged.itinerary;
     } else {
       textToSend = assistantMessage;
+      const targetDays = Math.max(1, Number(defaultFilters.durationDays || 0));
+      const shouldUseFallbackItinerary =
+        (durationFromLastUser && isDurationOnlyMessage(lastUserContent)) || hasRouteIntentInThread;
+      if (shouldUseFallbackItinerary && targetDays > 0) {
+        const fallbackItinerary = buildFallbackItinerary(defaultFilters.destination, targetDays);
+        if (fallbackItinerary.length > 0) {
+          itineraryToSend = fallbackItinerary;
+          const itineraryMarkdown = formatTripPlanToMarkdown({
+            tripSummary: '',
+            assumptions: [],
+            recommendedAreas: [],
+            hotelRecommendations: [],
+            itinerary: fallbackItinerary,
+            highlights: [],
+            foodRecommendations: [],
+            practicalTips: [],
+            followUpQuestion: '',
+          });
+          if (itineraryMarkdown && !/маршрут по дням|день\s*1/i.test(textToSend.toLowerCase())) {
+            textToSend = `${textToSend.trim()}\n\n${itineraryMarkdown}`.trim();
+          }
+        }
+      }
     }
 
     res.json({

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Plus, MessageSquare, Compass, Heart, Settings, ChevronLeft, ChevronRight, Users, Trash2, Mountain } from 'lucide-react';
+import { Plus, MessageSquare, Heart, Settings, ChevronLeft, ChevronRight, Users, Trash2, Mountain } from 'lucide-react';
 import { CreateTripModal } from './CreateTripModal';
 import { AuthModal } from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -327,22 +327,7 @@ export function Sidebar({ className }: SidebarProps) {
                 </div>
               )}
             </div>
-            <Link
-              to="/trips"
-              className={`
-                flex items-center gap-3 h-10 rounded-xl transition-colors duration-200
-                ${isSidebarCollapsed ? 'justify-center px-0 w-10 min-w-0 mx-auto' : 'px-3'}
-                ${isActivePath('/trips')
-                  ? 'bg-gray-100 text-gray-900'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }
-              `}
-            >
-              <Compass className="w-5 h-5 shrink-0" />
-              <span className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-                Мои путешествия
-              </span>
-            </Link>
+            {/* Пункт "Мои путешествия" временно скрыт */}
 
             {/* Пункт "Избранное" временно скрыт из сайдбара */}
 

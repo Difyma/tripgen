@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Send, 
   MapPin, 
@@ -19,7 +19,17 @@ const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
 import { useFlightInfo } from '../hooks/useFlightInfo';
-import { buildHotelPageLink, buildSerpLink, looksLikeHid, getRegionIdForCityName } from '@/lib/ostrovok';
+import {
+  buildHotelPageLink,
+  buildSerpLink,
+  looksLikeHid,
+  getRegionIdForCityName,
+  rewriteOstrovokHybridHotelPathToSerp,
+  rewriteOstrovokHotelPathToRooms,
+  normalizeHotelPreviewImageUrl,
+  etgHotelImageOptionsFromImportMeta,
+  DEFAULT_ETG_IMAGE_PREVIEW_SIZE,
+} from '@/lib/ostrovok';
 import { HotelCard } from './HotelCard';
 import { 
   getUserChats,
@@ -67,10 +77,73 @@ interface Message {
   itinerary?: import('../types/tripPlan').TripPlanDay[];
 }
 
+type StoredAssistantMeta = {
+  hotels?: AssistantHotel[];
+  itinerary?: import('../types/tripPlan').TripPlanDay[];
+};
+
+const STORED_META_PREFIX = '<!--TRIPGEN_META_B64:';
+const STORED_META_SUFFIX = '-->';
+
+function toBase64Utf8(input: string): string {
+  const bytes = new TextEncoder().encode(input);
+  let binary = '';
+  bytes.forEach((b) => {
+    binary += String.fromCharCode(b);
+  });
+  return btoa(binary);
+}
+
+function fromBase64Utf8(input: string): string {
+  const binary = atob(input);
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function packStoredAssistantMessage(content: string, meta?: StoredAssistantMeta): string {
+  const hasHotels = Array.isArray(meta?.hotels) && meta.hotels.length > 0;
+  const hasItinerary = Array.isArray(meta?.itinerary) && meta.itinerary.length > 0;
+  if (!hasHotels && !hasItinerary) return content;
+  try {
+    const payload = JSON.stringify({
+      hotels: hasHotels ? meta?.hotels : undefined,
+      itinerary: hasItinerary ? meta?.itinerary : undefined
+    });
+    return `${content}\n${STORED_META_PREFIX}${toBase64Utf8(payload)}${STORED_META_SUFFIX}`;
+  } catch {
+    return content;
+  }
+}
+
+function unpackStoredAssistantMessage(content: string): { text: string; meta?: StoredAssistantMeta } {
+  if (!content) return { text: '' };
+  const re = /\n?<!--TRIPGEN_META_B64:([A-Za-z0-9+/=]+)-->$/;
+  const match = content.match(re);
+  if (!match?.[1]) return { text: content };
+  const text = content.replace(re, '').trimEnd();
+  try {
+    const parsed = JSON.parse(fromBase64Utf8(match[1])) as StoredAssistantMeta;
+    const hotels = Array.isArray(parsed?.hotels) ? parsed.hotels : undefined;
+    const itinerary = Array.isArray(parsed?.itinerary) ? parsed.itinerary : undefined;
+    return { text, meta: { hotels, itinerary } };
+  } catch {
+    return { text };
+  }
+}
+
 const OSTROVOK_PARTNER_SLUG =
   import.meta.env.VITE_OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
 const CERT_MODE = import.meta.env.VITE_CERT_MODE || 'real';
 const FORCE_TEST_HOTELS = CERT_MODE === 'test_hotels';
+const WELCOME_MESSAGE_TEXT =
+  "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.";
+const AI_PROGRESS_STEPS = [
+  'Анализирую запрос',
+  'Собираю данные по направлению',
+  'Формирую рекомендации',
+  'Проверяю детали маршрута',
+  'Готовлю финальный ответ',
+] as const;
 
 interface FilterState {
   location: string;
@@ -236,6 +309,13 @@ const SYSTEM_PROMPT = `Ты — опытный travel-эксперт и проф
 4. Не используй формат https://ostrovok.ru/hotel/{id}/ — это неправильный формат
 5. Правильные ссылки содержат partner_slug и utm_medium=partners
 6. Если нет bookingUrl в данных — напиши "Бронирование недоступно" или предложи поискать отели на Ostrovok.ru самостоятельно
+
+ПРАВИЛА ССЫЛОК НА РЕКОМЕНДОВАННЫЕ МЕСТА:
+1. Для ключевых рекомендаций (достопримечательности, музеи, парки, рестораны) добавляй кликабельную ссылку
+2. Формат: [Название места](https://www.google.com/maps/search/?api=1&query=НАЗВАНИЕ+МЕСТА+ГОРОД)
+3. Добавляй ссылки только для реально упомянутых в ответе мест, без выдумывания несуществующих объектов
+4. Для каждого дня достаточно 2-4 ссылок на главные точки маршрута, не перегружай ответ
+5. Не подменяй и не генерируй bookingUrl для отелей — правило выше остаётся приоритетным
 
 ПРИМЕР ФОРМАТИРОВАНИЯ ОТВЕТА:
 
@@ -618,7 +698,7 @@ const Chat = () => {
     // Иначе - приветственное сообщение
     return [{
       id: Date.now() + Math.random(),
-      text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
+      text: WELCOME_MESSAGE_TEXT,
       isUser: false,
       role: 'assistant'
     }];
@@ -639,6 +719,7 @@ const Chat = () => {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
+  const [aiProgressStep, setAiProgressStep] = useState(0);
   const [currentMessage, setCurrentMessage] = useState<string>('');
   const [currentItinerary, setCurrentItinerary] = useState<import('../types/tripPlan').TripPlanDay[] | null>(null);
   const [showTripBuilder, setShowTripBuilder] = useState(false);
@@ -656,6 +737,18 @@ const Chat = () => {
   // Creator chat state (для чатов с организаторами туров)
   const [creatorChatId, setCreatorChatId] = useState<string | null>(null);
   const [isCreatorChat, setIsCreatorChat] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setAiProgressStep(0);
+      return;
+    }
+    const maxAutoStep = AI_PROGRESS_STEPS.length - 2;
+    const id = setInterval(() => {
+      setAiProgressStep(prev => (prev < maxAutoStep ? prev + 1 : prev));
+    }, 1300);
+    return () => clearInterval(id);
+  }, [isLoading]);
 
   // Функция для нормализации направления в именительный падеж
   const normalizeLocation = (word: string) => {
@@ -791,6 +884,55 @@ const Chat = () => {
     return undefined;
   }
 
+  const extractDurationDaysFromText = (text: string): number | undefined => {
+    if (!text) return undefined;
+    const match = text
+      .toLowerCase()
+      .match(/(?:^|\s)(\d{1,2})\s*(?:дн(?:я|ей)?|дня|дней|д\.?|day|days)(?:\s|$)/i);
+    if (!match?.[1]) return undefined;
+    const days = Number(match[1]);
+    if (!Number.isFinite(days) || days <= 0) return undefined;
+    return Math.min(30, Math.round(days));
+  };
+
+  const resolveDateRangeForRequest = (value: DateFilter, durationOverride?: number) => {
+    const toIso = (d: Date) => d.toISOString().split('T')[0];
+    const addDays = (d: Date, days: number) => new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
+    const diffDays = (start: Date, end: Date) =>
+      Math.max(1, Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)));
+    const baseStart = value.startDate ? new Date(value.startDate) : new Date();
+    const safeDuration = Math.max(1, durationOverride || value.duration || 7);
+
+    if (value.type === 'specific') {
+      const start = value.startDate ? new Date(value.startDate) : new Date();
+      const hasEnd = Boolean(value.endDate);
+      const endCandidate = hasEnd ? new Date(value.endDate as Date) : addDays(start, safeDuration);
+      const end = endCandidate.getTime() > start.getTime() ? endCandidate : addDays(start, safeDuration);
+      const durationDays = hasEnd && endCandidate.getTime() > start.getTime() ? diffDays(start, endCandidate) : safeDuration;
+      return { startIso: toIso(start), endIso: toIso(end), durationDays };
+    }
+
+    if (value.type === 'duration') {
+      const start = baseStart;
+      const end = addDays(start, safeDuration);
+      return { startIso: toIso(start), endIso: toIso(end), durationDays: safeDuration };
+    }
+
+    if (value.type === 'month' && value.month) {
+      const start = new Date(value.month.year, value.month.month, 1);
+      const end = new Date(value.month.year, value.month.month + 1, 1);
+      const durationDays = Math.max(
+        1,
+        Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000))
+      );
+      return { startIso: toIso(start), endIso: toIso(end), durationDays };
+    }
+
+    const start = new Date();
+    const end = addDays(start, safeDuration);
+    return { startIso: toIso(start), endIso: toIso(end), durationDays: safeDuration };
+  };
+
   // Автоматическое заполнение направления по тексту
   // Возвращает найденную локацию для использования в запросе
   const extractLocationFromText = (messageText: string): string => {
@@ -911,6 +1053,8 @@ const Chat = () => {
   const handleSendMessage = useCallback(async (textToSend?: string) => {
     const messageText = textToSend || inputText;
     if (!messageText.trim()) return;
+    const durationDaysFromMessage = extractDurationDaysFromText(messageText);
+    const flightInfoFromMessage = extractFlightInfo(messageText);
     if (filters.children > 0) {
       const validAges = filters.childrenAges.filter((age) => Number.isFinite(age) && age >= 0 && age <= 17);
       if (validAges.length !== filters.children) {
@@ -941,14 +1085,22 @@ const Chat = () => {
     // 1. Автоматически подставлять направление "Куда едем" из текста запроса
     autoFillLocation(messageText);
 
-    // 2. В фильтре выбрать даты подставлять текущую дату, если пользователь не указал дату в запросе
-    if (!extractFlightInfo(messageText).date && dateFilter.type === 'specific') {
+    let effectiveDateFilterForRequest: DateFilter = dateFilter;
+
+    // 2. В фильтре подставлять текущую дату только если пользователь не задал даты вообще
+    if (
+      !durationDaysFromMessage &&
+      !flightInfoFromMessage.date &&
+      dateFilter.type === 'specific' &&
+      !dateFilter.startDate &&
+      !dateFilter.endDate
+    ) {
       const today = new Date();
-      setDateFilter({ type: 'specific', startDate: today, endDate: undefined });
+      effectiveDateFilterForRequest = { type: 'specific', startDate: today, endDate: undefined };
+      setDateFilter(effectiveDateFilterForRequest);
     }
 
     // 2.1. Если в сообщении есть даты, подставить их в фильтр
-    const flightInfo = extractFlightInfo(messageText);
     const parsedChildrenAges = extractChildrenAgesFromText(messageText);
     if (parsedChildrenAges.length > 0) {
       setFilters((prev: FilterState) => ({
@@ -957,11 +1109,25 @@ const Chat = () => {
         childrenAges: parsedChildrenAges,
       }));
     }
-    if (flightInfo.date && flightInfo.returnDate) {
-      const startDate = parseRussianDateToDate(flightInfo.date);
-      const endDate = parseRussianDateToDate(flightInfo.returnDate);
+    if (flightInfoFromMessage.date && flightInfoFromMessage.returnDate) {
+      const startDate = parseRussianDateToDate(flightInfoFromMessage.date);
+      const endDate = parseRussianDateToDate(flightInfoFromMessage.returnDate);
       if (startDate && endDate) {
-        setDateFilter({ type: 'specific', startDate, endDate });
+        effectiveDateFilterForRequest = { type: 'specific', startDate, endDate };
+        setDateFilter(effectiveDateFilterForRequest);
+      }
+    } else if (durationDaysFromMessage) {
+      const hasExplicitSpecificRange =
+        effectiveDateFilterForRequest.type === 'specific' &&
+        Boolean(effectiveDateFilterForRequest.startDate) &&
+        Boolean(effectiveDateFilterForRequest.endDate);
+      if (!hasExplicitSpecificRange) {
+        effectiveDateFilterForRequest = {
+          type: 'duration',
+          duration: durationDaysFromMessage,
+          startDate: effectiveDateFilterForRequest.startDate || new Date(),
+        };
+        setDateFilter(effectiveDateFilterForRequest);
       }
     }
 
@@ -1085,19 +1251,19 @@ const Chat = () => {
       console.log('Extracted location from text:', extractedLocation);
       console.log('Using destination:', destinationLocation);
 
-      // Сразу показываем пузырь ответа ИИ (печатается), чтобы был эффект стриминга
-      const streamMessageId = Date.now() + Math.random();
-      setMessages(prev => [...prev, {
-        id: streamMessageId,
-        text: '',
-        isUser: false,
-        role: 'assistant',
-        hotels: undefined
-      }]);
-      setStreamingMessageId(streamMessageId);
+      const requestDateRange = resolveDateRangeForRequest(
+        effectiveDateFilterForRequest,
+        durationDaysFromMessage
+      );
 
-      // В dev обращаемся к бэкенду напрямую, чтобы стрим не буферизовался прокси Vite
-      const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '');
+      // Показываем отдельный прогресс выполнения, а ответ выводим только после полной готовности
+      const streamMessageId = Date.now() + Math.random();
+      setStreamingMessageId(streamMessageId);
+      setAiProgressStep(1);
+
+      const configuredApiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+      // Когда VITE_API_URL не задан, используем относительный путь и Vite proxy.
+      const apiBase = configuredApiBase;
       const response = await fetch(`${apiBase}/api/openai`, {
         method: 'POST',
         headers: {
@@ -1105,19 +1271,15 @@ const Chat = () => {
         },
         body: JSON.stringify({
           messages: messagesToSend,
-          // On production Vercel we intentionally avoid streaming to prevent
-          // FUNCTION_INVOCATION_FAILED. Streaming is kept for local dev.
-          stream: import.meta.env.DEV,
+          // Не показываем частичный текст — только готовый финальный ответ.
+          stream: false,
           filters: {
             destination: destinationLocation,
             dates: {
-              start: dateFilter.type === 'specific' && dateFilter.startDate
-                ? dateFilter.startDate.toISOString().split('T')[0]
-                : new Date().toISOString().split('T')[0],
-              end: dateFilter.type === 'specific' && dateFilter.endDate
-                ? dateFilter.endDate.toISOString().split('T')[0]
-                : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+              start: requestDateRange.startIso,
+              end: requestDateRange.endIso
             },
+            durationDays: requestDateRange.durationDays,
             budget: {
               min: filters.budget.min,
               max: filters.budget.max
@@ -1132,6 +1294,7 @@ const Chat = () => {
 
       const contentType = response.headers.get('Content-Type') || '';
       const isStream = contentType.includes('text/event-stream');
+      setAiProgressStep(2);
 
       if (!response.ok && !isStream) {
         // В проде ответ может быть не JSON (HTML/текст), поэтому читаем body один раз
@@ -1164,11 +1327,11 @@ const Chat = () => {
       }
 
       if (isStream && response.body) {
-        // Пузырь уже добавлен перед fetch, обновляем его текст по чанкам
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
         let fullText = '';
+        let hotelsFromStream: AssistantHotel[] | undefined;
 
         try {
           while (true) {
@@ -1188,11 +1351,7 @@ const Chat = () => {
                 try {
                   const parsed = JSON.parse(data);
                   if (parsed.type === 'hotels' && Array.isArray(parsed.hotels)) {
-                    setMessages(prev =>
-                      prev.map(m =>
-                        m.id === streamMessageId ? { ...m, hotels: parsed.hotels } : m
-                      )
-                    );
+                    hotelsFromStream = parsed.hotels as AssistantHotel[];
                     continue;
                   }
                   if (parsed.error) {
@@ -1201,11 +1360,6 @@ const Chat = () => {
                   const content = parsed.choices?.[0]?.delta?.content;
                   if (typeof content === 'string') {
                     fullText += content;
-                    setMessages(prev =>
-                      prev.map(m =>
-                        m.id === streamMessageId ? { ...m, text: fullText } : m
-                      )
-                    );
                   }
                 } catch {
                   // ignore JSON parse errors (e.g. SSE comments or incomplete chunks)
@@ -1218,8 +1372,20 @@ const Chat = () => {
           setStreamingMessageId(null);
         }
 
+        if (fullText) {
+          setAiProgressStep(4);
+          setMessages(prev => [...prev, {
+            id: Date.now() + Math.random(),
+            text: fullText,
+            isUser: false,
+            role: 'assistant',
+            hotels: hotelsFromStream
+          }]);
+        }
         if (chatId && user && fullText) {
-          await saveMessageToCurrentChat(chatId, 'assistant', fullText);
+          await saveMessageToCurrentChat(chatId, 'assistant', fullText, {
+            hotels: hotelsFromStream
+          });
         }
         return;
       }
@@ -1249,32 +1415,38 @@ const Chat = () => {
         : undefined;
 
       setStreamingMessageId(null);
-      setMessages(prev => prev.map(m =>
-        m.id === streamMessageId
-          ? { id: streamMessageId, text: responseText, isUser: false, role: 'assistant' as const, hotels: hotelsFromApi, itinerary: itineraryFromApi }
-          : m
-      ));
+      setAiProgressStep(4);
+      setMessages(prev => [...prev, {
+        id: Date.now() + Math.random(),
+        text: responseText,
+        isUser: false,
+        role: 'assistant' as const,
+        hotels: hotelsFromApi,
+        itinerary: itineraryFromApi
+      }]);
 
       if (chatId && user) {
-        await saveMessageToCurrentChat(chatId, 'assistant', responseText);
+        await saveMessageToCurrentChat(chatId, 'assistant', responseText, {
+          hotels: hotelsFromApi,
+          itinerary: itineraryFromApi
+        });
       }
     } catch (error) {
       console.error('Error in chat:', error);
       setStreamingMessageId(null);
       const errorMessage: Message = {
         id: Date.now() + Math.random(),
-        text: error instanceof Error 
-          ? `Извините, произошла ошибка: ${error.message}. Пожалуйста, попробуйте еще раз.`
+        text: error instanceof Error
+          ? (
+              error.message.includes('Failed to fetch')
+                ? 'Не удалось подключиться к серверу чата. Проверьте, что backend запущен (порт 3001), и попробуйте снова.'
+                : `Извините, произошла ошибка: ${error.message}. Пожалуйста, попробуйте еще раз.`
+            )
           : 'Извините, произошла неизвестная ошибка. Пожалуйста, попробуйте еще раз.',
         isUser: false,
         role: 'assistant'
       };
-      setMessages(prev => {
-        const hasPlaceholder = prev.some(m => m.id === streamingMessageId);
-        return hasPlaceholder
-          ? prev.map(m => m.id === streamingMessageId ? { ...errorMessage, id: streamingMessageId } : m)
-          : [...prev, errorMessage];
-      });
+      setMessages(prev => [...prev, errorMessage]);
       
       // Сохраняем сообщение об ошибке
       if (chatId && user) {
@@ -1282,6 +1454,7 @@ const Chat = () => {
       }
     } finally {
       setIsLoading(false);
+      setAiProgressStep(0);
     }
   }, [messages, inputText, filters, dateFilter, getFlightInfoForGPT, currentChatId, user, location.search]);
 
@@ -1299,7 +1472,7 @@ const Chat = () => {
       if (!hasChatId && !creatorChatId && !creatorId && !hasExistingMessages) {
         setMessages([{
           id: Date.now() + Math.random(),
-          text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
+          text: WELCOME_MESSAGE_TEXT,
           isUser: false,
           role: 'assistant'
         }]);
@@ -1395,12 +1568,21 @@ const Chat = () => {
       const loadCreatorMessages = async () => {
         try {
           const messages = await creatorChatApi.getMessages(creatorChatIdFromUrl);
-          const formattedMessages: Message[] = messages.map((msg: any) => ({
-            id: msg.id,
-            text: msg.content,
-            isUser: msg.sender_type === 'client',
-            role: msg.sender_type === 'client' ? 'user' : 'assistant'
-          }));
+          const formattedMessages: Message[] = messages.map((msg: any) => {
+            const content = typeof msg.content === 'string' ? msg.content : String(msg.content ?? '');
+            const unpacked =
+              msg.sender_type === 'client'
+                ? { text: content }
+                : unpackStoredAssistantMessage(content);
+            return {
+              id: msg.id,
+              text: unpacked.text,
+              isUser: msg.sender_type === 'client',
+              role: msg.sender_type === 'client' ? 'user' : 'assistant',
+              hotels: unpacked.meta?.hotels,
+              itinerary: unpacked.meta?.itinerary
+            };
+          });
           setMessages(formattedMessages.length > 0 ? formattedMessages : [{
             id: Date.now(),
             text: 'Чат с организатором тура. Задавайте ваши вопросы.',
@@ -1431,9 +1613,9 @@ const Chat = () => {
       const createChat = async () => {
         try {
           await creatorChatApi.connect();
-          const { chatId } = await creatorChatApi.joinChat(creatorIdFromUrl, tourTitleFromUrl || undefined);
-          
-          setCreatorChatId(chatId);
+          const { chat_id: wsChatId } = await creatorChatApi.joinChat(creatorIdFromUrl, tourTitleFromUrl || undefined);
+
+          setCreatorChatId(wsChatId);
           setIsCreatorChat(true);
           setMessages([{
             id: Date.now(),
@@ -1441,24 +1623,25 @@ const Chat = () => {
             isUser: false,
             role: 'assistant'
           }]);
-          
+
           // Добавляем в список чатов
           const newChat: Chat = {
-            id: chatId,
+            id: wsChatId,
             title: tourTitleFromUrl ? `Тур: ${tourTitleFromUrl}` : 'Чат с организатором',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             user_id: user.id,
             isCreatorChat: true,
-            creatorChatId: chatId,
+            creatorChatId: wsChatId,
             unread_count: 0
           };
           setUserChats(prev => [newChat, ...prev]);
-          
+
           // Обновляем URL
           const newParams = new URLSearchParams(location.search);
-          newParams.set('creatorChat', chatId);
+          newParams.set('creatorChat', wsChatId);
           newParams.delete('creatorId');
+          newParams.delete('new');
           navigate({ pathname: location.pathname, search: newParams.toString() }, { replace: true });
           
         } catch (err) {
@@ -1479,9 +1662,14 @@ const Chat = () => {
     
     // Обычный чат
     if (chatIdFromUrl && user && chatIdFromUrl !== currentChatId) {
+      if (params.get('new')) {
+        const cleanedParams = new URLSearchParams(params);
+        cleanedParams.delete('new');
+        navigate({ pathname: location.pathname, search: cleanedParams.toString() }, { replace: true });
+      }
       const chat = userChats.find(c => c.id === chatIdFromUrl);
-      if (chat && (chat as any).isCreatorChat) {
-        setCreatorChatId((chat as any).creatorChatId || chatIdFromUrl);
+      if (chat?.isCreatorChat) {
+        setCreatorChatId(chat.creatorChatId || chatIdFromUrl);
         setIsCreatorChat(true);
         setCurrentChatId(chatIdFromUrl);
         return;
@@ -1542,18 +1730,26 @@ const Chat = () => {
       console.log('Loaded messages:', loadedMessages.length, loadedMessages);
       
       if (loadedMessages.length > 0) {
-        const formattedMessages: Message[] = loadedMessages.map((msg: ChatMessageDB, index: number) => ({
-          id: index,
-          text: msg.content,
-          isUser: msg.role === 'user',
-          role: msg.role as 'user' | 'assistant' | 'system'
-        }));
+        const formattedMessages: Message[] = loadedMessages.map((msg: ChatMessageDB, index: number) => {
+          const content = typeof msg.content === 'string' ? msg.content : String(msg.content ?? '');
+          const unpacked = msg.role === 'assistant'
+            ? unpackStoredAssistantMessage(content)
+            : { text: content };
+          return {
+            id: index,
+            text: unpacked.text,
+            isUser: msg.role === 'user',
+            role: msg.role as 'user' | 'assistant' | 'system',
+            hotels: unpacked.meta?.hotels,
+            itinerary: unpacked.meta?.itinerary
+          };
+        });
         setMessages(formattedMessages);
       } else {
         // Если сообщений нет, показываем приветственное
         setMessages([{
           id: Date.now() + Math.random(),
-          text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
+          text: WELCOME_MESSAGE_TEXT,
           isUser: false,
           role: 'assistant'
         }]);
@@ -1581,10 +1777,10 @@ const Chat = () => {
           await creatorChatApi.connect();
           
           // Создаём/присоединяемся к чату
-          const { chatId } = await creatorChatApi.joinChat(creatorIdFromUrl, tourTitleFromUrl || undefined);
-          setCreatorChatId(chatId);
+          const { chat_id: wsChatId } = await creatorChatApi.joinChat(creatorIdFromUrl, tourTitleFromUrl || undefined);
+          setCreatorChatId(wsChatId);
           setIsCreatorChat(true);
-          
+
           // Добавляем системное сообщение о начале чата
           setMessages([{
             id: Date.now(),
@@ -1592,29 +1788,29 @@ const Chat = () => {
             isUser: false,
             role: 'assistant'
           }]);
-          
+
           // Добавляем чат в список (чтобы он появился в левой панели)
           const newChat: Chat = {
-            id: chatId,
+            id: wsChatId,
             title: tourTitleFromUrl ? `Тур: ${tourTitleFromUrl}` : 'Чат с организатором',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             user_id: user.id,
             isCreatorChat: true,
-            creatorChatId: chatId,
+            creatorChatId: wsChatId,
             unread_count: 0
           };
           setUserChats(prev => [newChat, ...prev]);
-          
+
           // Обновляем URL
           const newParams = new URLSearchParams(location.search);
-          newParams.set('creatorChat', chatId);
+          newParams.set('creatorChat', wsChatId);
           newParams.delete('creatorId');
-          newParams.delete('creatorChat');
           newParams.delete('newTour');
+          newParams.delete('new');
           navigate({ pathname: location.pathname, search: newParams.toString() }, { replace: true });
-          
-          return chatId;
+
+          return wsChatId;
         } catch (err) {
           console.error('Error creating creator chat:', err);
           // Fallback к обычному чату если не удалось создать creator чат
@@ -1643,7 +1839,7 @@ const Chat = () => {
         setUserChats(prev => [chat, ...prev]);
         
         // Добавляем приветственное сообщение в новый чат
-        await addChatMessage(chat.id, 'assistant', messages[0].text);
+        await addChatMessage(chat.id, 'assistant', WELCOME_MESSAGE_TEXT);
 
         // Обновляем URL, чтобы прокинуть chatId — это триггерит
         // повторную загрузку списка чатов в сайдбаре
@@ -1651,6 +1847,7 @@ const Chat = () => {
           const params = new URLSearchParams(location.search);
           params.set('chat', chat.id);
           params.delete('newTour');
+          params.delete('new');
           navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
         } catch (e) {
           console.error('Error updating URL with new chatId:', e);
@@ -1665,7 +1862,12 @@ const Chat = () => {
   };
 
   // Сохранение сообщения в текущий чат
-  const saveMessageToCurrentChat = async (chatId: string, role: 'user' | 'assistant', content: string) => {
+  const saveMessageToCurrentChat = async (
+    chatId: string,
+    role: 'user' | 'assistant',
+    content: string,
+    meta?: StoredAssistantMeta
+  ) => {
     console.log('Saving message:', { role, content: content.slice(0, 50) + '...', chatId, user: !!user });
     
     if (!user || !chatId) {
@@ -1674,7 +1876,8 @@ const Chat = () => {
     }
     
     try {
-      await addChatMessage(chatId, role, content);
+      const payload = role === 'assistant' ? packStoredAssistantMessage(content, meta) : content;
+      await addChatMessage(chatId, role, payload);
       console.log('Message saved successfully');
     } catch (error) {
       console.error('Error saving message:', error);
@@ -1732,10 +1935,22 @@ const Chat = () => {
     }));
   };
 
+  /** Числовой region id в query (регистр ключа q не важен). Fallback по сырой строке — на случай дублей/нестандартного query. */
+  const getOstrovokNumericQ = (u: URL): string | null => {
+    for (const [k, v] of u.searchParams.entries()) {
+      if (k.toLowerCase() !== 'q') continue;
+      const t = String(v).trim();
+      if (/^\d+$/.test(t)) return t;
+    }
+    const raw = u.search.match(/(?:^|[?&])q=(\d+)(?:&|#|$)/i);
+    return raw ? raw[1] : null;
+  };
+
   // Порядок параметров как на ostrovok.ru: utm_medium → partner_slug → utm_source
   const normalizeOstrovokQueryOrder = (url: string): string => {
     try {
-      const u = new URL(url);
+      const pre = rewriteOstrovokHybridHotelPathToSerp(url) || url;
+      let u = new URL(pre);
       const order = ['utm_medium', 'partner_slug', 'utm_source'];
       const rest: [string, string][] = [];
       u.searchParams.forEach((v, k) => {
@@ -1759,6 +1974,16 @@ const Chat = () => {
       return url;
     }
 
+    const roomsCanonical = rewriteOstrovokHotelPathToRooms(url);
+    if (roomsCanonical) {
+      url = roomsCanonical;
+    }
+
+    const unhybrid = rewriteOstrovokHybridHotelPathToSerp(url);
+    if (unhybrid) {
+      url = unhybrid;
+    }
+
     const resolveDates = (): { checkIn: string; checkOut: string } => {
       if (checkInDate && checkOutDate) {
         return { checkIn: checkInDate, checkOut: checkOutDate };
@@ -1773,7 +1998,12 @@ const Chat = () => {
       return { checkIn: today, checkOut: week };
     };
 
-    const { checkIn, checkOut } = resolveDates();
+    let { checkIn, checkOut } = resolveDates();
+    if (checkIn === checkOut) {
+      const d = new Date(`${checkIn}T12:00:00`);
+      d.setDate(d.getDate() + 1);
+      checkOut = d.toISOString().split('T')[0];
+    }
     const roomsArg = [{ adults: filters.travelers, childrenAges: filters.childrenAges }];
 
     if (FORCE_TEST_HOTELS) {
@@ -1793,22 +2023,36 @@ const Chat = () => {
     }
 
     const withNorm = (u: string) => normalizeOstrovokQueryOrder(u);
-    const regionFromFilter = getRegionIdForCityName((filters.location || '').trim());
 
-    const buildGenericHotels = () => {
-      const u = new URL('https://www.ostrovok.ru/hotels/');
-      u.searchParams.set('utm_medium', 'partners');
-      u.searchParams.set('partner_slug', OSTROVOK_PARTNER_SLUG);
-      u.searchParams.set('utm_source', OSTROVOK_PARTNER_SLUG);
-      u.searchParams.set('dates', `${checkIn.split('-').reverse().join('.')}-${checkOut.split('-').reverse().join('.')}`);
-      u.searchParams.set('guests', String(filters.travelers));
-      u.searchParams.set('cur', 'RUB');
-      u.searchParams.set('lang', 'ru');
-      return withNorm(u.toString());
+    const resolveRegionId = (): number | undefined => {
+      const fromFilter = getRegionIdForCityName((filters.location || '').trim());
+      if (fromFilter != null) return fromFilter;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const m = messages[i];
+        if (!m.isUser) continue;
+        const loc = extractLocationFromText(m.text);
+        if (loc) {
+          const id = getRegionIdForCityName(loc.trim());
+          if (id != null) return id;
+        }
+      }
+      return undefined;
     };
 
-    const qParam = parsed.searchParams.get('q');
-    if (qParam && /^\d+$/.test(qParam)) {
+    const regionId = resolveRegionId();
+    /** SERP без q= на ostrovok.ru даёт 404 — всегда передаём регион (fallback Москва, как на бэкенде). */
+    const buildSerpForContext = (rid: number) =>
+      withNorm(
+        buildSerpLink(String(rid), {
+          partnerSlug: OSTROVOK_PARTNER_SLUG,
+          checkIn,
+          checkOut,
+          rooms: roomsArg,
+        })
+      );
+
+    const qParam = getOstrovokNumericQ(parsed);
+    if (qParam) {
       return withNorm(
         buildSerpLink(qParam, {
           partnerSlug: OSTROVOK_PARTNER_SLUG,
@@ -1819,20 +2063,31 @@ const Chat = () => {
       );
     }
 
-    const hotelSeg = parsed.pathname.match(/\/hotel\/([^/?]+)/)?.[1];
+    const extractHotelSlugFromPath = (pathname: string): string | null => {
+      const parts = pathname
+        .split('/')
+        .map((p) => p.trim())
+        .filter(Boolean);
+      if (parts.length < 2 || parts[0].toLowerCase() !== 'hotel') return null;
+
+      // /hotel/{slug}
+      if (parts.length === 2) return parts[1] || null;
+
+      // /hotel/{country}/{city}/mid123456/{hotel_slug}/
+      for (let i = parts.length - 1; i >= 1; i -= 1) {
+        const seg = parts[i];
+        if (!seg) continue;
+        if (/^mid\d+$/i.test(seg)) continue;
+        if (/^(hotel|hotels|rooms)$/i.test(seg)) continue;
+        return seg;
+      }
+      return null;
+    };
+
+    const hotelSeg = extractHotelSlugFromPath(parsed.pathname);
     if (hotelSeg) {
       if (looksLikeHid(hotelSeg)) {
-        if (regionFromFilter != null) {
-          return withNorm(
-            buildSerpLink(regionFromFilter, {
-              partnerSlug: OSTROVOK_PARTNER_SLUG,
-              checkIn,
-              checkOut,
-              rooms: roomsArg,
-            })
-          );
-        }
-        return withNorm(buildGenericHotels());
+        return buildSerpForContext(regionId ?? 1);
       }
       try {
         return withNorm(
@@ -1851,17 +2106,7 @@ const Chat = () => {
     const roomsSeg = parsed.pathname.match(/\/rooms\/([^/?]+)/)?.[1];
     if (roomsSeg) {
       if (looksLikeHid(roomsSeg)) {
-        if (regionFromFilter != null) {
-          return withNorm(
-            buildSerpLink(regionFromFilter, {
-              partnerSlug: OSTROVOK_PARTNER_SLUG,
-              checkIn,
-              checkOut,
-              rooms: roomsArg,
-            })
-          );
-        }
-        return withNorm(buildGenericHotels());
+        return buildSerpForContext(regionId ?? 1);
       }
       try {
         return withNorm(
@@ -1878,17 +2123,7 @@ const Chat = () => {
     }
 
     if (parsed.pathname.endsWith('/hotels/') || parsed.pathname === '/hotels') {
-      if (regionFromFilter != null) {
-        return withNorm(
-          buildSerpLink(regionFromFilter, {
-            partnerSlug: OSTROVOK_PARTNER_SLUG,
-            checkIn,
-            checkOut,
-            rooms: roomsArg,
-          })
-        );
-      }
-      return withNorm(buildGenericHotels());
+      return buildSerpForContext(regionId ?? 1);
     }
 
     return withNorm(url);
@@ -1897,8 +2132,46 @@ const Chat = () => {
   const formatMessage = (text: string): string => {
     if (!text) return '';
 
-    // First, fix any broken booking URLs in the raw text
-    let fixedText = text.replace(
+    const autoLinkPlaceMentions = (raw: string): string => {
+      const destination = (filters.location || '').trim();
+
+      const withRestaurantLinks = raw.replace(
+        /(Обед в ресторане|Ужин в ресторане)\s+[«"]([^"»\n]+)[»"]/gi,
+        (full, prefix: string, placeName: string) => {
+          if (/^\s*#{1,6}\s/.test(full)) return full;
+          if (/\]\(https?:\/\/[^\)]+\)/i.test(full)) return full;
+          const restaurantQuery = `ресторан ${placeName.trim()}`;
+          const query = encodeURIComponent(
+            destination ? `${restaurantQuery}, ${destination}` : restaurantQuery
+          );
+          const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${query}`;
+          return `${prefix} [${placeName}](${mapsUrl})`;
+        }
+      );
+
+      return withRestaurantLinks;
+    };
+
+    // First, normalize escaped markdown links and fix broken booking URLs in raw text
+    let fixedText = autoLinkPlaceMentions(text)
+      // В ответе чата не показываем кнопку/строку сохранения маршрута.
+      .replace(/^\s*\[[^\]]*сохранить маршрут[^\]]*\]\([^)]+\)\s*$/gmi, '')
+      .replace(/^\s*.*сохранить маршрут.*$/gmi, '')
+      // GPT иногда экранирует markdown как \[text\](url) — приводим к обычному виду
+      .replace(/\\\[((?:\\.|[^\]])+?)\\\]\((https?:\/\/[^)\s]+)\)/g, (_, label, url) => {
+        const cleanLabel = String(label).replace(/\\([()[\]])/g, '$1');
+        const cleanUrl = String(url).replace(/\\+$/, '');
+        return `[${cleanLabel}](${cleanUrl})`;
+      })
+      .replace(
+        /\\\[([^\]]+?)\\\]\((https?:\/\/[^)\s]+)\)/g,
+        (_, label, url) => `[${label}](${String(url).replace(/\\+$/, '')})`
+      )
+      .replace(
+        /\[([^\]]+?)\]\\\((https?:\/\/[^)\s]+)\\\)/g,
+        (_, label, url) => `[${label}](${String(url).replace(/\\+$/, '')})`
+      )
+      .replace(
       /\[([^\]]*🛎️[^\]]*)\]\((https?:\/\/ostrovok\.ru\/hotel\/[^)]+)\)/g,
       (_, label, url) => {
         const fixedUrl = fixBookingUrl(url);
@@ -1976,6 +2249,8 @@ const Chat = () => {
     
     // Continue formatting
     formattedText = formattedText
+      // Удаляем пустые markdown-маркеры заголовков, чтобы они не попадали в UI как "###".
+      .replace(/^\s*#{1,6}\s*$/gm, '')
       // Format images (non-hotel photos)
       .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<div class="my-4"><img src="$2" alt="$1" class="w-full max-w-md rounded-xl shadow-lg object-cover aspect-video" loading="lazy" /></div>')
       
@@ -1986,8 +2261,13 @@ const Chat = () => {
         return `<div class="my-3"><a href="${fixedUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-colors shadow-lg"><span>🛎️</span><span>${label.trim()}</span></a></div>`;
       })
       
-      // Handle other markdown links
-      .replace(/\[([^\]]+?)\]\(\s*(https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline font-medium">$1</a>')
+      // Остальные markdown-ссылки (в т.ч. бронь без 🛎️ в тексте — иначе href остаётся гибридом /hotel/slug/?q=53)
+      .replace(/\[([^\]]+?)\]\(\s*(https?:\/\/[^)]+)\)/g, (_, label: string, url: string) => {
+        const trimmed = url.trim();
+        const href =
+          /ostrovok\.ru\/(hotel|rooms)\//i.test(trimmed) ? fixBookingUrl(trimmed) : trimmed;
+        return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline font-medium">${label}</a>`;
+      })
       
       // Format headers with emojis
       .replace(/^(Day \d+:.*)/gm, '<h3 class="text-xl font-bold mt-6 mb-3">$1</h3>')
@@ -2025,8 +2305,8 @@ const Chat = () => {
       // Format italic text
       .replace(/\*([^*]+)\*/g, '<em>$1</em>')
       
-      // Format paragraphs (simple version)
-      .replace(/([^\n]+)/g, '<p class="my-2 leading-relaxed">$1</p>');
+      // Format paragraphs (не оборачиваем уже сформированные HTML-теги).
+      .replace(/^(?!\s*<)([^\n]+)$/gm, '<p class="my-2 leading-relaxed">$1</p>');
 
     return formattedText;
   };
@@ -2048,6 +2328,8 @@ const Chat = () => {
     isTop?: boolean;
     description?: string;
   }> => {
+    if (!text || typeof text !== 'string') return [];
+
     const hotels: Array<{
       name: string;
       stars: number;
@@ -2087,8 +2369,10 @@ const Chat = () => {
     };
 
     const extractBookingUrl = (block: string): string => {
-      const m = block.match(/\[\s*🛎️[^\]]*\]\(([^)]+)\)/);
-      return m ? fixBookingUrl(m[1].trim()) : '';
+      const mEmoji = block.match(/\[\s*🛎️[^\]]*\]\(([^)]+)\)/);
+      if (mEmoji) return fixBookingUrl(mEmoji[1].trim());
+      const mO = block.match(/\]\((https?:\/\/[^)]*ostrovok\.ru\/(?:hotel|rooms)\/[^)]+)\)/i);
+      return mO ? fixBookingUrl(mO[1].trim()) : '';
     };
 
     const extractAddress = (block: string): string => {
@@ -2220,10 +2504,12 @@ const Chat = () => {
 
   // Update the message rendering in the Chat component
   const renderMessage = (message: Message) => {
+    const safeText = typeof message.text === 'string' ? message.text : String(message.text ?? '');
+
     if (message.isUser) {
       return (
         <div className="bg-black text-white rounded-[20px] rounded-br-[4px] px-4 py-3">
-          <p className="text-[15px] font-medium leading-snug">{message.text}</p>
+          <p className="text-[15px] font-medium leading-snug">{safeText}</p>
         </div>
       );
     }
@@ -2232,7 +2518,7 @@ const Chat = () => {
     const handleMessageClick = (e: React.MouseEvent) => {
       const target = e.target as HTMLElement;
       const link = target.closest('a');
-      const isOstrovok = link && (link.href.includes('ostrovok.ru/hotel/') || link.href.includes('ostrovok.ru/rooms/'));
+      const isOstrovok = link && /ostrovok\.ru/i.test(link.href);
       if (isOstrovok && link) {
         e.preventDefault();
         e.stopPropagation();
@@ -2264,7 +2550,11 @@ const Chat = () => {
           const mainImage =
             h.images?.find(img => img.category === 'exterior' || img.category === 'hotel_front') ||
             h.images?.[0];
-          const imageUrl = mainImage?.url ? mainImage.url.replace('{size}', '640x400') : undefined;
+          const imageUrl = normalizeHotelPreviewImageUrl(
+            mainImage?.url,
+            DEFAULT_ETG_IMAGE_PREVIEW_SIZE,
+            etgHotelImageOptionsFromImportMeta()
+          );
           let distanceToCenter: string | undefined;
           if (typeof h.distanceToCenter === 'number' && h.distanceToCenter > 0) {
             const km = h.distanceToCenter / 1000;
@@ -2411,104 +2701,222 @@ const Chat = () => {
         <div className="space-y-4" style={{ contain: 'layout style paint' }}>
           {/* Обработка отелей и текста без useMemo */}
           {(() => {
-            const parsedHotels = hotelsFromApi ?? parseHotelsFromText(message.text);
+            try {
+              const parsedHotels = hotelsFromApi ?? parseHotelsFromText(safeText);
 
-            // Всегда убираем из текста блоки с деталями отелей
-            const isHotelDetailBlock = (s: string) =>
-              /Адрес:|Цена:|Описание:/i.test(s) && (/Цена:/i.test(s) || /Описание:/i.test(s));
-            let textWithoutHotels = message.text;
-            if (parsedHotels?.length) {
-              parsedHotels.forEach(hotel => {
-                const escapedName = hotel.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const patternOld = new RegExp(
-                  `###\\s*\\d+\\.\\s*${escapedName}[\\s\\S]*?(?=###\\s*\\d+\\.|##\\s*🏨|\\n---\\s*\\n|$)`,
-                  'gmi'
+              // Всегда убираем из текста блоки с деталями отелей
+              const isHotelDetailBlock = (s: string) =>
+                /Адрес:|Цена:|Описание:/i.test(s) && (/Цена:/i.test(s) || /Описание:/i.test(s));
+              let textWithoutHotels = safeText;
+              if (parsedHotels?.length) {
+                parsedHotels.forEach(hotel => {
+                  const escapedName = hotel.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                  const patternOld = new RegExp(
+                    `###\\s*\\d+\\.\\s*${escapedName}[\\s\\S]*?(?=###\\s*\\d+\\.|##\\s*🏨|\\n---\\s*\\n|$)`,
+                    'gmi'
+                  );
+                  const patternNew = new RegExp(
+                    `##\\s*🏨\\s*${escapedName}[\\s\\S]*?(?=##\\s*🏨|###\\s*\\d+\\.|\\n---\\s*\\n|$)`,
+                    'gmi'
+                  );
+                  textWithoutHotels = textWithoutHotels.replace(patternOld, '');
+                  textWithoutHotels = textWithoutHotels.replace(patternNew, '');
+                });
+              }
+              // Блоки с заголовком ### N. или ##
+              textWithoutHotels = textWithoutHotels.replace(
+                /(?:^|\n)((?:###\s*\d+\.\s*[^\n]+|##\s[^\n]+)\n[\s\S]*?)(?=\n(?:###\s*\d+\.|##\s|\n---\s*\n)|$)/gim,
+                (fullMatch, block) => (isHotelDetailBlock(block) ? '\n' : fullMatch)
+              );
+              // Блоки без заголовка
+              textWithoutHotels = textWithoutHotels.replace(
+                /(?:^|\n)((!\[[^\]]*\]\([^)]+\)\s*\n[\s\S]*?))(?=\n\n|(?:\n###|\n##)\s|\n---\s*\n|$)/gim,
+                (fullMatch, block) => (isHotelDetailBlock(block) ? '\n' : fullMatch)
+              );
+              // Блоки с произвольным заголовком
+              textWithoutHotels = textWithoutHotels.replace(
+                /(?:^|\n\n)([\s\S]*?)(?=\n\n|\n(?:###|##)\s|\n---\s*\n|$)/gim,
+                (fullMatch, segment) => (isHotelDetailBlock(segment) ? '\n\n' : fullMatch)
+              );
+              // Доп. очистка от markdown-блоков отелей, чтобы не дублировать карточки и не рендерить битые изображения
+              if (parsedHotels?.length) {
+                textWithoutHotels = textWithoutHotels
+                  .replace(/!\[[^\]]*\]\([^)]+\)\s*/g, '')
+                  .replace(/^\s*\[\s*🛎️[^\]]*\]\((https?:\/\/[^)]+)\)\s*$/gmi, '')
+                  .replace(/^\s*\[[^\]]*Забронировать[^\]]*\]\((https?:\/\/[^)]+)\)\s*$/gmi, '')
+                  .replace(
+                    /^\s*[-•]?\s*\*\*(Адрес|Рейтинг|Цена|До центра|До метро|Налоги\/сборы|Питание|Отмена|Дедлайн отмены|Check-in\/out|Номер|Удобства номера|Удобства отеля|Важные ограничения)\*\*:\s*.*$/gmi,
+                    ''
+                  )
+                  .replace(
+                    /^\s*(?:[📍⭐🎯💰🛎️🍽️⛔⏰]|\uD83C[\uDF00-\uDFFF])?\s*\*?\*?\s*(Адрес|Рейтинг|Цена|До центра|До метро|Налоги\/сборы|Питание|Отмена|Дедлайн отмены|Check-in\/out|Номер|Удобства номера|Удобства отеля|Важные ограничения)\*?\*?\s*:\s*.*$/gmi,
+                    ''
+                  )
+                  .replace(
+                    /^\s*(?:[-•*]\s*)?(?:[📍⭐🎯💰🛎️🍽️⛔⏰✅]\s*)?(Адрес|Рейтинг|Цена|До центра|До метро|Налоги\/сборы|Питание|Отмена|Дедлайн отмены|Check-?in\/?out|Номер|Удобства номера|Удобства отеля|Важные ограничения)\s*:\s*.*$/gmi,
+                    ''
+                  )
+                  .replace(
+                    /^\s*(?:[#>*\-•]\s*)?(?:[🏨⭐✅]\s*)?(Где остановиться|Рекомендуемые отели)\b.*$/gmi,
+                    ''
+                  )
+                  .replace(/^\s*(?:[-•*]\s*)?(?:[📍]\s*)?\*{0,2}(?:Адрес|Address)\*{0,2}\s*:\s*.*$/gmi, '')
+                  .replace(/^\s*\[[^\]]*сохранить маршрут[^\]]*\]\([^)]+\)\s*$/gmi, '')
+                  .replace(/^\s*.*сохранить маршрут.*$/gmi, '')
+                  .replace(/^###\s*\d+\.\s*.*$/gmi, '')
+                  .replace(/^##\s*🏨.*$/gmi, '')
+                  .replace(/^\s*#{1,6}\s*$/gmi, '')
+                  .replace(/^\s*---\s*$/gmi, '')
+                  .replace(/\n{3,}/g, '\n\n')
+                  .trim();
+
+                // Remove loose one-line mentions of hotel names above cards.
+                for (const hotel of parsedHotels) {
+                  const escapedName = hotel.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                  const hotelNameLine = new RegExp(
+                    `^\\s*(?:[#>*\\-•\\d.)]\\s*)?(?:[🏨⭐✅]\\s*)?${escapedName}\\s*(?:[⭐✅\\d./\\-\\s]*)$`,
+                    'gmi'
+                  );
+                  textWithoutHotels = textWithoutHotels.replace(hotelNameLine, '');
+                }
+                textWithoutHotels = textWithoutHotels.replace(/\n{3,}/g, '\n\n').trim();
+                // Дополнительная зачистка: адресные строки над карточками нам не нужны
+                textWithoutHotels = textWithoutHotels
+                  .replace(/^\s*(?:[-•*]\s*)?(?:📍\s*)?Адрес\s*:\s*.*$/gmi, '')
+                  .replace(/^\s*(?:[-•*]\s*)?(?:📍\s*)?Address\s*:\s*.*$/gmi, '')
+                  .replace(/\n{3,}/g, '\n\n')
+                  .trim();
+              }
+
+              if (!parsedHotels || parsedHotels.length === 0) {
+                return (
+                  <div
+                    className="prose prose-sm max-w-none text-gray-900"
+                    style={{ contain: 'content' }}
+                    dangerouslySetInnerHTML={{ __html: formatMessage(textWithoutHotels) }}
+                  />
                 );
-                const patternNew = new RegExp(
-                  `##\\s*🏨\\s*${escapedName}[\\s\\S]*?(?=##\\s*🏨|###\\s*\\d+\\.|\\n---\\s*\\n|$)`,
-                  'gmi'
-                );
-                textWithoutHotels = textWithoutHotels.replace(patternOld, '');
-                textWithoutHotels = textWithoutHotels.replace(patternNew, '');
+              }
+
+              const seenKeys = new Set<string>();
+              const uniqueHotels = parsedHotels.filter((h, idx) => {
+                const key = `${(h.name || '').trim().toLowerCase()}|${(h.bookingUrl || '').trim().toLowerCase()}|${idx}`;
+                if (seenKeys.has(key)) return false;
+                seenKeys.add(key);
+                return true;
               });
-            }
-            // Блоки с заголовком ### N. или ##
-            textWithoutHotels = textWithoutHotels.replace(
-              /(?:^|\n)((?:###\s*\d+\.\s*[^\n]+|##\s[^\n]+)\n[\s\S]*?)(?=\n(?:###\s*\d+\.|##\s|\n---\s*\n)|$)/gim,
-              (fullMatch, block) => (isHotelDetailBlock(block) ? '\n' : fullMatch)
-            );
-            // Блоки без заголовка
-            textWithoutHotels = textWithoutHotels.replace(
-              /(?:^|\n)((!\[[^\]]*\]\([^)]+\)\s*\n[\s\S]*?))(?=\n\n|(?:\n###|\n##)\s|\n---\s*\n|$)/gim,
-              (fullMatch, block) => (isHotelDetailBlock(block) ? '\n' : fullMatch)
-            );
-            // Блоки с произвольным заголовком
-            textWithoutHotels = textWithoutHotels.replace(
-              /(?:^|\n\n)([\s\S]*?)(?=\n\n|\n(?:###|##)\s|\n---\s*\n|$)/gim,
-              (fullMatch, segment) => (isHotelDetailBlock(segment) ? '\n\n' : fullMatch)
-            );
+              const hotelsToRender = uniqueHotels.slice(0, 10);
+              const descBullets = hotelsToRender
+                .map(h =>
+                  'description' in h && typeof h.description === 'string'
+                    ? h.description.trim()
+                    : ''
+                )
+                .filter(Boolean)
+                .slice(0, 3)
+                .map(d => `• ${d}`)
+                .join('\n');
+              const validPrices = hotelsToRender
+                .map(h => Number(h.price))
+                .filter(p => Number.isFinite(p) && p > 0);
+              const minPrice = validPrices.length ? Math.min(...validPrices) : null;
+              const maxPrice = validPrices.length ? Math.max(...validPrices) : null;
+              const currency = hotelsToRender.find(h => h.currency)?.currency || 'RUB';
+              const areas = Array.from(
+                new Set(
+                  hotelsToRender
+                    .map(h => (h.address || '').split(',')[0].trim())
+                    .filter(Boolean)
+                )
+              ).slice(0, 3);
 
-            if (!parsedHotels || parsedHotels.length === 0) {
+              const looksThinNarrative =
+                textWithoutHotels.trim().length < 260 ||
+                /адрес\s*:/i.test(textWithoutHotels) ||
+                /(оптимальный|бюджетный|premium)\s+вариант/i.test(textWithoutHotels);
+              const hasRouteNarrative =
+                /(?:\bдень\s*\d+\b|маршрут|утро|вечер|достопримечательност|что посмотреть|план)/i.test(
+                  safeText
+                );
+
+              if (looksThinNarrative && !hasRouteNarrative) {
+                const intro = `Я собрал подборку из ${hotelsToRender.length} отелей с разным уровнем бюджета и форматом размещения.`;
+                const budget =
+                  minPrice != null && maxPrice != null
+                    ? `По цене ориентир — от ${new Intl.NumberFormat('ru-RU').format(minPrice)} до ${new Intl.NumberFormat('ru-RU').format(maxPrice)} ${currency} за ночь.`
+                    : '';
+                const areaHint = areas.length
+                  ? `По локациям стоит смотреть варианты в районах: ${areas.join(', ')}.`
+                  : '';
+                const extra = descBullets ? `\n\n💡 Кратко по вариантам:\n${descBullets}` : '';
+                textWithoutHotels = [intro, budget, areaHint].filter(Boolean).join(' ') + extra;
+              } else if (descBullets && textWithoutHotels.trim().length < 420) {
+                textWithoutHotels = `${textWithoutHotels.trim()}\n\n💡 Кратко по вариантам:\n${descBullets}`.trim();
+              }
+
+              const hasNarrative = textWithoutHotels.trim().length > 0;
+
               return (
-                <div
-                  className="prose prose-sm max-w-none text-gray-900"
-                  style={{ contain: 'content' }}
-                  dangerouslySetInnerHTML={{ __html: formatMessage(textWithoutHotels) }}
-                />
+                <>
+                  {hasNarrative ? (
+                    <div
+                      className="prose prose-sm max-w-none text-gray-900"
+                      style={{ contain: 'content' }}
+                      dangerouslySetInnerHTML={{ __html: formatMessage(textWithoutHotels) }}
+                    />
+                  ) : null}
+                  <div className="mt-4" style={{ contain: 'layout' }}>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">🏨 Рекомендуемые отели</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {hotelsToRender.map((hotel, index) => (
+                        <HotelCard
+                          key={`${hotel.name}-${index}`}
+                          variant="mini"
+                          onBookingClick={(e) => {
+                            e.preventDefault();
+                            window.open(
+                              fixBookingUrl(e.currentTarget.href),
+                              '_blank',
+                              'noopener,noreferrer'
+                            );
+                          }}
+                          name={hotel.name}
+                          stars={hotel.stars}
+                          rating={hotel.rating}
+                          reviewCount={hotel.reviewCount}
+                          address={hotel.address}
+                          price={hotel.price}
+                          currency={hotel.currency}
+                          imageUrl={hotel.imageUrl}
+                          bookingUrl={fixBookingUrl(hotel.bookingUrl || '')}
+                          distanceToCenter={hotel.distanceToCenter}
+                          distanceToMetro={hotel.distanceToMetro}
+                          amenities={hotel.amenities}
+                          roomAmenities={('roomAmenities' in hotel ? hotel.roomAmenities : undefined)}
+                          taxesAndFees={('taxesAndFees' in hotel ? hotel.taxesAndFees : undefined)}
+                          mealType={('mealType' in hotel ? hotel.mealType : undefined)}
+                          cancellationPolicy={('cancellationPolicy' in hotel ? hotel.cancellationPolicy : undefined)}
+                          cancellationDeadline={('cancellationDeadline' in hotel ? hotel.cancellationDeadline : undefined)}
+                          checkInTime={('checkInTime' in hotel ? hotel.checkInTime : undefined)}
+                          checkOutTime={('checkOutTime' in hotel ? hotel.checkOutTime : undefined)}
+                          metapolicyHighlights={('metapolicyHighlights' in hotel ? hotel.metapolicyHighlights : undefined)}
+                          roomName={('roomName' in hotel ? hotel.roomName : undefined)}
+                          isTop={hotel.isTop}
+                          description={'description' in hotel ? hotel.description : undefined}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </>
+              );
+            } catch (renderError) {
+              console.error('[Chat] renderMessage failed, fallback to plain text', renderError, message);
+              return (
+                <div className="prose prose-sm max-w-none text-gray-900">
+                  <p className="my-2 leading-relaxed whitespace-pre-wrap">{safeText}</p>
+                </div>
               );
             }
-
-            const seenNames = new Set<string>();
-            const uniqueHotels = parsedHotels.filter(h => {
-              const key = h.name.trim().toLowerCase();
-              if (seenNames.has(key)) return false;
-              seenNames.add(key);
-              return true;
-            });
-
-            return (
-              <>
-                <div
-                  className="prose prose-sm max-w-none text-gray-900"
-                  style={{ contain: 'content' }}
-                  dangerouslySetInnerHTML={{ __html: formatMessage(textWithoutHotels) }}
-                />
-                <div className="mt-4" style={{ contain: 'layout' }}>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">🏨 Рекомендуемые отели</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {uniqueHotels.map((hotel, index) => (
-                      <HotelCard
-                        key={`${hotel.name}-${index}`}
-                        variant="mini"
-                        name={hotel.name}
-                        stars={hotel.stars}
-                        rating={hotel.rating}
-                        reviewCount={hotel.reviewCount}
-                        address={hotel.address}
-                        price={hotel.price}
-                        currency={hotel.currency}
-                        imageUrl={hotel.imageUrl}
-                        bookingUrl={hotel.bookingUrl}
-                        distanceToCenter={hotel.distanceToCenter}
-                        distanceToMetro={hotel.distanceToMetro}
-                        amenities={hotel.amenities}
-                        roomAmenities={('roomAmenities' in hotel ? hotel.roomAmenities : undefined)}
-                        taxesAndFees={('taxesAndFees' in hotel ? hotel.taxesAndFees : undefined)}
-                        mealType={('mealType' in hotel ? hotel.mealType : undefined)}
-                        cancellationPolicy={('cancellationPolicy' in hotel ? hotel.cancellationPolicy : undefined)}
-                        cancellationDeadline={('cancellationDeadline' in hotel ? hotel.cancellationDeadline : undefined)}
-                        checkInTime={('checkInTime' in hotel ? hotel.checkInTime : undefined)}
-                        checkOutTime={('checkOutTime' in hotel ? hotel.checkOutTime : undefined)}
-                        metapolicyHighlights={('metapolicyHighlights' in hotel ? hotel.metapolicyHighlights : undefined)}
-                        roomName={('roomName' in hotel ? hotel.roomName : undefined)}
-                        isTop={hotel.isTop}
-                        description={'description' in hotel ? hotel.description : undefined}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </>
-            );
           })()}
         </div>
         {streamingMessageId === message.id && (
@@ -2796,7 +3204,7 @@ ${Array.from({ length: duration - 2 }, (_, i) => `
   };
 
   // Add this function to generate itinerary from recommendations
-  const generateItineraryFromRecommendations = (text: string) => {
+  const generateItineraryFromRecommendations = (text: string = '') => {
     const places: { [key: string]: string[] } = {
       attractions: [],
       restaurants: [],
@@ -2856,7 +3264,9 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
     (window as any).createRoute = () => {
       const lastAssistantMessage = messages.find((m: Message) => !m.isUser && m.role === 'assistant');
       if (lastAssistantMessage) {
-        const itinerary = generateItineraryFromRecommendations(lastAssistantMessage.text);
+        const itinerary = generateItineraryFromRecommendations(
+          typeof lastAssistantMessage.text === 'string' ? lastAssistantMessage.text : ''
+        );
         setCurrentMessage(itinerary);
         setShowTripBuilder(true);
       }
@@ -2872,20 +3282,18 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
     handleSendMessage(text);
   };
 
-  // Заглушка для сохранения маршрута
-  const handleSaveRoute = (_message: Message) => {
-    // TODO: Реализовать сохранение маршрута
-    alert('Маршрут сохранён!');
-  };
-
   // Сброс чата при нажатии 'Новый чат' в сайдбаре
   useEffect(() => {
-    const newParam = searchParams.get('new');
-    if (newParam) {
+    const params = new URLSearchParams(location.search);
+    const newParam = params.get('new');
+    const hasChatId = params.get('chat');
+    const hasCreatorChatId = params.get('creatorChat');
+    const hasCreatorId = params.get('creatorId');
+    if (newParam && !hasChatId && !hasCreatorChatId && !hasCreatorId) {
       setMessages([
         {
           id: Date.now() + Math.random(),
-          text: "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.",
+          text: WELCOME_MESSAGE_TEXT,
           isUser: false,
           role: 'assistant'
         }
@@ -2906,7 +3314,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
       setDateFilter({ type: 'specific' });
       setHasInteracted(false);
     }
-  }, [searchParams.get('new')]);
+  }, [location.search]);
 
   const currentChatTitle = currentChatId ? (userChats.find(c => c.id === currentChatId)?.title ?? 'Чат') : null;
 
@@ -2995,7 +3403,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
             >
               <div className="max-w-3xl md:max-w-4xl md:ml-12 md:mr-auto space-y-6">
                 {/* Показываем приветственное сообщение и подсказки до взаимодействия */}
-                {!hasInteracted && (
+                {!hasInteracted && !currentChatId && (
                   <>
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
@@ -3014,7 +3422,7 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                       <div className="max-w-[85%] w-full overflow-hidden">
                         <div className="bg-gray-50 rounded-2xl rounded-bl-[4px] p-4">
                           <div className="prose prose-sm max-w-none text-gray-900">
-                            {messages[0].text}
+                            {WELCOME_MESSAGE_TEXT}
                           </div>
                         </div>
                       </div>
@@ -3062,21 +3470,63 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                       `}
                     >
                       {renderMessage(message)}
-                      {/* Кнопка 'Сохранить маршрут' только для ассистента, не для приветственного сообщения, только на десктопе и не для чатов с организаторами */}
-                      {!isCreatorChat && !message.isUser && message.id !== messages[0].id && (
-                        <div className="mt-3 flex md:justify-end justify-center">
-                          <button
-                            className="hidden md:flex items-center gap-2 px-5 py-2 bg-black text-white rounded-full font-medium hover:bg-gray-900 transition-colors shadow"
-                            onClick={() => handleSaveRoute(message)}
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 5v14l7-7 7 7V5a2 2 0 00-2-2H7a2 2 0 00-2 2z"/></svg>
-                            <span>Сохранить маршрут</span>
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </motion.div>
                 ))}
+                {isLoading && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-start items-end gap-3"
+                  >
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 flex items-center justify-center">
+                        <img
+                          src={AILogo2}
+                          alt="TRIPGEN Assistant"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    </div>
+                    <div className="max-w-[95%] md:max-w-3xl w-full overflow-hidden">
+                      <div className="bg-gray-50 rounded-2xl rounded-bl-[4px] p-4">
+                        <p className="text-sm font-semibold text-gray-900 mb-3">Готовлю ответ...</p>
+                        <div className="space-y-2">
+                          {AI_PROGRESS_STEPS.map((step, idx) => {
+                            const done = idx < aiProgressStep;
+                            const active = idx === aiProgressStep;
+                            return (
+                              <div key={step} className="flex items-center gap-2 text-sm">
+                                <span
+                                  className={
+                                    done
+                                      ? 'text-green-600'
+                                      : active
+                                      ? 'text-black animate-pulse'
+                                      : 'text-gray-400'
+                                  }
+                                >
+                                  {done ? '✓' : active ? '•' : '○'}
+                                </span>
+                                <span
+                                  className={
+                                    done
+                                      ? 'text-gray-800'
+                                      : active
+                                      ? 'text-gray-900 font-medium'
+                                      : 'text-gray-400'
+                                  }
+                                >
+                                  {step}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
             </div>

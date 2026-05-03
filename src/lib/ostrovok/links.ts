@@ -120,6 +120,85 @@ export function looksLikeHid(value: string): boolean {
 }
 
 /**
+ * ETG/partner API иногда отдаёт гибрид: `/hotel/{slug}/?q={numeric_region_id}&...`
+ * На сайте в приоритете path → открывается неверный регион (например `el_salvador` при `q=53` для Парижа).
+ * Если в query есть числовой `q`, каноничный URL — только `/hotels/?q=...` с теми же параметрами.
+ * Также снимает `&amp;` в строке (двойное экранирование из JSON/HTML).
+ */
+export function rewriteOstrovokHybridHotelPathToSerp(url: string): string | null {
+  const raw = url.trim().replace(/&amp;/gi, "&");
+  if (!raw || !/ostrovok\.ru/i.test(raw)) return null;
+  let pathname: string;
+  try {
+    pathname = new URL(raw).pathname;
+  } catch {
+    return null;
+  }
+  if (!/^\/hotel\/[^/]+/i.test(pathname)) return null;
+  if (!/(?:[?&])q=(\d+)(?:&|#|$)/i.test(raw)) return null;
+  try {
+    const u = new URL(raw);
+    const serp = new URL("https://www.ostrovok.ru/hotels/");
+    u.searchParams.forEach((v, k) => serp.searchParams.set(k, v));
+    return serp.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Канонизирует partner-ссылку вида:
+ * - /hotel/{slug}/
+ * - /hotel/{country}/{city}/mid{hid}/{slug}/
+ * в формат /rooms/{slug}/ с сохранением query-параметров.
+ *
+ * Если slug не удалось безопасно определить — возвращает null.
+ */
+export function rewriteOstrovokHotelPathToRooms(url: string): string | null {
+  const raw = url.trim().replace(/&amp;/gi, "&");
+  if (!raw || !/ostrovok\.ru/i.test(raw)) return null;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+
+  if (/^\/rooms\/[^/]+/i.test(parsed.pathname)) return raw;
+  if (!/^\/hotel\/[^/]+/i.test(parsed.pathname)) return null;
+
+  const parts = parsed.pathname
+    .split("/")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length < 2 || parts[0].toLowerCase() !== "hotel") return null;
+
+  let slug: string | undefined;
+  if (parts.length === 2) {
+    // Для /hotel/{single-segment}/?q=... это может быть региональный slug; не конвертируем.
+    const q = parsed.searchParams.get("q");
+    if (q && /^\d+$/.test(q)) return null;
+    slug = parts[1];
+  } else {
+    for (let i = parts.length - 1; i >= 1; i -= 1) {
+      const seg = parts[i];
+      if (!seg) continue;
+      if (/^mid\d+$/i.test(seg)) continue;
+      if (/^(hotel|hotels|rooms)$/i.test(seg)) continue;
+      slug = seg;
+      break;
+    }
+  }
+
+  if (!slug || looksLikeHid(slug)) return null;
+
+  const roomsUrl = new URL(`https://www.ostrovok.ru/rooms/${encodeURIComponent(slug)}/`);
+  parsed.searchParams.forEach((value, key) => roomsUrl.searchParams.set(key, value));
+  return roomsUrl.toString();
+}
+
+/**
  * Hotel Page link (HP): требуется hotelSlug (НЕ hid!)
  * Base: https://www.ostrovok.ru/rooms/{hotel_slug}/
  * 

@@ -16,6 +16,7 @@ import {
 } from '../lib/ostrovok-links.cjs';
 import { getTrace, listRecentTraces } from '../src/diagnostics/searchLogger.js';
 import { getPgPool } from '../src/storage/postgres.js';
+import { formatEtgImageUrlForServer } from '../src/lib/etgHotelImageUrl.js';
 
 dotenv.config();
 
@@ -323,9 +324,9 @@ const generatePartnerLink = (
   }
 };
 
-// Format image URL with size
+// Format image URL with size (ETG cdn.worldota.net + опции легаси — см. .env.example)
 const formatImageUrl = (url: string, size: string = '640x400'): string => {
-  return url.replace('{size}', size);
+  return formatEtgImageUrlForServer(url, size);
 };
 
 // Demo hotels for testing when API is unavailable

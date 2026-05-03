@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Star, MapPin, Wifi, Car, Utensils, Lock, Dumbbell, Info, Ban, Clock, Wallet } from 'lucide-react';
 
 interface HotelCardProps {
@@ -27,6 +28,8 @@ interface HotelCardProps {
   description?: string;
   /** Компактный вид для списка в чате */
   variant?: 'default' | 'mini';
+  /** Если задан — вызывается вместо обычного перехода (нормализация URL и т.п.) */
+  onBookingClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
 export const HotelCard = ({
@@ -54,7 +57,49 @@ export const HotelCard = ({
   isTop = false,
   description,
   variant = 'default',
+  onBookingClick,
 }: HotelCardProps) => {
+  const [imageBroken, setImageBroken] = useState(false);
+  const hasImage = Boolean(imageUrl) && !imageBroken;
+
+  const looksLikeRawJson = (value?: string) => {
+    if (!value) return false;
+    const s = value.trim();
+    if (!s) return false;
+    if (s.startsWith('{') || s.startsWith('[')) return true;
+    return /"included_by_supplier"|tax_details|cancellation_penalties|"name"\s*:/i.test(s);
+  };
+
+  const sanitizeTariffLine = (value?: string, type: 'taxes' | 'cancellation' | 'deadline' | 'meal' = 'meal') => {
+    if (!value) return undefined;
+    let v = value.trim();
+    if (!v || v === '—' || v === '-') return undefined;
+    if (looksLikeRawJson(v)) {
+      if (type === 'taxes') return 'Налоги/сборы уточняются в тарифе';
+      if (type === 'cancellation') return 'Условия отмены уточняются в тарифе';
+      return undefined;
+    }
+    if (type === 'meal') {
+      const meal = v.toLowerCase();
+      if (meal === 'breakfast') v = 'Завтрак';
+      if (meal === 'lunch') v = 'Обед';
+      if (meal === 'dinner') v = 'Ужин';
+      if (meal === 'half board') v = 'Полупансион';
+      if (meal === 'full board') v = 'Полный пансион';
+      if (meal === 'all inclusive') v = 'Все включено';
+      if (meal === 'no meals' || meal === 'without meals' || meal === 'nomeal' || meal === 'room only') v = 'Без питания';
+    }
+    if (type === 'taxes' && /^Доп\.\s*сборы\/налоги к тарифу:\s*\d/i.test(v)) {
+      return 'Налоги/сборы уточняются на шаге бронирования';
+    }
+    return v.length > 180 ? `${v.slice(0, 177)}…` : v;
+  };
+
+  const safeTaxes = sanitizeTariffLine(taxesAndFees, 'taxes');
+  const safeMealType = sanitizeTariffLine(mealType, 'meal');
+  const safeCancellationPolicy = sanitizeTariffLine(cancellationPolicy, 'cancellation');
+  const safeCancellationDeadline = sanitizeTariffLine(cancellationDeadline, 'deadline');
+
   const formatPrice = (price: number, currency: string) => {
     return new Intl.NumberFormat('ru-RU').format(price) + ' ' + currency;
   };
@@ -70,8 +115,14 @@ export const HotelCard = ({
     return (
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex">
         <div className="w-24 h-20 flex-shrink-0">
-          {imageUrl ? (
-            <img src={imageUrl} alt={name} className="w-full h-full object-cover" loading="lazy" />
+          {hasImage ? (
+            <img
+              src={imageUrl}
+              alt={name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              onError={() => setImageBroken(true)}
+            />
           ) : (
             <div className="w-full h-full bg-gray-100 flex items-center justify-center">
               <span className="text-gray-400 text-xs font-medium px-1 text-center line-clamp-2">{name}</span>
@@ -92,16 +143,17 @@ export const HotelCard = ({
               href={bookingUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={onBookingClick}
               className="bg-black hover:bg-gray-800 text-white px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors"
             >
               Забронировать
             </a>
           </div>
           <div className="mt-2 space-y-1 text-[11px] text-gray-600">
-            {taxesAndFees && <div><strong>Налоги/сборы:</strong> {taxesAndFees}</div>}
-            {mealType && <div><strong>Питание:</strong> {mealType}</div>}
-            {cancellationPolicy && <div><strong>Отмена:</strong> {cancellationPolicy}</div>}
-            {cancellationDeadline && <div><strong>Дедлайн отмены:</strong> {cancellationDeadline}</div>}
+            {safeTaxes && <div><strong>Налоги/сборы:</strong> {safeTaxes}</div>}
+            {safeMealType && <div><strong>Питание:</strong> {safeMealType}</div>}
+            {safeCancellationPolicy && <div><strong>Отмена:</strong> {safeCancellationPolicy}</div>}
+            {safeCancellationDeadline && <div><strong>Дедлайн отмены:</strong> {safeCancellationDeadline}</div>}
             {(checkInTime || checkOutTime) && (
               <div><strong>Check-in/out:</strong> {checkInTime || '-'} / {checkOutTime || '-'}</div>
             )}
@@ -147,12 +199,13 @@ export const HotelCard = ({
       <div className="flex flex-col sm:flex-row">
         {/* Image */}
         <div className="sm:w-56 h-40 sm:h-auto relative flex-shrink-0">
-          {imageUrl ? (
+          {hasImage ? (
             <img
               src={imageUrl}
               alt={name}
               className="w-full h-full object-cover"
               loading="lazy"
+              onError={() => setImageBroken(true)}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
@@ -223,41 +276,41 @@ export const HotelCard = ({
           {/* Tariff Info */}
           <div className="mt-2 space-y-1.5 text-xs">
             {/* Cancellation Policy */}
-            {cancellationPolicy && (
+            {safeCancellationPolicy && (
               <div className="flex items-start gap-1.5">
                 <Ban className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
-                <span className={cancellationPolicy.includes('Бесплатная') ? 'text-green-600 font-medium' : 'text-amber-600'}>
-                  {cancellationPolicy}
+                <span className={safeCancellationPolicy.includes('Бесплатная') ? 'text-green-600 font-medium' : 'text-amber-600'}>
+                  {safeCancellationPolicy}
                 </span>
               </div>
             )}
             
             {/* Cancellation Deadline */}
-            {cancellationDeadline && cancellationDeadline !== 'Нет' && (
+            {safeCancellationDeadline && safeCancellationDeadline !== 'Нет' && (
               <div className="flex items-start gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
                 <span className="text-gray-600">
-                  Дедлайн: {cancellationDeadline}
+                  Дедлайн: {safeCancellationDeadline}
                 </span>
               </div>
             )}
             
             {/* Taxes */}
-            {taxesAndFees && (
+            {safeTaxes && (
               <div className="flex items-start gap-1.5">
                 <Wallet className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
                 <span className="text-gray-600">
-                  Налоги: {taxesAndFees}
+                  Налоги: {safeTaxes}
                 </span>
               </div>
             )}
             
             {/* Meal */}
-            {mealType && mealType !== 'Не указано' && (
+            {safeMealType && safeMealType !== 'Не указано' && (
               <div className="flex items-start gap-1.5">
                 <Utensils className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
                 <span className="text-gray-600">
-                  {mealType}
+                  {safeMealType}
                 </span>
               </div>
             )}
@@ -321,6 +374,7 @@ export const HotelCard = ({
               href={bookingUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={onBookingClick}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2.5 rounded-lg font-medium text-sm sm:text-base transition-colors whitespace-nowrap"
             >
               Забронировать отель

@@ -1,11 +1,6 @@
 const API_BASE_URL = 'https://api.travelpayouts.com';
 const API_TOKEN = import.meta.env.VITE_AVIASALES_API_TOKEN;
 
-// Check if API token is available
-if (!API_TOKEN) {
-  console.warn('Aviasales API token is not configured. Please add VITE_AVIASALES_API_TOKEN to your .env file.');
-}
-
 interface FlightSearchParams {
   origin: string;           // Airport code (e.g., MOW)
   destination: string;      // Airport code (e.g., LHR)
@@ -42,6 +37,10 @@ class AviasalesApi {
   }
 
   async searchFlights(params: FlightSearchParams): Promise<FlightInfo[]> {
+    if (!API_TOKEN) {
+      throw new Error('Aviasales API token is not configured. Add VITE_AVIASALES_API_TOKEN to .env.');
+    }
+
     const queryParams = new URLSearchParams({
       origin: params.origin,
       destination: params.destination,

@@ -1,7 +1,8 @@
 import { supabase } from '../lib/supabase';
 import { io, Socket } from 'socket.io-client';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const withApiBase = (path: string): string => `${API_URL}${path}`;
 
 export interface Creator {
   id: string;
@@ -41,18 +42,18 @@ let unreadCallbacks: ((count: number) => void)[] = [];
 
 // Initialize WebSocket connection
 async function getSocket(): Promise<Socket | null> {
-  if (socket?.connected) return socket;
-  if (socket?.connecting) return socket;
+  // Один экземпляр на сессию: не создаём второй io(), пока первый жив (в т.ч. до connect)
+  if (socket) return socket;
 
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) return null;
 
-  socket = io(API_URL, {
+  socket = io(API_URL || undefined, {
     path: '/socket.io/chat',
     auth: { token: session.access_token },
     transports: ['websocket', 'polling'],
     reconnection: true,
-    reconnectionAttempts: 5
+    reconnectionAttempts: 2
   });
 
   socket.on('connect', () => {
@@ -73,6 +74,10 @@ async function getSocket(): Promise<Socket | null> {
 
   socket.on('error', (error: any) => {
     console.error('[ChatWS] Error:', error);
+  });
+
+  socket.on('connect_error', (error: any) => {
+    console.warn('[ChatWS] connect_error:', error?.message || error);
   });
 
   return socket;
@@ -110,7 +115,7 @@ export const creatorChatApi = {
 
   // Получить список креаторов (через HTTP)
   async getCreators(): Promise<Creator[]> {
-    const response = await fetch(`${API_URL}/api/creator-chat/creators`);
+    const response = await fetch(withApiBase('/api/creator-chat/creators'));
     if (!response.ok) throw new Error('Failed to fetch creators');
     const data = await response.json();
     return data.creators;
@@ -121,14 +126,20 @@ export const creatorChatApi = {
     const s = await getSocket();
     if (!s) throw new Error('Not connected');
 
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Timeout')), 5000);
-      
-      s.emit('get_chats');
-      s.once('chats_list', (data: { chats: Chat[] }) => {
+    return new Promise((resolve) => {
+      const onChats = (data: { chats: Chat[] }) => {
         clearTimeout(timeout);
-        resolve(data.chats);
-      });
+        resolve(Array.isArray(data?.chats) ? data.chats : []);
+      };
+      const timeout = setTimeout(() => {
+        s.off('chats_list', onChats);
+        // Для обычного AI-чата сервер может не присылать chats_list сразу.
+        // Не считаем это ошибкой UX: просто возвращаем пустой список creator-чатов.
+        resolve([]);
+      }, 5000);
+
+      s.once('chats_list', onChats);
+      s.emit('get_chats');
     });
   },
 
@@ -144,9 +155,14 @@ export const creatorChatApi = {
       const timeout = setTimeout(() => reject(new Error('Timeout')), 5000);
       
       s.emit('join_chat', { creatorId, clientId, tourTitle });
-      s.once('chat_joined', (data: { chatId: string; messages: Message[] }) => {
+      s.once('chat_joined', (data: { chatId?: string; chat_id?: string; messages?: Message[] }) => {
         clearTimeout(timeout);
-        resolve(data);
+        const chat_id = data.chat_id ?? data.chatId;
+        if (!chat_id) {
+          reject(new Error('chat_joined: missing chat id'));
+          return;
+        }
+        resolve({ chat_id, messages: data.messages ?? [] });
       });
     });
   },

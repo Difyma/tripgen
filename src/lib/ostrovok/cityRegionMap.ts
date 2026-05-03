@@ -2,12 +2,19 @@
 export const CITY_REGION_MAP: Record<string, number> = {
   москва: 1,
   moscow: 1,
+  москве: 1,
+  москвы: 1,
+  москву: 1,
   'санкт-петербург': 2,
   'saint petersburg': 2,
   питер: 2,
   петербург: 2,
+  петербурге: 2,
   париж: 53,
   paris: 53,
+  париже: 53,
+  парижа: 53,
+  парижу: 53,
   лондон: 211,
   london: 211,
   дубай: 1435,
@@ -28,6 +35,9 @@ export const CITY_REGION_MAP: Record<string, number> = {
   berlin: 964,
   милан: 1188,
   milan: 1188,
+  казань: 1993,
+  казани: 1993,
+  kazan: 1993,
   вена: 1352,
   vienna: 1352,
   лиссабон: 1461,
@@ -39,6 +49,21 @@ export const CITY_REGION_MAP: Record<string, number> = {
 };
 
 export function getRegionIdForCityName(destination: string): number | undefined {
-  const k = destination.trim().toLowerCase();
-  return CITY_REGION_MAP[k];
+  let s = destination.trim().toLowerCase();
+  if (!s) return undefined;
+  s = s.replace(/^(?:в|во|на|по|из|изо|к|ко)\s+/u, '');
+  s = s.split(',')[0].trim();
+  if (CITY_REGION_MAP[s]) return CITY_REGION_MAP[s];
+  for (const part of s.split(/[\s/]+/).filter(Boolean)) {
+    if (CITY_REGION_MAP[part]) return CITY_REGION_MAP[part];
+  }
+  for (const [key, id] of Object.entries(CITY_REGION_MAP)) {
+    if (key.length < 4) continue;
+    if (s === key) return id;
+    if (s.startsWith(key)) {
+      const next = s[key.length];
+      if (next === undefined || !/[a-zа-яё]/i.test(next)) return id;
+    }
+  }
+  return undefined;
 }

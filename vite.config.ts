@@ -27,6 +27,12 @@ export default defineConfig({
         secure: false,
         timeout: 0, // не обрывать длинные соединения (SSE/streaming)
       },
+      '/socket.io': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
     },
   },
   build: {

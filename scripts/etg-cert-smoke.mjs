@@ -22,6 +22,29 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function assertRealHotelsPayload(data) {
+  assert(Array.isArray(data.hotels), 'Hotels array missing');
+  assert(data.hotels.length > 0, 'No hotels returned from ETG search');
+  const hasSyntheticCertMarker = data.hotels.some((h) =>
+    String(h?.mealType || '').includes('CERT_MODE=test_hotels')
+  );
+  assert(!hasSyntheticCertMarker, 'Synthetic test fallback detected (CERT_MODE=test_hotels marker)');
+  const hasLiveRateFields = data.hotels.some((h) =>
+    Number.isFinite(Number(h?.price)) &&
+    Number(h?.price) > 0 &&
+    typeof h?.bookingUrl === 'string' &&
+    h.bookingUrl.includes('partner_slug=') &&
+    typeof h?.taxesAndFees === 'string' &&
+    h.taxesAndFees.length > 0
+  );
+  assert(hasLiveRateFields, 'No live ETG tariff fields found in hotels payload');
+}
+
+function assertHotelsListSize(data, min = 10) {
+  assert(Array.isArray(data.hotels), 'Hotels array missing');
+  assert(data.hotels.length >= min, `Expected at least ${min} hotels, got ${data.hotels.length}`);
+}
+
 async function scenario(name, payload, validator) {
   console.log(`\n[smoke] ${name}`);
   const result = await callOpenAi(payload);
@@ -45,11 +68,9 @@ const basePayload = {
 
 async function run() {
   await scenario('2 adults city search', basePayload, async ({ status, data }) => {
-    assert(status === 200 || status === 502, 'Unexpected status');
-    if (status === 200) {
-      assert(Array.isArray(data.hotels), 'Hotels array missing');
-      assert(data.hotels.length >= 0, 'Hotels malformed');
-    }
+    assert(status === 200, 'Expected 200 from /api/openai');
+    assertRealHotelsPayload(data);
+    assertHotelsListSize(data, 10);
   });
 
   await scenario('2 adults + child 5', {
