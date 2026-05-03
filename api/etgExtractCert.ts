@@ -108,6 +108,64 @@ export function extractCancellationDeadlineLine(rate: any): string {
   return '—';
 }
 
+export function extractMetapolicyHighlights(metapolicy: any): string[] {
+  if (!metapolicy || typeof metapolicy !== 'object') return [];
+  const lines: string[] = [];
+
+  const children = metapolicy.children;
+  if (children) {
+    if (children.allow === false) lines.push('Дети: не допускаются');
+    else if (children.min_age != null) lines.push(`Дети: допускаются с ${children.min_age} лет`);
+    else if (children.allow === true) lines.push('Дети: допускаются');
+  }
+
+  const infant = metapolicy.infant;
+  if (infant) {
+    if (infant.allow === false) lines.push('Младенцы: не допускаются');
+    else if (infant.allow === true) lines.push('Младенцы: допускаются');
+  }
+
+  const pets = metapolicy.pets;
+  if (pets) {
+    if (pets.allow === false) lines.push('Животные: не допускаются');
+    else if (pets.allow === true) {
+      const note = pets.charge ? ` (доп. плата ${pets.charge})` : '';
+      lines.push(`Животные: допускаются${note}`);
+    }
+  }
+
+  const extraBed = metapolicy.extra_bed;
+  if (extraBed) {
+    if (extraBed.available === false) lines.push('Дополнительная кровать: недоступна');
+    else if (extraBed.available === true) {
+      const charge = extraBed.charge ? ` (${extraBed.charge})` : '';
+      lines.push(`Дополнительная кровать: доступна${charge}`);
+    }
+  }
+
+  const crib = metapolicy.crib ?? metapolicy.baby_cot;
+  if (crib) {
+    if (crib.available === false) lines.push('Детская кроватка: недоступна');
+    else if (crib.available === true) {
+      const charge = crib.charge ? ` (${crib.charge})` : ' (бесплатно)';
+      lines.push(`Детская кроватка: доступна${charge}`);
+    }
+  }
+
+  const smoking = metapolicy.smoking;
+  if (smoking) {
+    if (smoking.allowed === false) lines.push('Курение: запрещено');
+    else if (smoking.allowed === true) lines.push('Курение: разрешено');
+  }
+
+  if (lines.length === 0 && Object.keys(metapolicy).length > 0) {
+    const raw = JSON.stringify(metapolicy);
+    lines.push(raw.length > 300 ? raw.slice(0, 300) + '…' : raw);
+  }
+
+  return lines;
+}
+
 export function extractCheckInOut(hotel: any): { in: string; out: string } {
   const cin = hotel?.check_in_time || hotel?.checkin_time;
   const cout = hotel?.check_out_time || hotel?.checkout_time;

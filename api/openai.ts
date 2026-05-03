@@ -5,6 +5,7 @@ import {
   extractCancellationPolicyLine,
   extractCheckInOut,
   extractMealLine,
+  extractMetapolicyHighlights,
   extractTaxesLine,
 } from './etgExtractCert';
 
@@ -397,7 +398,7 @@ function mapEtgHotelToApi(
     cancellationDeadline: extractCancellationDeadlineLine(rate),
     checkInTime: cinout.in,
     checkOutTime: cinout.out,
-    metapolicyHighlights: hotel?.metapolicy_struct ? [JSON.stringify(hotel.metapolicy_struct)] : undefined,
+    metapolicyHighlights: hotel?.metapolicy_struct ? extractMetapolicyHighlights(hotel.metapolicy_struct) : undefined,
     roomName: rate?.room_name,
     roomAmenities: Array.isArray(rate?.amenities) ? rate.amenities.map((a: any) => String(a)) : undefined,
     amenities: Array.isArray(hotel?.amenities) ? hotel.amenities.map((a: any) => String(a)) : undefined,
@@ -514,15 +515,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let hotels: HotelForApi[] = [];
     const searchStartedAt = Date.now();
     try {
-      // ВСЕГДА используем тестовые отели для чата
-      hotels = getCertificationTestHotels(destination, start, end, travelers);
-      upsertTrace({
-        traceId,
-        selectedEndpoint: 'test_hotels:always',
-        numberOfHotels: hotels.length,
-        firstReferralLink: hotels[0]?.bookingUrl,
-      });
-      /* Оригинальный код поиска реальных отелей (отключен):
       if (!hasEtgCredentials()) {
         throw new Error('ETG credentials are not configured');
       }
@@ -575,15 +567,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         responseStatus: 200,
         responseTimeMs: Date.now() - searchStartedAt,
         hotelsFound: hotels.length,
-        etgResponseSummary: {
-          hotelsCount: hotels.length,
-        },
+        etgResponseSummary: { hotelsCount: hotels.length },
         numberOfHotels: hotels.length,
         firstReferralLink: hotels[0]?.bookingUrl,
         durationMs: Date.now() - searchStartedAt,
       });
       logSearchStep('info', traceId, 'search_success', { hotelsFound: hotels.length, responseTimeMs: Date.now() - searchStartedAt });
-      */
     } catch (searchError: unknown) {
       const reason = searchError instanceof Error ? searchError.message : 'search_failed';
       upsertTrace({

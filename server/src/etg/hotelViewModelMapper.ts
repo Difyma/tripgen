@@ -3,6 +3,7 @@ import {
   extractCancellationPolicyLine,
   extractCheckInOut,
   extractMealLine,
+  extractMetapolicyHighlights,
   extractTaxesLine,
 } from './extractCertRateFields.js';
 
@@ -58,7 +59,7 @@ export function mapEtgHotelToViewModel(hotel: any): HotelSearchViewModel {
       cancellationDeadline: extractCancellationDeadlineLine(rate),
       checkInTime: cinout.in,
       checkOutTime: cinout.out,
-      metapolicyHighlights: hotel?.metapolicy_struct ? [JSON.stringify(hotel.metapolicy_struct)] : undefined,
+      metapolicyHighlights: hotel?.metapolicy_struct ? extractMetapolicyHighlights(hotel.metapolicy_struct) : undefined,
       roomName: rate?.room_name,
     },
   };
