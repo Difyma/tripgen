@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "functions": {
+    "api/openai.ts": { "maxDuration": 60 },
+    "api/creators.ts": { "maxDuration": 30 },
+    "api/yandex-gpt.ts": { "maxDuration": 30 }
+  },
   "rewrites": [
     {
       "source": "/api/yandex-gpt",

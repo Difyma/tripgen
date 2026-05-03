@@ -335,7 +335,7 @@ async function searchSerpRegion(regionId: number, params: { checkIn: string; che
       currency: 'RUB',
       residency: 'ru',
     },
-    { headers: etgAuthHeaders(), timeout: 15000 }
+    { headers: etgAuthHeaders(), timeout: 8000 }
   );
   return response.data?.data?.hotels || response.data?.hotels || [];
 }
@@ -354,7 +354,7 @@ async function searchSerpGeo(latitude: number, longitude: number, radiusKm: numb
       currency: 'RUB',
       residency: 'ru',
     },
-    { headers: etgAuthHeaders(), timeout: 15000 }
+    { headers: etgAuthHeaders(), timeout: 8000 }
   );
   return response.data?.data?.hotels || response.data?.hotels || [];
 }
@@ -371,7 +371,7 @@ async function searchSerpHotels(ids: readonly string[], params: { checkIn: strin
       currency: 'RUB',
       residency: 'ru',
     },
-    { headers: etgAuthHeaders(), timeout: 15000 }
+    { headers: etgAuthHeaders(), timeout: 8000 }
   );
   return response.data?.data?.hotels || response.data?.hotels || [];
 }
