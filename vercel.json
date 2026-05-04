@@ -6,10 +6,6 @@
   },
   "rewrites": [
     {
-      "source": "/api/yandex-gpt",
-      "destination": "/api/yandex-gpt.ts"
-    },
-    {
       "source": "/api/creators",
       "destination": "/api/creators"
     },

@@ -17,6 +17,7 @@ const ETG_ENABLE_TEST_FALLBACK = process.env.ETG_ENABLE_TEST_FALLBACK === 'true'
 const CERT_MODE = process.env.CERT_MODE || 'real';
 const FORCE_TEST_HOTELS = CERT_MODE === 'test_hotels';
 const CERT_TEST_HOTEL_IDS = ['test_hotel', 'test_hotel_do_not_book'] as const;
+const BUILD_VERSION = 'v1.6.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -716,7 +717,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!trace) return res.status(404).json({ error: 'Trace not found' });
       return res.status(200).json({ trace });
     }
-    return res.status(200).json({ traces: listRecentTraces(30) });
+    return res.status(200).json({ traces: listRecentTraces(30), buildVersion: BUILD_VERSION });
   }
 
   if (req.method !== 'POST') {
@@ -970,12 +971,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       logSearchStep('error', traceId, 'search_failed', { reason, responseTimeMs: Date.now() - searchStartedAt });
       const canUseFallback = FORCE_TEST_HOTELS || canUseTestIdFallback;
       if (!canUseFallback) {
+        // Return 200 with emptyState so Vercel doesn't treat this as FUNCTION_INVOCATION_FAILED.
+        // The AI responds with general travel advice when no hotels are available.
         Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
-        return res.status(502).json({
-          error: 'Hotel search failed',
-          message: reason,
+        return res.status(200).json({
+          text: null,
+          hotels: [],
           emptyState: true,
+          error: reason,
           traceId,
+          buildVersion: BUILD_VERSION,
         });
       }
       upsertTrace({
@@ -1100,6 +1105,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       text: textToSend,
       hotels,
+      buildVersion: BUILD_VERSION,
     });
   } catch (error: unknown) {
     const err = error as { message?: string; response?: { data?: unknown } };
