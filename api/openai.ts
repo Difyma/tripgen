@@ -1246,12 +1246,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(502).json({ error: 'Empty response from OpenRouter API' });
     }
 
-    const textToSend = assistantMessage;
+    let textToSend = assistantMessage;
+    let itineraryFromGpt: unknown[] | undefined;
+    try {
+      const gptJson = JSON.parse(assistantMessage) as Record<string, unknown>;
+      if (typeof gptJson.tripSummary === 'string' && gptJson.tripSummary) {
+        textToSend = gptJson.tripSummary;
+      }
+      if (Array.isArray(gptJson.itinerary) && gptJson.itinerary.length > 0) {
+        itineraryFromGpt = gptJson.itinerary as unknown[];
+      }
+    } catch {
+      // GPT вернул не JSON — используем как есть
+    }
 
     Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
     return res.status(200).json({
       text: textToSend,
       hotels,
+      itinerary: itineraryFromGpt,
       buildVersion: BUILD_VERSION,
     });
   } catch (error: unknown) {
