@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import axios from 'axios';
-import { Pool } from 'pg';
 import {
   extractCancellationDeadlineLine,
   extractCancellationPolicyLine,
@@ -61,10 +60,11 @@ function hasPgConfig(): boolean {
   );
 }
 
-let pgPool: Pool | null = null;
+let pgPool: any = null;
 
-function getPgPool(): Pool {
+async function getPgPool(): Promise<any> {
   if (pgPool) return pgPool;
+  const { Pool } = await import('pg');
   if (process.env.DATABASE_URL) {
     pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
     return pgPool;
@@ -270,8 +270,8 @@ type RoomGroupStaticRow = {
 async function getRoomGroupByRgExt(hid: string, rgExt: Record<string, unknown> | null | undefined): Promise<RoomGroupStaticRow | null> {
   const key = stableRgExtKey(rgExt);
   if (!key || !hasPgConfig()) return null;
-  const pool = getPgPool();
-  const result = await pool.query<RoomGroupStaticRow>(
+  const pool = await getPgPool();
+  const result = await pool.query(
     `SELECT name, room_amenities, images
        FROM etg_room_groups
       WHERE hid = $1 AND rg_ext_key = $2
