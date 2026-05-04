@@ -1134,6 +1134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         hotels = getCertificationTestHotels(destination, start, end, travelers);
       }
       // hotels остаётся [] — продолжаем и возвращаем GPT-ответ без карточек отелей
+      logSearchStep('info', traceId, 'etg_failed_continuing_gpt', { hotelsCount: 0 });
     }
     const hotelsText = formatHotelsForPrompt(hotels);
 
