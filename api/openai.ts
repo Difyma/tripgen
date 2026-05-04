@@ -66,17 +66,25 @@ let pgPool: any = null;
 async function getPgPool(): Promise<any> {
   if (pgPool) return pgPool;
   const { Pool } = await import('pg');
-  if (process.env.DATABASE_URL) {
-    pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
-    return pgPool;
-  }
-  pgPool = new Pool({
-    host: process.env.PGHOST,
-    port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
-    user: process.env.PGUSER,
-    password: process.env.PGPASSWORD,
-    database: process.env.PGDATABASE,
-    ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : undefined,
+  const config = process.env.DATABASE_URL
+    ? { connectionString: process.env.DATABASE_URL, max: 2, idleTimeoutMillis: 10000, connectionTimeoutMillis: 5000 }
+    : {
+        host: process.env.PGHOST,
+        port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE,
+        ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : undefined,
+        max: 2,
+        idleTimeoutMillis: 10000,
+        connectionTimeoutMillis: 5000,
+      };
+  pgPool = new Pool(config);
+  // CRITICAL: without this handler, a failed connection crashes the Node.js process
+  // (Node.js throws unhandled 'error' events as uncaught exceptions → FUNCTION_INVOCATION_FAILED).
+  pgPool.on('error', (err: Error) => {
+    console.error('[pg pool] background connection error (non-fatal):', err.message);
+    pgPool = null;
   });
   return pgPool;
 }
