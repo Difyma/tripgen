@@ -50,6 +50,44 @@ type SearchTrace = {
 
 const inMemoryTraces: SearchTrace[] = [];
 
+const ANON_DAILY_LIMIT = 5;
+
+function getClientIp(req: VercelRequest): string {
+  const fwd = req.headers['x-forwarded-for'];
+  if (typeof fwd === 'string') return fwd.split(',')[0].trim();
+  if (Array.isArray(fwd)) return fwd[0].split(',')[0].trim();
+  return 'unknown';
+}
+
+function isAuthenticatedRequest(req: VercelRequest): boolean {
+  const auth = req.headers['authorization'];
+  return typeof auth === 'string' && auth.startsWith('Bearer ') && auth.length > 50;
+}
+
+async function checkAndIncrementRateLimit(ip: string): Promise<{ allowed: boolean; remaining: number }> {
+  if (!hasPgConfig()) return { allowed: true, remaining: ANON_DAILY_LIMIT };
+  try {
+    const pool = await getPgPool();
+    const result = await pool.query<{ request_count: number }>(
+      `INSERT INTO anonymous_rate_limits (ip, request_count, window_date)
+       VALUES ($1, 1, CURRENT_DATE)
+       ON CONFLICT (ip) DO UPDATE
+         SET request_count = CASE
+               WHEN anonymous_rate_limits.window_date < CURRENT_DATE THEN 1
+               ELSE anonymous_rate_limits.request_count + 1
+             END,
+             window_date = CURRENT_DATE
+       RETURNING request_count`,
+      [ip]
+    );
+    const count = result.rows[0]?.request_count ?? 1;
+    return { allowed: count <= ANON_DAILY_LIMIT, remaining: Math.max(0, ANON_DAILY_LIMIT - count) };
+  } catch (err) {
+    console.error('[rate limit] db error, allowing request:', err instanceof Error ? err.message : err);
+    return { allowed: true, remaining: ANON_DAILY_LIMIT };
+  }
+}
+
 function hasEtgCredentials(): boolean {
   return Boolean(ETG_KEY_ID && ETG_API_TOKEN);
 }
@@ -739,6 +777,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       error: 'OpenRouter API key is not configured',
       message: 'Set OPENROUTER_API_KEY in Vercel environment variables',
     });
+  }
+
+  // Rate limiting for anonymous users (5 requests per day)
+  if (!isAuthenticatedRequest(req)) {
+    const ip = getClientIp(req);
+    const { allowed, remaining } = await checkAndIncrementRateLimit(ip);
+    if (!allowed) {
+      Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+      return res.status(429).json({
+        error: 'rate_limit_exceeded',
+        message: 'Вы использовали все 5 бесплатных запросов на сегодня. Зарегистрируйтесь для неограниченного доступа.',
+        rateLimitExceeded: true,
+        remaining: 0,
+      });
+    }
+    logSearchStep('info', 'rate-limit', 'anonymous_request', { ip, remaining });
   }
 
   let useStream = false;

@@ -33,6 +33,7 @@ import {
 import { HotelCard } from './HotelCard';
 import { 
   getUserChats,
+  supabase,
   createChat,
   getChatMessages,
   addChatMessage,
@@ -1264,11 +1265,14 @@ const Chat = () => {
       const configuredApiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
       // Когда VITE_API_URL не задан, используем относительный путь и Vite proxy.
       const apiBase = configuredApiBase;
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const requestHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (currentSession?.access_token) {
+        requestHeaders['Authorization'] = `Bearer ${currentSession.access_token}`;
+      }
       const response = await fetch(`${apiBase}/api/openai`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: requestHeaders,
         body: JSON.stringify({
           messages: messagesToSend,
           // Не показываем частичный текст — только готовый финальный ответ.
@@ -1438,7 +1442,9 @@ const Chat = () => {
         id: Date.now() + Math.random(),
         text: error instanceof Error
           ? (
-              error.message.includes('Failed to fetch')
+              error.message.includes('Лимит запросов') || error.message.includes('rate_limit') || error.message.includes('бесплатных запросов')
+                ? `${error.message}\n\nЗарегистрируйтесь — это бесплатно и даёт неограниченный доступ к чату.`
+                : error.message.includes('Failed to fetch')
                 ? 'Не удалось подключиться к серверу чата. Проверьте, что backend запущен (порт 3001), и попробуйте снова.'
                 : `Извините, произошла ошибка: ${error.message}. Пожалуйста, попробуйте еще раз.`
             )
