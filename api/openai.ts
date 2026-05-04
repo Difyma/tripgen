@@ -1,12 +1,95 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import axios from 'axios';
-import {
-  extractCancellationDeadlineLine,
-  extractCancellationPolicyLine,
-  extractCheckInOut,
-  extractMealLine,
-  extractTaxesLine,
-} from './etgExtractCert';
+
+// Inlined from ./etgExtractCert to avoid ESM import resolution issues on Vercel
+function _firstPt(rate: any) { return rate?.payment_options?.payment_types?.[0]; }
+function extractTaxesLine(rate: any): string {
+  const pt = _firstPt(rate); const td = pt?.tax_data;
+  if (typeof td?.taxes === 'string' && td.taxes.trim()) return td.taxes.trim();
+  if (td && typeof td === 'object') {
+    const details = td.tax_details ?? td.items;
+    if (Array.isArray(details) && details.length > 0) {
+      const names: string[] = []; let inc = 0; let notInc = 0;
+      for (const t of details) {
+        if (!t || typeof t !== 'object') continue;
+        const n = String((t as any).name || (t as any).title || (t as any).type || '').trim();
+        if (n) names.push(n);
+        if ((t as any).included_by_supplier === true) inc += 1;
+        if ((t as any).included_by_supplier === false) notInc += 1;
+      }
+      if (inc > 0 || notInc > 0) {
+        const labels = names.slice(0, 2).join(', ');
+        const suffix = labels ? ` (${labels}${names.length > 2 ? '…' : ''})` : '';
+        if (inc > 0 && notInc > 0) return `Налоги/сборы: включено ${inc}, оплачивается отдельно ${notInc}${suffix}`;
+        if (inc > 0) return `Налоги/сборы включены в тариф${suffix}`;
+        return `Есть дополнительные налоги/сборы${suffix}`;
+      }
+      if (names.length > 0) return `Налоги/сборы: ${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''}`;
+      return 'Налоги/сборы присутствуют (детали в тарифе)';
+    }
+    if (td.tax_amount != null || td.total_taxes != null) {
+      const amt = Number(td.tax_amount ?? td.total_taxes);
+      const cur = pt?.show_currency_code || pt?.currency_code || rate?.currency || 'RUB';
+      if (Number.isFinite(amt) && amt > 0) return `Налоги/сборы: ${amt.toLocaleString('ru-RU')} ${cur}`;
+    }
+  }
+  const show = Number(pt?.show_amount); const net = Number(pt?.amount ?? rate?.amount);
+  const cur = pt?.show_currency_code || pt?.currency_code || rate?.currency || 'RUB';
+  if (Number.isFinite(show) && Number.isFinite(net) && show > net && show > 0) {
+    const extra = show - net;
+    if (extra > 0 && extra <= show * 0.3) return `Доп. сборы/налоги к тарифу: ${extra.toLocaleString('ru-RU')} ${cur}`;
+  }
+  return 'Налоги/сборы уточняются на шаге бронирования';
+}
+function extractMealLine(rate: any): string {
+  const v = rate?.meal_data?.value || rate?.meal_data?.meal_name || rate?.meal || _firstPt(rate)?.meal_data?.value || _firstPt(rate)?.meal;
+  if (typeof v === 'string' && v.trim()) {
+    const m = v.trim().toLowerCase();
+    if (m === 'breakfast') return 'Завтрак';
+    if (m === 'lunch') return 'Обед';
+    if (m === 'dinner') return 'Ужин';
+    if (m === 'half board') return 'Полупансион';
+    if (m === 'full board') return 'Полный пансион';
+    if (m === 'all inclusive') return 'Все включено';
+    if (m === 'no meals' || m === 'without meals' || m === 'nomeal' || m === 'room only') return 'Без питания';
+    return v.trim();
+  }
+  return 'Тип питания не указан в блоке тарифа';
+}
+function _firstCancel(rate: any) {
+  const cp = rate?.cancellation_penalties;
+  if (Array.isArray(cp) && cp.length > 0) return cp[0];
+  if (cp && typeof cp === 'object' && !Array.isArray(cp)) return cp;
+  return undefined;
+}
+function extractCancellationPolicyLine(rate: any): string {
+  const pen = _firstCancel(rate);
+  if (!pen) return 'Условия отмены уточняются в тарифе';
+  if (pen.free_cancellation_before) {
+    try { const d = new Date(pen.free_cancellation_before); if (!Number.isNaN(d.getTime())) return `Бесплатная отмена до ${d.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`; } catch { /* ignore */ }
+  }
+  if (Array.isArray(pen.policies) && pen.policies.length > 0) {
+    const p0 = pen.policies[0]; const amt = p0?.amount_show ?? p0?.amount_charge ?? p0?.amount; const cur = rate?.currency || 'RUB';
+    if (amt != null && Number(amt) > 0) return `Отмена со штрафом от ${Number(amt).toLocaleString('ru-RU')} ${cur} (по данным API)`;
+    return 'Частично/условно возвратный тариф (см. условия бронирования)';
+  }
+  return 'Условия отмены доступны на шаге бронирования';
+}
+function extractCancellationDeadlineLine(rate: any): string {
+  const pen = _firstCancel(rate);
+  if (!pen) return '—';
+  if (pen.free_cancellation_before) {
+    try { const d = new Date(pen.free_cancellation_before); if (!Number.isNaN(d.getTime())) return d.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }); } catch { /* ignore */ }
+    return String(pen.free_cancellation_before);
+  }
+  if (pen.start_at) return String(pen.start_at);
+  if (Array.isArray(pen.policies) && pen.policies[0]?.date_from) return String(pen.policies[0].date_from);
+  return '—';
+}
+function extractCheckInOut(hotel: any): { in: string; out: string } {
+  const fmt = (v: unknown) => { if (v == null || v === '') return '—'; if (typeof v === 'string') return v.replace(/:00$/, '').replace(/:00:00$/, ''); return String(v); };
+  return { in: fmt(hotel?.check_in_time || hotel?.checkin_time), out: fmt(hotel?.check_out_time || hotel?.checkout_time) };
+}
 
 // Catch process-level crashes so they appear in Vercel function logs
 process.on('uncaughtException', (err) => {
@@ -25,7 +108,7 @@ const ETG_ENABLE_TEST_FALLBACK = process.env.ETG_ENABLE_TEST_FALLBACK === 'true'
 const CERT_MODE = process.env.CERT_MODE || 'real';
 const FORCE_TEST_HOTELS = CERT_MODE === 'test_hotels';
 const CERT_TEST_HOTEL_IDS = ['test_hotel', 'test_hotel_do_not_book'] as const;
-const BUILD_VERSION = 'v1.7.0';
+const BUILD_VERSION = 'v1.8.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
