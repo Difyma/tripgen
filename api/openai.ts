@@ -8,6 +8,14 @@ import {
   extractTaxesLine,
 } from './etgExtractCert';
 
+// Catch process-level crashes so they appear in Vercel function logs
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] uncaughtException:', err?.message, err?.stack?.slice(0, 500));
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] unhandledRejection:', reason instanceof Error ? reason.message : String(reason));
+});
+
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const PARTNER_SLUG = process.env.OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
 const ETG_BASE_URL = process.env.OSTROVOK_API_URL || 'https://api.worldota.net';
@@ -17,7 +25,7 @@ const ETG_ENABLE_TEST_FALLBACK = process.env.ETG_ENABLE_TEST_FALLBACK === 'true'
 const CERT_MODE = process.env.CERT_MODE || 'real';
 const FORCE_TEST_HOTELS = CERT_MODE === 'test_hotels';
 const CERT_TEST_HOTEL_IDS = ['test_hotel', 'test_hotel_do_not_book'] as const;
-const BUILD_VERSION = 'v1.6.0';
+const BUILD_VERSION = 'v1.7.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,6 +101,9 @@ function hasEtgCredentials(): boolean {
 }
 
 function hasPgConfig(): boolean {
+  // pg enrichment is opt-in: set ENABLE_ROOM_ENRICHMENT=true in Vercel env vars to activate.
+  // Default OFF to prevent pg pool crashes in serverless environment.
+  if (process.env.ENABLE_ROOM_ENRICHMENT !== 'true') return false;
   return Boolean(
     process.env.DATABASE_URL ||
       (process.env.PGDATABASE && process.env.PGHOST && process.env.PGUSER)
@@ -780,19 +791,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Rate limiting for anonymous users (5 requests per day)
-  if (!isAuthenticatedRequest(req)) {
-    const ip = getClientIp(req);
-    const { allowed, remaining } = await checkAndIncrementRateLimit(ip);
-    if (!allowed) {
-      Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
-      return res.status(429).json({
-        error: 'rate_limit_exceeded',
-        message: 'Вы использовали все 5 бесплатных запросов на сегодня. Зарегистрируйтесь для неограниченного доступа.',
-        rateLimitExceeded: true,
-        remaining: 0,
-      });
+  try {
+    if (!isAuthenticatedRequest(req)) {
+      const ip = getClientIp(req);
+      const { allowed, remaining } = await checkAndIncrementRateLimit(ip);
+      if (!allowed) {
+        Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+        return res.status(429).json({
+          error: 'rate_limit_exceeded',
+          message: 'Вы использовали все 5 бесплатных запросов на сегодня. Зарегистрируйтесь для неограниченного доступа.',
+          rateLimitExceeded: true,
+          remaining: 0,
+        });
+      }
+      logSearchStep('info', 'rate-limit', 'anonymous_request', { ip, remaining });
     }
-    logSearchStep('info', 'rate-limit', 'anonymous_request', { ip, remaining });
+  } catch (rateLimitErr) {
+    console.error('[rate limit] unexpected error, continuing:', rateLimitErr instanceof Error ? rateLimitErr.message : rateLimitErr);
   }
 
   let useStream = false;
