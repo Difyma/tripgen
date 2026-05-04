@@ -1129,25 +1129,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         errorReason: reason,
       });
       logSearchStep('error', traceId, 'search_failed', { reason, responseTimeMs: Date.now() - searchStartedAt });
-      const canUseFallback = FORCE_TEST_HOTELS || canUseTestIdFallback;
-      if (!canUseFallback) {
-        // Return 200 with emptyState so Vercel doesn't treat this as FUNCTION_INVOCATION_FAILED.
-        // The AI responds with general travel advice when no hotels are available.
-        Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
-        return res.status(200).json({
-          text: null,
-          hotels: [],
-          emptyState: true,
-          error: reason,
-          traceId,
-          buildVersion: BUILD_VERSION,
-        });
+      if (FORCE_TEST_HOTELS || canUseTestIdFallback) {
+        upsertTrace({ traceId, selectedEndpoint: 'test_hotels:fallback_after_error' });
+        hotels = getCertificationTestHotels(destination, start, end, travelers);
       }
-      upsertTrace({
-        traceId,
-        selectedEndpoint: 'test_hotels:fallback_after_error',
-      });
-      hotels = getCertificationTestHotels(destination, start, end, travelers);
+      // hotels остаётся [] — продолжаем и возвращаем GPT-ответ без карточек отелей
     }
     const hotelsText = formatHotelsForPrompt(hotels);
 
