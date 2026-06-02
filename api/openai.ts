@@ -108,7 +108,11 @@ const ETG_ENABLE_TEST_FALLBACK = process.env.ETG_ENABLE_TEST_FALLBACK === 'true'
 const CERT_MODE = process.env.CERT_MODE || 'real';
 const FORCE_TEST_HOTELS = CERT_MODE === 'test_hotels';
 const CERT_TEST_HOTEL_IDS = ['test_hotel', 'test_hotel_do_not_book'] as const;
-const BUILD_VERSION = 'v1.8.0';
+const parsedEtgTimeout = Number(process.env.ETG_SEARCH_TIMEOUT_MS || 15000);
+const ETG_SEARCH_TIMEOUT_MS = Number.isFinite(parsedEtgTimeout)
+  ? Math.min(Math.max(parsedEtgTimeout, 1000), 30000)
+  : 15000;
+const BUILD_VERSION = 'v1.8.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -476,7 +480,7 @@ async function searchSerpRegion(regionId: number, params: { checkIn: string; che
       currency: 'RUB',
       residency: 'ru',
     },
-    { headers: etgAuthHeaders(), timeout: 8000 }
+    { headers: etgAuthHeaders(), timeout: ETG_SEARCH_TIMEOUT_MS }
   );
   return response.data?.data?.hotels || response.data?.hotels || [];
 }
@@ -495,7 +499,7 @@ async function searchSerpGeo(latitude: number, longitude: number, radiusKm: numb
       currency: 'RUB',
       residency: 'ru',
     },
-    { headers: etgAuthHeaders(), timeout: 8000 }
+    { headers: etgAuthHeaders(), timeout: ETG_SEARCH_TIMEOUT_MS }
   );
   return response.data?.data?.hotels || response.data?.hotels || [];
 }
@@ -512,7 +516,7 @@ async function searchSerpHotels(ids: readonly string[], params: { checkIn: strin
       currency: 'RUB',
       residency: 'ru',
     },
-    { headers: etgAuthHeaders(), timeout: 8000 }
+    { headers: etgAuthHeaders(), timeout: ETG_SEARCH_TIMEOUT_MS }
   );
   return response.data?.data?.hotels || response.data?.hotels || [];
 }
@@ -998,6 +1002,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             adults: travelers,
             childrenAges,
           });
+          if (rawHotels.length === 0) {
+            logSearchStep('warn', traceId, 'serp_region_empty', { regionId });
+          }
           upsertTrace({
             traceId,
             selectedEndpoint: '/api/b2b/v3/search/serp/region/',
@@ -1035,6 +1042,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               childrenAges,
             }
           );
+          if (rawHotels.length === 0) {
+            logSearchStep('warn', traceId, 'serp_geo_empty', {
+              latitude: normalized.latitude,
+              longitude: normalized.longitude,
+              radius: normalized.radiusKm || 10,
+            });
+          }
           upsertTrace({
             traceId,
             selectedEndpoint: '/api/b2b/v3/search/serp/geo/',
