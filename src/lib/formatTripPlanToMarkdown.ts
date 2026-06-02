@@ -5,13 +5,6 @@
 
 import type { TripPlanResponse } from '../types/tripPlan';
 
-/** Только http(s) URL; иначе пустая строка (не вставляем битые ссылки/изображения). */
-function escapeMarkdownUrl(url: string): string {
-  if (url == null || typeof url !== 'string') return '';
-  const t = url.trim();
-  return t.startsWith('http://') || t.startsWith('https://') ? t : '';
-}
-
 /** Экранирует символы, которые могут сломать markdown: \ ` * _ [ ] ( ) # */
 function escapeMarkdownText(s: string | null | undefined): string {
   if (s == null || typeof s !== 'string') return '';

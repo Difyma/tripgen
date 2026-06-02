@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Plus, MessageSquare, Heart, Settings, ChevronLeft, ChevronRight, Users, Trash2, Mountain } from 'lucide-react';
+import { Plus, MessageSquare, Settings, ChevronLeft, ChevronRight, Users, Trash2, Mountain } from 'lucide-react';
 import { CreateTripModal } from './CreateTripModal';
 import { AuthModal } from './AuthModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,7 +16,6 @@ export function Sidebar({ className }: SidebarProps) {
   const { isSidebarCollapsed, setIsSidebarCollapsed, mobileOpen, setMobileOpen } = useSidebar();
   const navigate = useNavigate();
   const [showChatList, setShowChatList] = useState(true);
-  const [showTourChatList, setShowTourChatList] = useState(false);
   const [activeChatTab, setActiveChatTab] = useState<'regular' | 'tours'>('regular');
   const [isCreateTripModalOpen, setIsCreateTripModalOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -88,10 +87,6 @@ export function Sidebar({ className }: SidebarProps) {
 
   const toggleChatList = () => {
     setShowChatList(prev => !prev);
-  };
-
-  const toggleTourChatList = () => {
-    setShowTourChatList(!showTourChatList);
   };
 
   const hasTourChats = userChats.some(isTourChat);

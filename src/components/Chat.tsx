@@ -1576,7 +1576,7 @@ const Chat = () => {
           const messages = await creatorChatApi.getMessages(creatorChatIdFromUrl);
           const formattedMessages: Message[] = messages.map((msg: any) => {
             const content = typeof msg.content === 'string' ? msg.content : String(msg.content ?? '');
-            const unpacked =
+            const unpacked: { text: string; meta?: StoredAssistantMeta } =
               msg.sender_type === 'client'
                 ? { text: content }
                 : unpackStoredAssistantMessage(content);

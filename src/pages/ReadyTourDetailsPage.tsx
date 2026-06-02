@@ -338,7 +338,7 @@ export function ReadyTourDetailsPage() {
                     animate={{ opacity: 1 }}
                     className="space-y-4"
                   >
-                    {tour.itinerary.map((day, index) => (
+                    {tour.itinerary.map((day) => (
                       <div
                         key={day.day}
                         className="flex gap-4 p-4 bg-gray-50 rounded-xl"

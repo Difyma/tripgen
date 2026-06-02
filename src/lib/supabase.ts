@@ -181,7 +181,7 @@ export const auth = {
   },
 
   // Legacy method - kept for compatibility
-  signInOrSignUp: async (email: string, password: string): Promise<AuthResponse> => {
+  signInOrSignUp: async (_email: string, _password: string): Promise<AuthResponse> => {
     // Placeholder - use sendOTP and verifyOTP instead
     throw new Error('Use sendOTP and verifyOTP instead');
   },
@@ -449,4 +449,4 @@ export const generateChatTitle = (message: string): string => {
   const words = trimmed.split(/\s+/).filter(Boolean);
   const short = words.slice(0, MAX_TITLE_WORDS).join(' ');
   return words.length > MAX_TITLE_WORDS ? `${short}…` : short;
-}; 
+};

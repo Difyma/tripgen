@@ -4,10 +4,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useState } from 'react';
 
 interface MainNavbarProps {
-  onAuthClick: () => void;
+  onAuthClick?: () => void;
 }
 
-export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
+export const MainNavbar = ({ onAuthClick = () => {} }: MainNavbarProps) => {
   const { user, isCreator } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -191,4 +191,4 @@ export const MainNavbar = ({ onAuthClick }: MainNavbarProps) => {
       </div>
     </nav>
   );
-}; 
+};

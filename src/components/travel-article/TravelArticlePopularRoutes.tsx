@@ -17,7 +17,7 @@ export function TravelArticlePopularRoutes({ block }: TravelArticlePopularRoutes
           {title}
         </h2>
         <ul className="space-y-4">
-          {items.map((item, index) => (
+          {items.map((item) => (
             <motion.li
               key={item.href}
               initial={{ opacity: 0, x: -8 }}

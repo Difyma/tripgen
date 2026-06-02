@@ -15,7 +15,7 @@ export function TravelArticleWhenToVisit({ block }: TravelArticleWhenToVisitProp
           {title}
         </h2>
         <div className="space-y-6">
-          {seasons.map((season, index) => (
+          {seasons.map((season) => (
             <motion.div
               key={season.name}
               initial={{ opacity: 0, y: 12 }}

@@ -15,7 +15,7 @@ export function TravelArticlePlacesDetail({ block }: TravelArticlePlacesDetailPr
           {title}
         </h2>
         <div className="space-y-8 md:space-y-10">
-          {items.map((item, index) => (
+          {items.map((item) => (
             <motion.article
               key={item.name}
               initial={{ opacity: 0, y: 12 }}

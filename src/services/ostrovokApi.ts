@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { buildHotelPageLink, buildSerpLink, encodeGuests, type RoomGuests } from '@/lib/ostrovok';
+import { buildHotelPageLink, type RoomGuests } from '@/lib/ostrovok';
 
 const API_BASE_URL = 'https://api.ostrovok.ru/v2';
 const API_TOKEN = import.meta.env.VITE_OSTROVOK_API_TOKEN;
@@ -52,7 +52,7 @@ class OstrovokApi {
       headers: {
         'Authorization': `Bearer ${API_TOKEN}`,
         'Accept': 'application/json',
-        'X-Partner-ID': PARTNER_ID
+        'X-Partner-ID': PARTNER_SLUG
       },
     });
   }
@@ -144,4 +144,4 @@ export function formatHotelInfoForGPT(hotels: HotelInfo[]): string {
   });
 
   return response;
-} 
+}

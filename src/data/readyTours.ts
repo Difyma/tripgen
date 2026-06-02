@@ -177,7 +177,6 @@ export const readyTours: ReadyTour[] = [
     spotsLeft: 8,
     startDate: '2026-06-15',
     endDate: '2026-06-21',
-    creatorId: 'creator-1', // ID создателя тура для прямого чата
   },
   {
     id: '2',

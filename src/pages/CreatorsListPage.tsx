@@ -7,7 +7,6 @@ import {
   MessageCircle, 
   Search, 
   Star,
-  MapPin,
   Calendar
 } from 'lucide-react';
 import { MainNavbar } from '../components/MainNavbar';
@@ -46,7 +45,7 @@ export const CreatorsListPage: React.FC = () => {
 
     setStartingChat(creatorId);
     try {
-      const { chat_id } = await creatorChatApi.createChat(creatorId);
+      const { chat_id } = await creatorChatApi.joinChat(creatorId);
       navigate(`/chat/${chat_id}`);
     } catch (err) {
       console.error('Error starting chat:', err);

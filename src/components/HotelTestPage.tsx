@@ -51,7 +51,7 @@ const HotelTestPage = () => {
 
   const getBookingUrl = (hotel: Hotel) => {
     return hotel.bookingUrl || generatePartnerLink({
-      hotelId: hotel.hid || hotel.id,
+      hotelId: String(hotel.hid || hotel.id),
       checkIn: searchParams.checkIn,
       checkOut: searchParams.checkOut,
       guests: searchParams.guests
@@ -266,7 +266,7 @@ const HotelTestPage = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-3xl font-bold">
-                          {selectedHotel.price.toLocaleString('ru-RU')} {selectedHotel.currency}
+                          {formatHotelForDisplay(selectedHotel).price.toLocaleString('ru-RU')} {selectedHotel.currency}
                         </div>
                         <div className="text-gray-500 text-sm">за ночь</div>
                       </div>
@@ -323,40 +323,40 @@ const HotelTestPage = () => {
                   )}
 
                   {/* Policies */}
-                  {selectedHotel.metapolicy && (
+                  {selectedHotel.metapolicy_struct && (
                     <div className="mb-6">
                       <h3 className="font-semibold mb-3">Правила проживания</h3>
                       <div className="grid grid-cols-2 gap-4">
-                        {selectedHotel.metapolicy.check_in_check_out && (
+                        {selectedHotel.metapolicy_struct.check_in_check_out && (
                           <div className="flex items-center gap-2 text-sm">
                             <Info className="w-4 h-4 text-gray-400" />
                             <span>
-                              Заезд/выезд: {selectedHotel.metapolicy.check_in_check_out.map(p => p.type).join(', ')}
+                              Заезд/выезд: {selectedHotel.metapolicy_struct.check_in_check_out.map(p => p.type).join(', ')}
                             </span>
                           </div>
                         )}
                         
-                        {selectedHotel.metapolicy.meals && selectedHotel.metapolicy.meals.length > 0 && (
+                        {selectedHotel.metapolicy_struct.meals && selectedHotel.metapolicy_struct.meals.length > 0 && (
                           <div className="flex items-center gap-2 text-sm">
                             <Coffee className="w-4 h-4 text-gray-400" />
                             <span>Питание доступно</span>
                           </div>
                         )}
                         
-                        {selectedHotel.metapolicy.internet && (
+                        {selectedHotel.metapolicy_struct.internet && (
                           <div className="flex items-center gap-2 text-sm">
                             <Wifi className="w-4 h-4 text-gray-400" />
                             <span>
-                              WiFi: {selectedHotel.metapolicy.internet[0]?.inclusion === 'included' ? 'бесплатно' : 'платно'}
+                              WiFi: {selectedHotel.metapolicy_struct.internet[0]?.inclusion === 'included' ? 'бесплатно' : 'платно'}
                             </span>
                           </div>
                         )}
                         
-                        {selectedHotel.metapolicy.parking && (
+                        {selectedHotel.metapolicy_struct.parking && (
                           <div className="flex items-center gap-2 text-sm">
                             <Car className="w-4 h-4 text-gray-400" />
                             <span>
-                              Парковка: {selectedHotel.metapolicy.parking[0]?.inclusion === 'included' ? 'бесплатно' : 'платно'}
+                              Парковка: {selectedHotel.metapolicy_struct.parking[0]?.inclusion === 'included' ? 'бесплатно' : 'платно'}
                             </span>
                           </div>
                         )}

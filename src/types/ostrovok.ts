@@ -257,6 +257,7 @@ export interface Hotel {
   rates: HotelRate[];
   min_price?: number;
   currency: string;
+  bookingUrl?: string;
   
   // Descriptions
   description?: string;
@@ -288,6 +289,7 @@ export interface Hotel {
 export interface HotelImage {
   category: ImageCategory;
   url: string; // Contains {size} placeholder
+  sizes?: Record<string, string>;
 }
 
 export interface DescriptionParagraph {

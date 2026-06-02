@@ -8,8 +8,6 @@
 import axios from 'axios';
 import {
   buildHotelPageLink,
-  buildSerpLink,
-  encodeGuests,
   normalizeHotelPreviewImageUrl,
   etgHotelImageOptionsFromImportMeta,
   type RoomGuests,
@@ -38,6 +36,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Default image size for hotel photos
 const DEFAULT_IMAGE_SIZE: ImageSize = '640x400';
+
+type ApiResponse<T> = T & {
+  success: boolean;
+  error?: string;
+};
 
 /**
  * Format image URL with specific size (ETG: `{size}` + опции VITE_ETG_* — см. .env.example)
@@ -76,7 +79,7 @@ export async function searchHotels(params: HotelSearchParams): Promise<{
   hotels: Hotel[];
   total: number;
 }> {
-  const response = await axios.post(`${API_BASE_URL}/api/hotels/search`, {
+  const response = await axios.post<ApiResponse<{ hotels: Hotel[]; total: number }>>(`${API_BASE_URL}/api/hotels/search`, {
     query: params.location,
     checkIn: params.checkIn,
     checkOut: params.checkOut,
@@ -109,7 +112,7 @@ export async function getHotelPage(
     children?: number[];
   }
 ): Promise<Hotel> {
-  const response = await axios.post(`${API_BASE_URL}/api/hotels/hotelpage`, {
+  const response = await axios.post<ApiResponse<{ hotel: Hotel }>>(`${API_BASE_URL}/api/hotels/hotelpage`, {
     id: hotelId,
     checkIn: params.checkIn,
     checkOut: params.checkOut,
@@ -132,8 +135,8 @@ export async function getHotelPage(
 export async function getHotelContent(
   hotelId: string,
   language: string = 'ru'
-): Promise<HotelContentResponse['content']> {
-  const response = await axios.post(`${API_BASE_URL}/api/hotels/content`, {
+): Promise<HotelContentResponse> {
+  const response = await axios.post<ApiResponse<{ content: HotelContentResponse }>>(`${API_BASE_URL}/api/hotels/content`, {
     id: hotelId,
     language
   });
@@ -152,7 +155,7 @@ export async function suggestHotelsAndRegions(
   query: string,
   language: string = 'ru'
 ): Promise<SuggestResponse> {
-  const response = await axios.get(`${API_BASE_URL}/api/hotels/suggest`, {
+  const response = await axios.get<ApiResponse<SuggestResponse>>(`${API_BASE_URL}/api/hotels/suggest`, {
     params: { q: query, language }
   });
   
@@ -173,7 +176,7 @@ export async function prebookRate(
   bookHash: string,
   priceIncreasePercent: number = 0
 ): Promise<PrebookResponse> {
-  const response = await axios.post(`${API_BASE_URL}/api/hotels/prebook`, {
+  const response = await axios.post<ApiResponse<{ prebook: PrebookResponse }>>(`${API_BASE_URL}/api/hotels/prebook`, {
     hash: bookHash,
     price_increase_percent: priceIncreasePercent
   });
@@ -191,7 +194,7 @@ export async function prebookRate(
 export function getImagesByCategory(
   hotel: Hotel,
   category?: string
-): { category: string; url: string; sizes: Record<string, string> }[] {
+) {
   if (!hotel.images || hotel.images.length === 0) {
     return [];
   }
@@ -229,17 +232,17 @@ export function getMainHotelImage(hotel: Hotel): string | null {
  * Get room images
  */
 export function getRoomImages(hotel: Hotel, roomGroupId?: number): any[] {
-  if (!hotel.roomGroups || hotel.roomGroups.length === 0) {
+  if (!hotel.room_groups || hotel.room_groups.length === 0) {
     return [];
   }
   
   if (roomGroupId) {
-    const roomGroup = hotel.roomGroups.find(rg => rg.room_group_id === roomGroupId);
+    const roomGroup = hotel.room_groups.find(rg => rg.room_group_id === roomGroupId);
     return roomGroup?.images || [];
   }
   
   // Return all room images
-  return hotel.roomGroups.flatMap(rg => rg.images || []);
+  return hotel.room_groups.flatMap(rg => rg.images || []);
 }
 
 /**
@@ -259,10 +262,10 @@ export function formatHotelForDisplay(hotel: Hotel): {
 } {
   // Format distance to center
   let distanceStr: string | undefined;
-  if (hotel.distanceToCenter) {
-    const km = hotel.distanceToCenter / 1000;
+  if (hotel.distance_center) {
+    const km = hotel.distance_center / 1000;
     distanceStr = km < 1 
-      ? `${Math.round(hotel.distanceToCenter)} м от центра`
+      ? `${Math.round(hotel.distance_center)} м от центра`
       : `${km.toFixed(1)} км от центра`;
   }
   
@@ -294,9 +297,9 @@ export function formatHotelForDisplay(hotel: Hotel): {
     rating: hotel.rating,
     address: hotel.address,
     mainImage: getMainHotelImage(hotel),
-    price: hotel.price,
+    price: hotel.min_price ?? hotel.rates[0]?.show_amount ?? hotel.rates[0]?.amount ?? 0,
     currency: hotel.currency,
-    type: typeTranslations[hotel.hotelType || ''] || hotel.hotelType || 'Отель',
+    type: typeTranslations[hotel.hotel_type || ''] || hotel.hotel_type || 'Отель',
     distanceToCenter: distanceStr
   };
 }
@@ -338,11 +341,11 @@ export function formatAmenities(hotel: Hotel): { category: string; items: string
  * Format policies for display
  */
 export function formatPolicies(hotel: Hotel) {
-  if (!hotel.metapolicy) {
+  if (!hotel.metapolicy_struct) {
     return null;
   }
   
-  const mp = hotel.metapolicy;
+  const mp = hotel.metapolicy_struct;
   
   return {
     checkInOut: mp.check_in_check_out,

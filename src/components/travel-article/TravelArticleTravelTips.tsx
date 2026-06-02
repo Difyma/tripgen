@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import type { TravelArticleBlockTravelTips } from '../../data/travelArticleTypes';
 
 interface TravelArticleTravelTipsProps {
