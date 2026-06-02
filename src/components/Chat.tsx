@@ -1975,8 +1975,9 @@ const Chat = () => {
   };
 
   // Fix booking URLs — партнёрская разметка + корректный HP/SERP (без принудительного test_hotel).
-  const fixBookingUrl = (url: string, checkInDate?: string, checkOutDate?: string): string => {
-    if (!url || !url.includes('ostrovok.ru')) {
+  const fixBookingUrl = (url: string, checkInDate?: string, checkOutDate?: string, hotelSlug?: string): string => {
+    const safeHotelSlug = String(hotelSlug || '').trim();
+    if ((!url || !url.includes('ostrovok.ru')) && (!safeHotelSlug || looksLikeHid(safeHotelSlug))) {
       return url;
     }
 
@@ -2021,14 +2022,28 @@ const Chat = () => {
       });
     }
 
+    const withNorm = (u: string) => normalizeOstrovokQueryOrder(u);
+    if (safeHotelSlug && !looksLikeHid(safeHotelSlug)) {
+      try {
+        return withNorm(
+          buildHotelPageLink(safeHotelSlug, {
+            partnerSlug: OSTROVOK_PARTNER_SLUG,
+            checkIn,
+            checkOut,
+            rooms: roomsArg,
+          })
+        );
+      } catch {
+        /* fall through to URL-based recovery */
+      }
+    }
+
     let parsed: URL;
     try {
       parsed = new URL(url);
     } catch {
       return url;
     }
-
-    const withNorm = (u: string) => normalizeOstrovokQueryOrder(u);
 
     const resolveRegionId = (): number | undefined => {
       const fromFilter = getRegionIdForCityName((filters.location || '').trim());
@@ -2578,7 +2593,7 @@ const Chat = () => {
             price: h.price,
             currency: h.currency,
             imageUrl,
-            bookingUrl: fixBookingUrl(h.bookingUrl || ''),
+            bookingUrl: fixBookingUrl(h.bookingUrl || '', undefined, undefined, h.id),
             amenities: h.amenities,
             roomAmenities: h.roomAmenities,
             taxesAndFees: h.taxesAndFees,
@@ -2894,7 +2909,12 @@ const Chat = () => {
                           price={hotel.price}
                           currency={hotel.currency}
                           imageUrl={hotel.imageUrl}
-                          bookingUrl={fixBookingUrl(hotel.bookingUrl || '')}
+                          bookingUrl={fixBookingUrl(
+                            hotel.bookingUrl || '',
+                            undefined,
+                            undefined,
+                            'id' in hotel ? String(hotel.id || '') : undefined
+                          )}
                           distanceToCenter={hotel.distanceToCenter}
                           distanceToMetro={hotel.distanceToMetro}
                           amenities={hotel.amenities}

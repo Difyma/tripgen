@@ -112,7 +112,7 @@ const parsedEtgTimeout = Number(process.env.ETG_SEARCH_TIMEOUT_MS || 15000);
 const ETG_SEARCH_TIMEOUT_MS = Number.isFinite(parsedEtgTimeout)
   ? Math.min(Math.max(parsedEtgTimeout, 1000), 30000)
   : 15000;
-const BUILD_VERSION = 'v1.8.1';
+const BUILD_VERSION = 'v1.8.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -163,7 +163,7 @@ async function checkAndIncrementRateLimit(ip: string): Promise<{ allowed: boolea
   if (!hasPgConfig()) return { allowed: true, remaining: ANON_DAILY_LIMIT };
   try {
     const pool = await getPgPool();
-    const result = await pool.query<{ request_count: number }>(
+    const result = await pool.query(
       `INSERT INTO anonymous_rate_limits (ip, request_count, window_date)
        VALUES ($1, 1, CURRENT_DATE)
        ON CONFLICT (ip) DO UPDATE
@@ -175,7 +175,7 @@ async function checkAndIncrementRateLimit(ip: string): Promise<{ allowed: boolea
        RETURNING request_count`,
       [ip]
     );
-    const count = result.rows[0]?.request_count ?? 1;
+    const count = Number((result.rows[0] as { request_count?: number } | undefined)?.request_count ?? 1);
     return { allowed: count <= ANON_DAILY_LIMIT, remaining: Math.max(0, ANON_DAILY_LIMIT - count) };
   } catch (err) {
     console.error('[rate limit] db error, allowing request:', err instanceof Error ? err.message : err);
@@ -445,6 +445,18 @@ function buildTextSearchFallbackLink(checkIn: string, checkOut: string, adults: 
   return u.toString();
 }
 
+function buildHotelPageFallbackLink(hotelSlug: string, checkIn: string, checkOut: string, adults: number): string {
+  const u = new URL(`https://www.ostrovok.ru/rooms/${encodeURIComponent(hotelSlug)}/`);
+  u.searchParams.set('utm_medium', 'partners');
+  u.searchParams.set('partner_slug', PARTNER_SLUG);
+  u.searchParams.set('utm_source', PARTNER_SLUG);
+  u.searchParams.set('dates', `${toDMY(checkIn)}-${toDMY(checkOut)}`);
+  u.searchParams.set('guests', String(adults));
+  u.searchParams.set('cur', 'RUB');
+  u.searchParams.set('lang', 'ru');
+  return u.toString();
+}
+
 function buildSerpFallbackLink(
   checkIn: string,
   checkOut: string,
@@ -469,7 +481,7 @@ function buildSerpFallbackLink(
 }
 
 async function searchSerpRegion(regionId: number, params: { checkIn: string; checkOut: string; adults: number; childrenAges: number[] }) {
-  const response = await axios.post(
+  const response: any = await axios.post(
     `${ETG_BASE_URL}/api/b2b/v3/search/serp/region/`,
     {
       region_id: regionId,
@@ -486,7 +498,7 @@ async function searchSerpRegion(regionId: number, params: { checkIn: string; che
 }
 
 async function searchSerpGeo(latitude: number, longitude: number, radiusKm: number, params: { checkIn: string; checkOut: string; adults: number; childrenAges: number[] }) {
-  const response = await axios.post(
+  const response: any = await axios.post(
     `${ETG_BASE_URL}/api/b2b/v3/search/serp/geo/`,
     {
       latitude,
@@ -505,7 +517,7 @@ async function searchSerpGeo(latitude: number, longitude: number, radiusKm: numb
 }
 
 async function searchSerpHotels(ids: readonly string[], params: { checkIn: string; checkOut: string; adults: number; childrenAges: number[] }) {
-  const response = await axios.post(
+  const response: any = await axios.post(
     `${ETG_BASE_URL}/api/b2b/v3/search/serp/hotels/`,
     {
       ids: [...ids],
@@ -617,7 +629,7 @@ interface HotelForApi {
   price: number;
   currency: string;
   images?: { category: string; url: string }[];
-  bookingUrl: string;
+  bookingUrl?: string;
   distanceToCenter?: number;
   taxesAndFees?: string;
   mealType?: string;
@@ -740,6 +752,8 @@ function mapEtgHotelToApi(
       ? rewriteOstrovokHotelPathToRooms(rate.payment_options.payment_types[0].link) ||
         rewriteOstrovokHybridHotelPathToSerp(rate.payment_options.payment_types[0].link) ||
         rate.payment_options.payment_types[0].link
+      : rawId && !/^\d+$/.test(rawId)
+      ? buildHotelPageFallbackLink(rawId, checkIn, checkOut, adults)
       : buildSerpFallbackLink(
           checkIn,
           checkOut,
@@ -841,7 +855,10 @@ function formatHotelsForPrompt(hotels: HotelForApi[]): string {
       const km = hotel.distanceToCenter / 1000;
       text += `- **До центра:** ${km < 1 ? `${Math.round(hotel.distanceToCenter)} м` : `${km.toFixed(1)} км`}\n`;
     }
-    text += `\n[🛎️ Забронировать ${hotel.name}](${hotel.bookingUrl})\n\n---\n\n`;
+    if (hotel.bookingUrl) {
+      text += `\n[🛎️ Забронировать ${hotel.name}](${hotel.bookingUrl})\n`;
+    }
+    text += '\n---\n\n';
   });
   text += '\n⚠️ **ВАЖНО:** Используй ТОЛЬКО эти отели в своих рекомендациях.\n';
   return text;

@@ -34,6 +34,7 @@ function assertRealHotelsPayload(data) {
     Number(h?.price) > 0 &&
     typeof h?.bookingUrl === 'string' &&
     h.bookingUrl.includes('partner_slug=') &&
+    h.bookingUrl.includes('/rooms/') &&
     typeof h?.taxesAndFees === 'string' &&
     h.taxesAndFees.length > 0
   );
@@ -114,6 +115,7 @@ async function run() {
     const link = data.hotels[0]?.bookingUrl || '';
     assert(link.includes('partner_slug='), 'Missing partner_slug');
     assert(link.includes('utm_medium=partners'), 'Missing utm_medium');
+    assert(link.includes('/rooms/'), 'Expected hotel page link, received SERP fallback');
   });
 
   await scenario('response contains cancellation/taxes/check-in', basePayload, async ({ status, data }) => {

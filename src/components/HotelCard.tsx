@@ -12,7 +12,7 @@ interface HotelCardProps {
   price: number;
   currency: string;
   imageUrl?: string;
-  bookingUrl: string;
+  bookingUrl?: string;
   amenities?: string[];
   roomAmenities?: string[];
   taxesAndFees?: string;
@@ -139,15 +139,17 @@ export const HotelCard = ({
           </div>
           <div className="flex items-center justify-between gap-2 mt-1.5">
             <span className="text-sm font-bold text-gray-900">от {formatPrice(price, currency)}</span>
-            <a
-              href={bookingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={onBookingClick}
-              className="bg-black hover:bg-gray-800 text-white px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors"
-            >
-              Забронировать
-            </a>
+            {bookingUrl && (
+              <a
+                href={bookingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onBookingClick}
+                className="bg-black hover:bg-gray-800 text-white px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors"
+              >
+                Забронировать
+              </a>
+            )}
           </div>
           <div className="mt-2 space-y-1 text-[11px] text-gray-600">
             {safeTaxes && <div><strong>Налоги/сборы:</strong> {safeTaxes}</div>}
@@ -370,15 +372,17 @@ export const HotelCard = ({
               </div>
             </div>
 
-            <a
-              href={bookingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={onBookingClick}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2.5 rounded-lg font-medium text-sm sm:text-base transition-colors whitespace-nowrap"
-            >
-              Забронировать отель
-            </a>
+            {bookingUrl && (
+              <a
+                href={bookingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onBookingClick}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-5 py-2.5 rounded-lg font-medium text-sm sm:text-base transition-colors whitespace-nowrap"
+              >
+                Забронировать отель
+              </a>
+            )}
           </div>
         </div>
       </div>
