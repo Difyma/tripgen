@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { SimpleModal } from '@/components/ui/simple-modal';
+import { tourApi } from '@/services/tourApi';
 
 interface DayItinerary {
   day: number;
@@ -37,6 +38,8 @@ const mealOptions = ['завтрак', 'обед', 'ужин', 'перекус']
 export default function CreateTourPage() {
   const navigate = useNavigate();
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
   
   // Основная информация
@@ -51,6 +54,8 @@ export default function CreateTourPage() {
     maxGroupSize: 12,
     price: '',
     priceValue: 0,
+    paymentMethodTitle: 'Оплата напрямую организатору',
+    paymentInstructions: '',
     category: 'nature',
     categoryName: 'Природа',
     difficulty: 'medium' as 'easy' | 'medium' | 'hard',
@@ -164,16 +169,29 @@ export default function CreateTourPage() {
     setFormData({ ...formData, requirements: formData.requirements.filter((_, i) => i !== index) });
   };
 
-  const handleSubmit = () => {
-    // Здесь будет API вызов для сохранения тура
-    console.log('Tour data:', {
-      ...formData,
-      itinerary,
-      accommodation,
-      includes: includes.filter(i => i.trim()),
-      excludes: excludes.filter(i => i.trim()),
-    });
-    setIsSubmitModalOpen(true);
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setSubmitError('');
+    try {
+      await tourApi.createTour({
+        ...formData,
+        guideInfo: {
+          name: formData.guideName,
+          experience: formData.guideExperience,
+          languages: formData.guideLanguages,
+        },
+        itinerary,
+        accommodation,
+        includes: includes.filter(i => i.trim()),
+        excludes: excludes.filter(i => i.trim()),
+      });
+      setIsSubmitModalOpen(true);
+    } catch (error) {
+      console.error('Failed to create tour:', error);
+      setSubmitError(error instanceof Error ? error.message : 'Не удалось создать тур');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isStepValid = () => {
@@ -228,13 +246,20 @@ export default function CreateTourPage() {
             <Button 
               className="bg-green-600 hover:bg-green-700"
               onClick={handleSubmit}
+              disabled={isSubmitting}
             >
               <CheckCircle className="w-4 h-4 mr-2" />
-              Создать тур
+              {isSubmitting ? 'Сохраняем...' : 'Создать тур'}
             </Button>
           )}
         </div>
       </div>
+
+      {submitError && (
+        <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+          {submitError}
+        </div>
+      )}
 
       {/* Steps */}
       <div className="flex gap-2 overflow-x-auto pb-2">
@@ -394,7 +419,7 @@ export default function CreateTourPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Цена (текст) *</Label>
+                  <Label>Цена для пользователя (текст) *</Label>
                   <Input
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
@@ -402,12 +427,40 @@ export default function CreateTourPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Цена (число) *</Label>
+                  <Label>Цена для пользователя (число) *</Label>
                   <Input
                     type="number"
                     value={formData.priceValue}
                     onChange={(e) => setFormData({ ...formData, priceValue: parseInt(e.target.value) || 0 })}
                   />
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                <p className="text-sm font-medium text-blue-900">MVP-оплата без эквайринга</p>
+                <p className="mt-1 text-sm text-blue-700">
+                  Пользователь оставляет заявку, а оплату получает организатор напрямую. TripGen пока не принимает платежи внутри сервиса.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label>Название способа оплаты</Label>
+                  <Input
+                    value={formData.paymentMethodTitle}
+                    onChange={(e) => setFormData({ ...formData, paymentMethodTitle: e.target.value })}
+                    placeholder="Например: СБП на ИП Иванов / платежная ссылка / банковские реквизиты"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Инструкции по оплате для клиента</Label>
+                  <Textarea
+                    value={formData.paymentInstructions}
+                    onChange={(e) => setFormData({ ...formData, paymentInstructions: e.target.value })}
+                    placeholder="Например: после подтверждения заявки отправим ссылку на оплату или реквизиты для СБП."
+                    rows={3}
+                  />
+                  <p className="text-xs text-gray-500">Не указывайте чувствительные данные, если тур еще проходит модерацию.</p>
                 </div>
               </div>
             </CardContent>
@@ -885,7 +938,11 @@ export default function CreateTourPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {formData.priceValue > 0 ? <CheckCircle className="w-5 h-5 text-green-500" /> : <AlertCircle className="w-5 h-5 text-red-500" />}
-                  <span>Цена</span>
+                  <span>Цена для пользователя</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {formData.paymentMethodTitle ? <CheckCircle className="w-5 h-5 text-green-500" /> : <AlertCircle className="w-5 h-5 text-red-500" />}
+                  <span>Способ получения оплаты</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {itinerary.every(d => d.title && d.description) ? <CheckCircle className="w-5 h-5 text-green-500" /> : <AlertCircle className="w-5 h-5 text-red-500" />}

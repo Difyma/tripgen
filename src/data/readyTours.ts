@@ -47,6 +47,8 @@ export interface ReadyTour {
   spotsLeft: number;
   startDate: string;
   endDate: string;
+  paymentMethodTitle?: string;
+  paymentInstructions?: string;
   creatorId?: string; // ID создателя тура для чата
 }
 
@@ -177,6 +179,8 @@ export const readyTours: ReadyTour[] = [
     spotsLeft: 8,
     startDate: '2026-06-15',
     endDate: '2026-06-21',
+    paymentMethodTitle: 'Оплата напрямую организатору',
+    paymentInstructions: 'После заявки организатор пришлет реквизиты для СБП или платежную ссылку. Предоплата и финальная оплата согласуются напрямую с организатором.',
   },
   {
     id: '2',

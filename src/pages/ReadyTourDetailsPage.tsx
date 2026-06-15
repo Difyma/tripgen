@@ -22,7 +22,9 @@ import { getTourById } from '../data/readyTours';
 import { MainNavbar } from '../components/MainNavbar';
 import { Footer } from '../components/Footer';
 import { BookingModal } from '../components/BookingModal';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { ReadyTour } from '../data/readyTours';
+import { tourApi } from '../services/tourApi';
 
 export function ReadyTourDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -30,15 +32,40 @@ export function ReadyTourDetailsPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'itinerary' | 'includes'>('overview');
   const [isLiked, setIsLiked] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [backendTour, setBackendTour] = useState<ReadyTour | null>(null);
+  const [isLoadingBackendTour, setIsLoadingBackendTour] = useState(false);
 
-  const tour = id ? getTourById(id) : undefined;
+  const staticTour = id ? getTourById(id) : undefined;
+  const tour = staticTour || backendTour || undefined;
+
+  useEffect(() => {
+    if (!id || staticTour) return;
+    let cancelled = false;
+    setIsLoadingBackendTour(true);
+    tourApi.getTour(id)
+      .then(({ tour }) => {
+        if (!cancelled) setBackendTour(tour as ReadyTour);
+      })
+      .catch((error) => {
+        console.warn('Failed to load backend tour:', error);
+        if (!cancelled) setBackendTour(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingBackendTour(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, staticTour]);
 
   if (!tour) {
     return (
       <div className="min-h-screen bg-[#FBFBFD]">
         <MainNavbar />
         <div className="flex flex-col items-center justify-center min-h-[60vh]">
-          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Тур не найден</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-4">
+            {isLoadingBackendTour ? 'Загружаем тур...' : 'Тур не найден'}
+          </h1>
           <button
             onClick={() => navigate('/#tours')}
             className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors"
@@ -455,7 +482,7 @@ export function ReadyTourDetailsPage() {
                     onClick={handleBookTour}
                     className="w-full py-3.5 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors"
                   >
-                    Забронировать
+                    Оставить заявку
                   </button>
                   <button
                     onClick={handleAskQuestion}

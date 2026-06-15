@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Plus, Phone, Mail, MoreHorizontal, Filter, Download, MapPin, Users, Clock, Eye, Send, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { tourApi } from '@/services/tourApi';
 
 interface Client {
   id: string;
@@ -44,7 +45,7 @@ interface CreatorTour {
   difficulty: 'easy' | 'medium' | 'hard';
   shortDescription: string;
   image: string;
-  status: 'draft' | 'pending' | 'approved' | 'rejected';
+  status: 'draft' | 'pending' | 'published' | 'approved' | 'archived' | 'rejected';
   createdAt: string;
   moderationNotes?: string;
 }
@@ -57,60 +58,6 @@ const mockClients: Client[] = [
   { id: '5', name: 'Елена Волкова', email: 'elena@example.com', phone: '+7 (999) 567-89-01', status: 'inactive', tours: 1, totalSpent: 35000, lastContact: '2025-12-10', notes: 'Не была в турах давно' },
 ];
 
-const mockTours: CreatorTour[] = [
-  {
-    id: '1',
-    title: 'Тайга и водопады Алтая',
-    location: 'Горный Алтай',
-    region: 'Республика Алтай',
-    duration: '7 дней',
-    durationDays: 7,
-    groupSize: 'до 12 человек',
-    price: '85 000 ₽',
-    priceValue: 85000,
-    category: 'nature',
-    difficulty: 'medium',
-    shortDescription: 'Путешествие по самым живописным местам Алтайского края',
-    image: '/images/Traveling_around_Altai.jpg',
-    status: 'approved',
-    createdAt: '2026-01-15',
-  },
-  {
-    id: '2',
-    title: 'Зимний Байкал',
-    location: 'Остров Ольхон',
-    region: 'Иркутская область',
-    duration: '5 дней',
-    durationDays: 5,
-    groupSize: 'до 8 человек',
-    price: '65 000 ₽',
-    priceValue: 65000,
-    category: 'nature',
-    difficulty: 'easy',
-    shortDescription: 'Лёд Байкала, ледяные пещеры и коньки',
-    image: '/images/Traveling_around_Altai.jpg',
-    status: 'pending',
-    createdAt: '2026-03-01',
-  },
-  {
-    id: '3',
-    title: 'Камчатка: Земля медведей',
-    location: 'Петропавловск-Камчатский',
-    region: 'Камчатский край',
-    duration: '10 дней',
-    durationDays: 10,
-    groupSize: 'до 6 человек',
-    price: '180 000 ₽',
-    priceValue: 180000,
-    category: 'extreme',
-    difficulty: 'hard',
-    shortDescription: 'Вулканы, гейзеры и дикая природа Камчатки',
-    image: '/images/Traveling_around_Altai.jpg',
-    status: 'draft',
-    createdAt: '2026-03-28',
-  },
-];
-
 const statusMap = {
   lead: { label: 'Лид', color: 'bg-blue-100 text-blue-700' },
   active: { label: 'Активный', color: 'bg-green-100 text-green-700' },
@@ -121,7 +68,9 @@ const statusMap = {
 const tourStatusMap = {
   draft: { label: 'Черновик', color: 'bg-gray-100 text-gray-700', icon: AlertCircle },
   pending: { label: 'На модерации', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
+  published: { label: 'Опубликован', color: 'bg-green-100 text-green-700', icon: CheckCircle },
   approved: { label: 'Одобрен', color: 'bg-green-100 text-green-700', icon: CheckCircle },
+  archived: { label: 'В архиве', color: 'bg-gray-100 text-gray-700', icon: XCircle },
   rejected: { label: 'Отклонён', color: 'bg-red-100 text-red-700', icon: XCircle },
 };
 
@@ -138,7 +87,10 @@ export default function CrmPage() {
   const [activeTab, setActiveTab] = useState('clients');
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [clientFilter, setClientFilter] = useState('all');
-  const [tours, setTours] = useState<CreatorTour[]>(mockTours);
+  const [tours, setTours] = useState<CreatorTour[]>([]);
+  const [isLoadingTours, setIsLoadingTours] = useState(false);
+  const [toursError, setToursError] = useState('');
+  const [isSavingCrmTour, setIsSavingCrmTour] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
   const [selectedTour, setSelectedTour] = useState<CreatorTour | null>(null);
@@ -161,6 +113,28 @@ export default function CrmPage() {
     excludes: '',
   });
 
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingTours(true);
+    setToursError('');
+    tourApi.getMyTours()
+      .then(({ tours }) => {
+        if (!cancelled) setTours(tours as CreatorTour[]);
+      })
+      .catch((error) => {
+        console.error('Failed to load creator tours:', error);
+        if (!cancelled) {
+          setToursError(error instanceof Error ? error.message : 'Не удалось загрузить туры');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingTours(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const filteredClients = mockClients.filter(client => {
     const matchesSearch = 
       client.name.toLowerCase().includes(clientSearchTerm.toLowerCase()) ||
@@ -171,32 +145,66 @@ export default function CrmPage() {
     return matchesSearch && client.status === clientFilter;
   });
 
-  const handleCreateTour = () => {
-    const newTour: CreatorTour = {
-      id: Date.now().toString(),
-      ...formData,
-      image: '/images/Traveling_around_Altai.jpg',
-      status: 'draft',
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setTours([newTour, ...tours]);
-    setIsCreateDialogOpen(false);
-    setFormData({
-      title: '',
-      location: '',
-      region: '',
-      duration: '',
-      durationDays: 7,
-      groupSize: '',
-      price: '',
-      priceValue: 0,
-      category: 'nature',
-      difficulty: 'medium',
-      shortDescription: '',
-      description: '',
-      includes: '',
-      excludes: '',
-    });
+  const handleCreateTour = async () => {
+    setIsSavingCrmTour(true);
+    setToursError('');
+    try {
+      const { tour } = await tourApi.createTour({
+        title: formData.title,
+        location: formData.location,
+        region: formData.region,
+        duration: formData.duration || `${formData.durationDays} дней`,
+        durationDays: formData.durationDays,
+        groupSize: formData.groupSize,
+        minGroupSize: 1,
+        maxGroupSize: 1,
+        price: formData.price,
+        priceValue: formData.priceValue,
+        category: formData.category,
+        categoryName: categories.find(category => category.value === formData.category)?.label || 'Природа',
+        difficulty: formData.difficulty,
+        shortDescription: formData.shortDescription,
+        description: formData.description || formData.shortDescription,
+        image: '/images/Traveling_around_Altai.jpg',
+        images: [],
+        highlights: [],
+        activities: [],
+        requirements: [],
+        bestTime: '',
+        spotsLeft: 0,
+        startDate: '',
+        endDate: '',
+        paymentMethodTitle: 'Оплата напрямую организатору',
+        paymentInstructions: '',
+        itinerary: [],
+        accommodation: [],
+        includes: formData.includes.split(',').map(item => item.trim()).filter(Boolean),
+        excludes: formData.excludes.split(',').map(item => item.trim()).filter(Boolean),
+      });
+      setTours([tour as CreatorTour, ...tours]);
+      setIsCreateDialogOpen(false);
+      setFormData({
+        title: '',
+        location: '',
+        region: '',
+        duration: '',
+        durationDays: 7,
+        groupSize: '',
+        price: '',
+        priceValue: 0,
+        category: 'nature',
+        difficulty: 'medium',
+        shortDescription: '',
+        description: '',
+        includes: '',
+        excludes: '',
+      });
+    } catch (error) {
+      console.error('Failed to create CRM tour:', error);
+      setToursError(error instanceof Error ? error.message : 'Не удалось создать тур');
+    } finally {
+      setIsSavingCrmTour(false);
+    }
   };
 
   const handleSubmitForModeration = (tour: CreatorTour) => {
@@ -553,15 +561,23 @@ export default function CrmPage() {
                     <Button 
                       className="bg-gray-900 hover:bg-gray-800"
                       onClick={handleCreateTour}
-                      disabled={!formData.title || !formData.location || !formData.region}
+                      disabled={isSavingCrmTour || !formData.title || !formData.location || !formData.region}
                     >
-                      Сохранить черновик
+                      {isSavingCrmTour ? 'Сохраняем...' : 'Сохранить черновик'}
                     </Button>
                   </div>
                 </SimpleModal>
               </div>
             </CardHeader>
             <CardContent className="p-0">
+              {isLoadingTours && (
+                <div className="p-4 text-sm text-gray-500">Загружаем ваши туры...</div>
+              )}
+              {toursError && (
+                <div className="mx-4 mb-4 rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-700">
+                  {toursError}
+                </div>
+              )}
               <div className="divide-y">
                 {tours.map((tour) => {
                   const StatusIcon = tourStatusMap[tour.status].icon;
@@ -684,6 +700,11 @@ export default function CrmPage() {
                     </div>
                   );
                 })}
+                {!isLoadingTours && tours.length === 0 && (
+                  <div className="p-10 text-center text-gray-500">
+                    Туров пока нет. Создайте первый тур через кнопку «Создать тур».
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

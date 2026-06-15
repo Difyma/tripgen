@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search, Filter, MoreHorizontal, Eye, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { tourApi } from '@/services/tourApi';
 
 interface Order {
   id: string;
@@ -29,15 +30,11 @@ interface Order {
   amount: number;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   guests: number;
+  phone?: string;
+  comments?: string;
+  createdAt?: string;
+  paymentMethodTitle?: string;
 }
-
-const mockOrders: Order[] = [
-  { id: 'ORD-001', tourName: 'Тур по Алтаю', customer: 'Анна Петрова', email: 'anna@example.com', date: '2026-03-15', amount: 45000, status: 'confirmed', guests: 2 },
-  { id: 'ORD-002', tourName: 'Байкал зимой', customer: 'Сергей Иванов', email: 'sergey@example.com', date: '2026-02-28', amount: 38000, status: 'pending', guests: 1 },
-  { id: 'ORD-003', tourName: 'Камчатка экстрим', customer: 'Мария Сидорова', email: 'maria@example.com', date: '2026-04-10', amount: 89000, status: 'completed', guests: 3 },
-  { id: 'ORD-004', tourName: 'Карелия летом', customer: 'Дмитрий Козлов', email: 'dmitry@example.com', date: '2026-05-20', amount: 32000, status: 'cancelled', guests: 2 },
-  { id: 'ORD-005', tourName: 'Тур по Алтаю', customer: 'Елена Волкова', email: 'elena@example.com', date: '2026-03-22', amount: 45000, status: 'pending', guests: 2 },
-];
 
 const statusMap = {
   pending: { label: 'Ожидает', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
@@ -49,8 +46,33 @@ const statusMap = {
 export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
+  const [bookingRequests, setBookingRequests] = useState<Order[]>([]);
+  const [isLoadingBookings, setIsLoadingBookings] = useState(false);
+  const [bookingsError, setBookingsError] = useState('');
 
-  const filteredOrders = mockOrders.filter(order => {
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingBookings(true);
+    setBookingsError('');
+    tourApi.getMyBookings()
+      .then(({ bookings }) => {
+        if (!cancelled) setBookingRequests(bookings as Order[]);
+      })
+      .catch((error) => {
+        console.error('Failed to load tour booking requests:', error);
+        if (!cancelled) setBookingsError(error instanceof Error ? error.message : 'Не удалось загрузить заявки');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingBookings(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const allOrders = useMemo(() => bookingRequests, [bookingRequests]);
+
+  const filteredOrders = allOrders.filter(order => {
     const matchesSearch = 
       order.tourName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -59,6 +81,10 @@ export default function OrdersPage() {
     if (activeTab === 'all') return matchesSearch;
     return matchesSearch && order.status === activeTab;
   });
+
+  const pendingCount = allOrders.filter(order => order.status === 'pending').length;
+  const completedCount = allOrders.filter(order => order.status === 'completed').length;
+  const totalRevenue = allOrders.reduce((sum, order) => sum + order.amount, 0);
 
   return (
     <div className="space-y-6">
@@ -79,10 +105,10 @@ export default function OrdersPage() {
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         {[
-          { label: 'Всего заказов', value: '156', change: '+12% за месяц' },
-          { label: 'Ожидают подтверждения', value: '8', change: 'Требуют внимания' },
-          { label: 'Выручка за месяц', value: '₽1.2M', change: '+23% к прошлому' },
-          { label: 'Завершённые', value: '142', change: '91% успешных' },
+          { label: 'Всего заказов', value: String(allOrders.length), change: bookingRequests.length ? `+${bookingRequests.length} новых заявок` : 'Нет новых заявок' },
+          { label: 'Ожидают подтверждения', value: String(pendingCount), change: 'Требуют внимания' },
+          { label: 'Сумма заявок', value: `${totalRevenue.toLocaleString('ru-RU')} ₽`, change: 'Оплата напрямую организатору' },
+          { label: 'Завершённые', value: String(completedCount), change: 'Успешные туры' },
         ].map((stat, index) => (
           <Card key={index}>
             <CardContent className="pt-6">
@@ -107,7 +133,15 @@ export default function OrdersPage() {
                 className="pl-10"
               />
             </div>
+            {isLoadingBookings && (
+              <span className="text-sm text-gray-500">Загружаем заявки...</span>
+            )}
           </div>
+          {bookingsError && (
+            <div className="mt-4 rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-700">
+              {bookingsError}
+            </div>
+          )}
         </CardHeader>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="px-6">
@@ -180,6 +214,13 @@ export default function OrdersPage() {
                       </TableRow>
                     );
                   })}
+                  {!isLoadingBookings && filteredOrders.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-10 text-center text-gray-500">
+                        Заявок пока нет
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

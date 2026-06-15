@@ -122,11 +122,9 @@ export const CreatorChat: React.FC<CreatorChatProps> = ({
     setMessages([]);
     
     try {
-      // Join chat and get messages
-      const { messages: chatMessages } = await creatorChatApi.joinChat(
-        chat.creator_id, 
-        chat.tourTitle
-      );
+      // Загружаем именно выбранный диалог. Повторный join по creator_id может
+      // создать другой чат для автора, если выбран существующий клиентский диалог.
+      const chatMessages = await creatorChatApi.getMessages(chat.chat_id);
       setMessages(chatMessages);
       
       // Mark as read

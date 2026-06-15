@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Calendar, Users, ArrowRight, Mountain, Trees, Umbrella, Bike, Palette, Wine, Camera, Ticket, Clock } from 'lucide-react';
-import { readyTours } from '../data/readyTours';
+import { readyTours, type ReadyTour } from '../data/readyTours';
+import { tourApi } from '../services/tourApi';
 
 const categories = [
   { id: 'all', name: 'Все туры', icon: Camera },
@@ -18,10 +19,26 @@ const categories = [
 
 export function ReadyTours() {
   const [activeCategory, setActiveCategory] = useState('all');
+  const [backendTours, setBackendTours] = useState<ReadyTour[]>([]);
 
+  useEffect(() => {
+    let mounted = true;
+    tourApi.getPublishedTours()
+      .then(({ tours }) => {
+        if (mounted && Array.isArray(tours)) setBackendTours(tours as ReadyTour[]);
+      })
+      .catch((error) => {
+        console.warn('Failed to load backend tours, using static fallback:', error);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const allTours = [...backendTours, ...readyTours];
   const filteredTours = activeCategory === 'all' 
-    ? readyTours 
-    : readyTours.filter(tour => tour.category === activeCategory);
+    ? allTours
+    : allTours.filter(tour => tour.category === activeCategory);
 
   return (
     <section id="tours" className="py-20 bg-[#FBFBFD]">
