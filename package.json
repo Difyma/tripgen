@@ -16,6 +16,7 @@
     "sync:regions:full": "npm run server:build && node server/dist/src/jobs/sync_regions_full.js",
     "sync:content:hotels": "npm run server:build && node server/dist/src/jobs/sync_hotel_content.js",
     "db:migrate:002": "node scripts/pg-apply-migration.mjs db/migrations/002_etg_hotel_content_room_groups.sql",
+    "db:migrate:003": "node scripts/pg-apply-migration.mjs db/migrations/003_ai_daily_token_usage.sql",
     "smoke:etg": "node scripts/etg-cert-smoke.mjs",
     "lint": "eslint .",
     "preview": "vite preview",

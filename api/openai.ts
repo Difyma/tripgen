@@ -117,7 +117,7 @@ const AI_DAILY_TOKEN_LIMIT = Number.isFinite(parsedAiDailyTokenLimit)
   ? Math.max(1000, Math.round(parsedAiDailyTokenLimit))
   : 100000;
 const AI_MAX_COMPLETION_TOKENS = 1500;
-const BUILD_VERSION = 'v1.8.3';
+const BUILD_VERSION = 'v1.8.4';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -230,6 +230,56 @@ function addAiUsage(key: string, tokens: number): AiUsageSnapshot {
   return toAiUsageSnapshot(next.tokensUsed, dailyTokenLimit);
 }
 
+async function getAiUsageSnapshot(key: string): Promise<AiUsageSnapshot> {
+  if (!hasDatabaseConfig()) return getAiUsage(key);
+  try {
+    const pool = await getPgPool();
+    const result = await pool.query(
+      `INSERT INTO ai_daily_token_usage (subject_key, usage_date, daily_token_limit, tokens_used, updated_at)
+       VALUES ($1, CURRENT_DATE, $2, 0, NOW())
+       ON CONFLICT (subject_key, usage_date) DO UPDATE
+         SET daily_token_limit = EXCLUDED.daily_token_limit,
+             updated_at = ai_daily_token_usage.updated_at
+       RETURNING tokens_used, daily_token_limit`,
+      [key, AI_DAILY_TOKEN_LIMIT]
+    );
+    const row = result.rows[0] as { tokens_used?: number; daily_token_limit?: number } | undefined;
+    return toAiUsageSnapshot(
+      Number(row?.tokens_used ?? 0),
+      Number(row?.daily_token_limit ?? AI_DAILY_TOKEN_LIMIT)
+    );
+  } catch (err) {
+    console.error('[ai usage] db read failed, using in-memory:', err instanceof Error ? err.message : err);
+    return getAiUsage(key);
+  }
+}
+
+async function addAiUsageTokens(key: string, tokens: number): Promise<AiUsageSnapshot> {
+  const safeTokens = Math.max(0, Math.round(tokens));
+  if (!hasDatabaseConfig()) return addAiUsage(key, safeTokens);
+  try {
+    const pool = await getPgPool();
+    const result = await pool.query(
+      `INSERT INTO ai_daily_token_usage (subject_key, usage_date, daily_token_limit, tokens_used, updated_at)
+       VALUES ($1, CURRENT_DATE, $2, $3, NOW())
+       ON CONFLICT (subject_key, usage_date) DO UPDATE
+         SET tokens_used = ai_daily_token_usage.tokens_used + EXCLUDED.tokens_used,
+             daily_token_limit = EXCLUDED.daily_token_limit,
+             updated_at = NOW()
+       RETURNING tokens_used, daily_token_limit`,
+      [key, AI_DAILY_TOKEN_LIMIT, safeTokens]
+    );
+    const row = result.rows[0] as { tokens_used?: number; daily_token_limit?: number } | undefined;
+    return toAiUsageSnapshot(
+      Number(row?.tokens_used ?? safeTokens),
+      Number(row?.daily_token_limit ?? AI_DAILY_TOKEN_LIMIT)
+    );
+  } catch (err) {
+    console.error('[ai usage] db write failed, using in-memory:', err instanceof Error ? err.message : err);
+    return addAiUsage(key, safeTokens);
+  }
+}
+
 function estimateTokensFromText(text: string): number {
   const clean = String(text || '').trim();
   if (!clean) return 0;
@@ -265,7 +315,7 @@ function isAuthenticatedRequest(req: VercelRequest): boolean {
 }
 
 async function checkAndIncrementRateLimit(ip: string): Promise<{ allowed: boolean; remaining: number }> {
-  if (!hasPgConfig()) return { allowed: true, remaining: ANON_DAILY_LIMIT };
+  if (!hasDatabaseConfig()) return { allowed: true, remaining: ANON_DAILY_LIMIT };
   try {
     const pool = await getPgPool();
     const result = await pool.query(
@@ -296,6 +346,10 @@ function hasPgConfig(): boolean {
   // pg enrichment is opt-in: set ENABLE_ROOM_ENRICHMENT=true in Vercel env vars to activate.
   // Default OFF to prevent pg pool crashes in serverless environment.
   if (process.env.ENABLE_ROOM_ENRICHMENT !== 'true') return false;
+  return hasDatabaseConfig();
+}
+
+function hasDatabaseConfig(): boolean {
   return Boolean(
     process.env.DATABASE_URL ||
       (process.env.PGDATABASE && process.env.PGHOST && process.env.PGUSER)
@@ -1381,7 +1435,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...conversationMessages,
     ];
     const aiUsageKey = getAiUsageKey(req);
-    const aiUsageBefore = getAiUsage(aiUsageKey);
+    const aiUsageBefore = await getAiUsageSnapshot(aiUsageKey);
     if (aiUsageBefore.remainingTokens <= 0) {
       Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
       return res.status(429).json({
@@ -1486,7 +1540,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const fallbackTokens =
       estimateMessagesTokens(openRouterMessages) + estimateTokensFromText(assistantMessage);
-    const aiUsageAfter = addAiUsage(aiUsageKey, getOpenRouterTotalTokens(response.data, fallbackTokens));
+    const aiUsageAfter = await addAiUsageTokens(aiUsageKey, getOpenRouterTotalTokens(response.data, fallbackTokens));
 
     Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
     return res.status(200).json({

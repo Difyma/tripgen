@@ -1,8 +1,8 @@
-import { getPgPool } from './postgres.js';
+import { getPgPool, hasPgConnectionConfig } from './postgres.js';
 import { stableRgExtKey } from '../etg/rgExt.js';
 
 export function hasPgConfig(): boolean {
-  return Boolean(process.env.PGDATABASE && process.env.PGHOST && process.env.PGUSER);
+  return hasPgConnectionConfig();
 }
 
 export async function upsertHotelInfo(hid: string, payload: unknown): Promise<void> {

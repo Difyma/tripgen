@@ -31,6 +31,7 @@ import { resolveSearchEndpoint } from './etg/endpointResolver.js';
 import { searchSerpGeo, searchSerpHotels, searchSerpRegion } from './etg/searchClient.js';
 import { createTraceId, logSearchStep, upsertTrace } from './diagnostics/searchLogger.js';
 import { formatEtgImageUrlForServer, normalizeHotelPreviewImageUrlForServer } from './lib/etgHotelImageUrl.js';
+import { addAiUsageTokens, getAiUsageSnapshot } from './storage/aiUsageRepository.js';
 import {
   extractCancellationDeadlineLine,
   extractCancellationPolicyLine,
@@ -78,37 +79,6 @@ const AI_DAILY_TOKEN_LIMIT = Number.isFinite(parsedAiDailyTokenLimit)
   : 100000;
 const AI_MAX_COMPLETION_TOKENS = 1500;
 
-type AiUsageSnapshot = {
-  dailyTokenLimit: number;
-  tokensUsed: number;
-  remainingTokens: number;
-  usedPercent: number;
-  remainingPercent: number;
-};
-
-const inMemoryAiUsage = new Map<string, { day: string; tokensUsed: number; dailyTokenLimit: number }>();
-
-function getUtcDayKey(date = new Date()): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function clampPercent(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function toAiUsageSnapshot(tokensUsed: number, dailyTokenLimit = AI_DAILY_TOKEN_LIMIT): AiUsageSnapshot {
-  const safeUsed = Math.max(0, Math.round(tokensUsed));
-  const remainingTokens = Math.max(0, dailyTokenLimit - safeUsed);
-  const usedPercent = clampPercent((safeUsed / dailyTokenLimit) * 100);
-  return {
-    dailyTokenLimit,
-    tokensUsed: safeUsed,
-    remainingTokens,
-    usedPercent,
-    remainingPercent: Math.max(0, 100 - usedPercent),
-  };
-}
-
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const payload = token.split('.')[1];
@@ -136,31 +106,6 @@ function getAiUsageKey(req: Request): string {
     if (subject) return `user:${subject}`;
   }
   return `anon:${getClientIp(req)}`;
-}
-
-function getAiUsage(key: string): AiUsageSnapshot {
-  const today = getUtcDayKey();
-  const current = inMemoryAiUsage.get(key);
-  if (!current || current.day !== today) {
-    const fresh = { day: today, tokensUsed: 0, dailyTokenLimit: AI_DAILY_TOKEN_LIMIT };
-    inMemoryAiUsage.set(key, fresh);
-    return toAiUsageSnapshot(0, fresh.dailyTokenLimit);
-  }
-  return toAiUsageSnapshot(current.tokensUsed, current.dailyTokenLimit);
-}
-
-function addAiUsage(key: string, tokens: number): AiUsageSnapshot {
-  const today = getUtcDayKey();
-  const current = inMemoryAiUsage.get(key);
-  const dailyTokenLimit = current?.dailyTokenLimit || AI_DAILY_TOKEN_LIMIT;
-  const baseUsed = current?.day === today ? current.tokensUsed : 0;
-  const next = {
-    day: today,
-    tokensUsed: Math.max(0, baseUsed + Math.max(0, Math.round(tokens))),
-    dailyTokenLimit,
-  };
-  inMemoryAiUsage.set(key, next);
-  return toAiUsageSnapshot(next.tokensUsed, dailyTokenLimit);
 }
 
 function estimateTokensFromText(text: string): number {
@@ -1679,7 +1624,7 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
       ...conversationMessages
     ];
     const aiUsageKey = getAiUsageKey(req);
-    const aiUsageBefore = getAiUsage(aiUsageKey);
+    const aiUsageBefore = await getAiUsageSnapshot(aiUsageKey, AI_DAILY_TOKEN_LIMIT);
     if (aiUsageBefore.remainingTokens <= 0) {
       return res.status(429).json({
         error: 'ai_limit_exceeded',
@@ -1835,7 +1780,11 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
     }
 
     const fallbackTokens = estimateMessagesTokens(fullMessages) + estimateTokensFromText(assistantMessage);
-    const aiUsageAfter = addAiUsage(aiUsageKey, getOpenRouterTotalTokens(response.data, fallbackTokens));
+    const aiUsageAfter = await addAiUsageTokens(
+      aiUsageKey,
+      getOpenRouterTotalTokens(response.data, fallbackTokens),
+      AI_DAILY_TOKEN_LIMIT
+    );
 
     res.json({
       text: textToSend,
