@@ -72,6 +72,118 @@ const OSTROVOK_API_SECRET = process.env.OSTROVOK_API_SECRET;
 // Production: https://api.worldota.net
 const OSTROVOK_API_URL = process.env.OSTROVOK_API_URL || 'https://api.worldota.net';
 const PARTNER_SLUG = process.env.OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
+const parsedAiDailyTokenLimit = Number(process.env.AI_DAILY_TOKEN_LIMIT || 100000);
+const AI_DAILY_TOKEN_LIMIT = Number.isFinite(parsedAiDailyTokenLimit)
+  ? Math.max(1000, Math.round(parsedAiDailyTokenLimit))
+  : 100000;
+const AI_MAX_COMPLETION_TOKENS = 1500;
+
+type AiUsageSnapshot = {
+  dailyTokenLimit: number;
+  tokensUsed: number;
+  remainingTokens: number;
+  usedPercent: number;
+  remainingPercent: number;
+};
+
+const inMemoryAiUsage = new Map<string, { day: string; tokensUsed: number; dailyTokenLimit: number }>();
+
+function getUtcDayKey(date = new Date()): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function clampPercent(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function toAiUsageSnapshot(tokensUsed: number, dailyTokenLimit = AI_DAILY_TOKEN_LIMIT): AiUsageSnapshot {
+  const safeUsed = Math.max(0, Math.round(tokensUsed));
+  const remainingTokens = Math.max(0, dailyTokenLimit - safeUsed);
+  const usedPercent = clampPercent((safeUsed / dailyTokenLimit) * 100);
+  return {
+    dailyTokenLimit,
+    tokensUsed: safeUsed,
+    remainingTokens,
+    usedPercent,
+    remainingPercent: Math.max(0, 100 - usedPercent),
+  };
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function getClientIp(req: Request): string {
+  const forwardedFor = req.headers['x-forwarded-for'];
+  if (typeof forwardedFor === 'string') return forwardedFor.split(',')[0].trim();
+  if (Array.isArray(forwardedFor)) return String(forwardedFor[0] || '').split(',')[0].trim();
+  return req.ip || req.socket.remoteAddress || 'unknown';
+}
+
+function getAiUsageKey(req: Request): string {
+  const auth = req.headers.authorization;
+  if (typeof auth === 'string' && auth.startsWith('Bearer ')) {
+    const payload = decodeJwtPayload(auth.slice('Bearer '.length).trim());
+    const subject = typeof payload?.sub === 'string' ? payload.sub : '';
+    if (subject) return `user:${subject}`;
+  }
+  return `anon:${getClientIp(req)}`;
+}
+
+function getAiUsage(key: string): AiUsageSnapshot {
+  const today = getUtcDayKey();
+  const current = inMemoryAiUsage.get(key);
+  if (!current || current.day !== today) {
+    const fresh = { day: today, tokensUsed: 0, dailyTokenLimit: AI_DAILY_TOKEN_LIMIT };
+    inMemoryAiUsage.set(key, fresh);
+    return toAiUsageSnapshot(0, fresh.dailyTokenLimit);
+  }
+  return toAiUsageSnapshot(current.tokensUsed, current.dailyTokenLimit);
+}
+
+function addAiUsage(key: string, tokens: number): AiUsageSnapshot {
+  const today = getUtcDayKey();
+  const current = inMemoryAiUsage.get(key);
+  const dailyTokenLimit = current?.dailyTokenLimit || AI_DAILY_TOKEN_LIMIT;
+  const baseUsed = current?.day === today ? current.tokensUsed : 0;
+  const next = {
+    day: today,
+    tokensUsed: Math.max(0, baseUsed + Math.max(0, Math.round(tokens))),
+    dailyTokenLimit,
+  };
+  inMemoryAiUsage.set(key, next);
+  return toAiUsageSnapshot(next.tokensUsed, dailyTokenLimit);
+}
+
+function estimateTokensFromText(text: string): number {
+  const clean = String(text || '').trim();
+  if (!clean) return 0;
+  return Math.ceil(clean.length / 4);
+}
+
+function estimateMessagesTokens(messages: Array<{ role?: string; content?: string }>): number {
+  return messages.reduce((sum, msg) => sum + 4 + estimateTokensFromText(msg.role || '') + estimateTokensFromText(msg.content || ''), 0);
+}
+
+function getOpenRouterTotalTokens(response: any, fallback: number): number {
+  const usage = response?.usage;
+  const total = Number(usage?.total_tokens);
+  if (Number.isFinite(total) && total > 0) return Math.round(total);
+  const prompt = Number(usage?.prompt_tokens);
+  const completion = Number(usage?.completion_tokens);
+  if (Number.isFinite(prompt) || Number.isFinite(completion)) {
+    return Math.max(0, Math.round((Number.isFinite(prompt) ? prompt : 0) + (Number.isFinite(completion) ? completion : 0)));
+  }
+  return Math.max(0, Math.round(fallback));
+}
 
 // Interfaces
 interface FilterState {
@@ -1456,7 +1568,7 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
       return res.status(400).json({ error: 'Empty or invalid request body' });
     }
     
-    const { messages, filters = {}, stream: useStream = false } = req.body;
+    const { messages, filters = {}, stream: useStream = false, conversationSummary = '' } = req.body;
     
     console.log('[GPT Proxy] Received request', useStream ? '(streaming)' : '');
     console.log('[GPT Proxy] Raw filters from client:', JSON.stringify(filters, null, 2));
@@ -1535,7 +1647,12 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
       }))
       // Клиент присылает свой system prompt; оставляем только один серверный system.
       .filter((msg: any) => msg.role !== 'system')
-      .filter((msg: any) => typeof msg.content === 'string' && msg.content.trim() !== '');
+      .filter((msg: any) => typeof msg.content === 'string' && msg.content.trim() !== '')
+      .slice(-8)
+      .map((msg: any) => ({
+        role: msg.role,
+        content: String(msg.content).slice(0, msg.role === 'assistant' ? 2200 : 1800),
+      }));
 
     if (durationFromLastUser && isDurationOnlyMessage(lastUserContent)) {
       conversationMessages.push({
@@ -1556,8 +1673,21 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
         role: 'system',
         content: `${systemPromptForRequest}${durationInstruction}\n\n${contextBlock}`
       },
+      ...(typeof conversationSummary === 'string' && conversationSummary.trim()
+        ? [{ role: 'system', content: `Краткое резюме предыдущего диалога:\n${conversationSummary.trim().slice(0, 1400)}` }]
+        : []),
       ...conversationMessages
     ];
+    const aiUsageKey = getAiUsageKey(req);
+    const aiUsageBefore = getAiUsage(aiUsageKey);
+    if (aiUsageBefore.remainingTokens <= 0) {
+      return res.status(429).json({
+        error: 'ai_limit_exceeded',
+        message: 'Вы достигли дневного лимита. Попробуйте завтра.',
+        aiLimitExceeded: true,
+        aiUsage: aiUsageBefore,
+      });
+    }
 
     console.log('[GPT Proxy] Sending request to OpenRouter...');
 
@@ -1576,7 +1706,7 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
           model: 'openai/gpt-4o-mini',
           messages: fullMessages,
           temperature: 0.7,
-          max_tokens: 2000,
+          max_tokens: AI_MAX_COMPLETION_TOKENS,
           stream: true
         },
         {
@@ -1616,7 +1746,7 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
         model: 'openai/gpt-4o-mini',  // or any other model available on OpenRouter
         messages: fullMessages,
         temperature: 0.7,
-        max_tokens: 2000
+        max_tokens: AI_MAX_COMPLETION_TOKENS
       },
       {
         headers: {
@@ -1704,9 +1834,13 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
       }
     }
 
+    const fallbackTokens = estimateMessagesTokens(fullMessages) + estimateTokensFromText(assistantMessage);
+    const aiUsageAfter = addAiUsage(aiUsageKey, getOpenRouterTotalTokens(response.data, fallbackTokens));
+
     res.json({
       text: textToSend,
       hotels: hotels,
+      aiUsage: aiUsageAfter,
       ...(itineraryToSend && { itinerary: itineraryToSend })
     });
 

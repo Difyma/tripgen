@@ -112,6 +112,11 @@ const parsedEtgTimeout = Number(process.env.ETG_SEARCH_TIMEOUT_MS || 15000);
 const ETG_SEARCH_TIMEOUT_MS = Number.isFinite(parsedEtgTimeout)
   ? Math.min(Math.max(parsedEtgTimeout, 1000), 30000)
   : 15000;
+const parsedAiDailyTokenLimit = Number(process.env.AI_DAILY_TOKEN_LIMIT || 100000);
+const AI_DAILY_TOKEN_LIMIT = Number.isFinite(parsedAiDailyTokenLimit)
+  ? Math.max(1000, Math.round(parsedAiDailyTokenLimit))
+  : 100000;
+const AI_MAX_COMPLETION_TOKENS = 1500;
 const BUILD_VERSION = 'v1.8.3';
 
 const corsHeaders = {
@@ -144,8 +149,108 @@ type SearchTrace = {
 };
 
 const inMemoryTraces: SearchTrace[] = [];
+const inMemoryAiUsage = new Map<string, { day: string; tokensUsed: number; dailyTokenLimit: number }>();
 
 const ANON_DAILY_LIMIT = 5;
+
+type AiUsageSnapshot = {
+  dailyTokenLimit: number;
+  tokensUsed: number;
+  remainingTokens: number;
+  usedPercent: number;
+  remainingPercent: number;
+};
+
+function getUtcDayKey(date = new Date()): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function clampPercent(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function toAiUsageSnapshot(tokensUsed: number, dailyTokenLimit = AI_DAILY_TOKEN_LIMIT): AiUsageSnapshot {
+  const safeUsed = Math.max(0, Math.round(tokensUsed));
+  const remainingTokens = Math.max(0, dailyTokenLimit - safeUsed);
+  const usedPercent = clampPercent((safeUsed / dailyTokenLimit) * 100);
+  return {
+    dailyTokenLimit,
+    tokensUsed: safeUsed,
+    remainingTokens,
+    usedPercent,
+    remainingPercent: Math.max(0, 100 - usedPercent),
+  };
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function getAiUsageKey(req: VercelRequest): string {
+  const auth = req.headers['authorization'];
+  if (typeof auth === 'string' && auth.startsWith('Bearer ')) {
+    const token = auth.slice('Bearer '.length).trim();
+    const payload = decodeJwtPayload(token);
+    const subject = typeof payload?.sub === 'string' ? payload.sub : '';
+    if (subject) return `user:${subject}`;
+  }
+  return `anon:${getClientIp(req)}`;
+}
+
+function getAiUsage(key: string): AiUsageSnapshot {
+  const today = getUtcDayKey();
+  const current = inMemoryAiUsage.get(key);
+  if (!current || current.day !== today) {
+    const fresh = { day: today, tokensUsed: 0, dailyTokenLimit: AI_DAILY_TOKEN_LIMIT };
+    inMemoryAiUsage.set(key, fresh);
+    return toAiUsageSnapshot(0, fresh.dailyTokenLimit);
+  }
+  return toAiUsageSnapshot(current.tokensUsed, current.dailyTokenLimit);
+}
+
+function addAiUsage(key: string, tokens: number): AiUsageSnapshot {
+  const today = getUtcDayKey();
+  const current = inMemoryAiUsage.get(key);
+  const dailyTokenLimit = current?.dailyTokenLimit || AI_DAILY_TOKEN_LIMIT;
+  const baseUsed = current?.day === today ? current.tokensUsed : 0;
+  const next = {
+    day: today,
+    tokensUsed: Math.max(0, baseUsed + Math.max(0, Math.round(tokens))),
+    dailyTokenLimit,
+  };
+  inMemoryAiUsage.set(key, next);
+  return toAiUsageSnapshot(next.tokensUsed, dailyTokenLimit);
+}
+
+function estimateTokensFromText(text: string): number {
+  const clean = String(text || '').trim();
+  if (!clean) return 0;
+  return Math.ceil(clean.length / 4);
+}
+
+function estimateMessagesTokens(messages: Array<{ role?: string; content?: string }>): number {
+  return messages.reduce((sum, msg) => sum + 4 + estimateTokensFromText(msg.role || '') + estimateTokensFromText(msg.content || ''), 0);
+}
+
+function getOpenRouterTotalTokens(response: OpenRouterCompletionResponse, fallback: number): number {
+  const usage = response.usage;
+  const total = Number(usage?.total_tokens);
+  if (Number.isFinite(total) && total > 0) return Math.round(total);
+  const prompt = Number(usage?.prompt_tokens);
+  const completion = Number(usage?.completion_tokens);
+  if (Number.isFinite(prompt) || Number.isFinite(completion)) {
+    return Math.max(0, Math.round((Number.isFinite(prompt) ? prompt : 0) + (Number.isFinite(completion) ? completion : 0)));
+  }
+  return Math.max(0, Math.round(fallback));
+}
 
 function getClientIp(req: VercelRequest): string {
   const fwd = req.headers['x-forwarded-for'];
@@ -643,6 +748,11 @@ interface OpenRouterChoice {
 }
 interface OpenRouterCompletionResponse {
   choices?: OpenRouterChoice[];
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
 }
 
 interface HotelForApi {
@@ -943,10 +1053,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const body = req.body as {
       messages?: { role: string; text: string }[];
+      conversationSummary?: string;
       filters?: Record<string, unknown>;
       stream?: boolean;
     };
     const messages = body?.messages ?? [];
+    const conversationSummary = typeof body?.conversationSummary === 'string' ? body.conversationSummary.trim() : '';
     const filters = body?.filters as {
       destination?: string;
       dates?: { start?: string; end?: string };
@@ -1238,7 +1350,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         content: msg.text || '',
       }))
       .filter((msg) => msg.role !== 'system')
-      .filter((msg) => typeof msg.content === 'string' && msg.content.trim() !== '');
+      .filter((msg) => typeof msg.content === 'string' && msg.content.trim() !== '')
+      .slice(-8)
+      .map((msg) => ({
+        role: msg.role,
+        content: String(msg.content).slice(0, msg.role === 'assistant' ? 2200 : 1800),
+      }));
 
     if (durationFromMessage && isDurationOnlyMessage(String(lastUserText?.text || ''))) {
       conversationMessages.push({
@@ -1255,6 +1372,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? `\n\nКРИТИЧНО: В поле itinerary верни РОВНО ${effectiveDurationDays} дней (day: 1..${effectiveDurationDays}), без пропусков и пустых дней.`
         : '';
     const systemContent = `${systemPromptForRequest}${durationInstruction}\n\n${contextBlock}`;
+    const summaryMessages = conversationSummary
+      ? [{ role: 'system', content: `Краткое резюме предыдущего диалога:\n${conversationSummary.slice(0, 1400)}` }]
+      : [];
+    const openRouterMessages = [
+      { role: 'system', content: systemContent },
+      ...summaryMessages,
+      ...conversationMessages,
+    ];
+    const aiUsageKey = getAiUsageKey(req);
+    const aiUsageBefore = getAiUsage(aiUsageKey);
+    if (aiUsageBefore.remainingTokens <= 0) {
+      Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+      return res.status(429).json({
+        error: 'ai_limit_exceeded',
+        message: 'Вы достигли дневного лимита. Попробуйте завтра.',
+        aiLimitExceeded: true,
+        aiUsage: aiUsageBefore,
+      });
+    }
 
     if (useStream) {
       const streamHeaders = {
@@ -1270,12 +1406,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'https://openrouter.ai/api/v1/chat/completions',
           {
             model: 'openai/gpt-4o-mini',
-            messages: [
-              { role: 'system', content: systemContent },
-              ...conversationMessages,
-            ],
+            messages: openRouterMessages,
             temperature: 0.7,
-            max_tokens: 2000,
+            max_tokens: AI_MAX_COMPLETION_TOKENS,
             stream: true,
           },
           {
@@ -1316,12 +1449,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'https://openrouter.ai/api/v1/chat/completions',
       {
         model: 'openai/gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemContent },
-          ...conversationMessages,
-        ],
+        messages: openRouterMessages,
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: AI_MAX_COMPLETION_TOKENS,
       },
       {
         headers: {
@@ -1354,11 +1484,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // GPT вернул не JSON — используем как есть
     }
 
+    const fallbackTokens =
+      estimateMessagesTokens(openRouterMessages) + estimateTokensFromText(assistantMessage);
+    const aiUsageAfter = addAiUsage(aiUsageKey, getOpenRouterTotalTokens(response.data, fallbackTokens));
+
     Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
     return res.status(200).json({
       text: textToSend,
       hotels,
       itinerary: itineraryFromGpt,
+      aiUsage: aiUsageAfter,
       buildVersion: BUILD_VERSION,
     });
   } catch (error: unknown) {

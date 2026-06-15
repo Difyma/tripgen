@@ -78,6 +78,14 @@ interface Message {
   itinerary?: import('../types/tripPlan').TripPlanDay[];
 }
 
+interface AiUsage {
+  dailyTokenLimit: number;
+  tokensUsed: number;
+  remainingTokens: number;
+  usedPercent: number;
+  remainingPercent: number;
+}
+
 type StoredAssistantMeta = {
   hotels?: AssistantHotel[];
   itinerary?: import('../types/tripPlan').TripPlanDay[];
@@ -138,6 +146,47 @@ const CERT_MODE = import.meta.env.VITE_CERT_MODE || 'real';
 const FORCE_TEST_HOTELS = CERT_MODE === 'test_hotels';
 const WELCOME_MESSAGE_TEXT =
   "Привет! 👋 Я помогу спланировать твое идеальное путешествие. Выбери интересующий вопрос или спроси меня о чем угодно, что связано с поездкой.";
+const MODEL_CONTEXT_RECENT_MESSAGES = 8;
+
+function truncateForModel(text: string, maxChars: number): string {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (clean.length <= maxChars) return clean;
+  return `${clean.slice(0, maxChars - 1).trim()}…`;
+}
+
+function buildConversationSummaryForModel(history: Message[]): string {
+  const meaningful = history
+    .filter((msg) => msg.text?.trim() && msg.text !== WELCOME_MESSAGE_TEXT)
+    .filter((msg) => msg.role !== 'system');
+  const older = meaningful.slice(0, Math.max(0, meaningful.length - MODEL_CONTEXT_RECENT_MESSAGES));
+  if (older.length === 0) return '';
+
+  const firstUser = older.find((msg) => msg.isUser || msg.role === 'user')?.text;
+  const lastAssistant = [...older].reverse().find((msg) => !msg.isUser && msg.role === 'assistant')?.text;
+  const userFacts = older
+    .filter((msg) => msg.isUser || msg.role === 'user')
+    .slice(-3)
+    .map((msg) => truncateForModel(msg.text, 220));
+
+  const parts = [
+    firstUser ? `Первый запрос: ${truncateForModel(firstUser, 240)}` : '',
+    userFacts.length ? `Последние уточнения пользователя: ${userFacts.join(' / ')}` : '',
+    lastAssistant ? `Предыдущая рекомендация: ${truncateForModel(lastAssistant, 360)}` : '',
+  ].filter(Boolean);
+
+  return parts.join('\n');
+}
+
+function compactMessagesForModel(history: Message[]) {
+  return history
+    .filter((msg) => msg.text?.trim() && msg.text !== WELCOME_MESSAGE_TEXT)
+    .filter((msg) => msg.role !== 'system')
+    .slice(-MODEL_CONTEXT_RECENT_MESSAGES)
+    .map((msg) => ({
+      role: msg.role || (msg.isUser ? 'user' : 'assistant'),
+      text: truncateForModel(msg.text, msg.isUser ? 1800 : 2200)
+    }));
+}
 const AI_PROGRESS_STEPS = [
   'Анализирую запрос',
   'Собираю данные по направлению',
@@ -721,6 +770,7 @@ const Chat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
   const [aiProgressStep, setAiProgressStep] = useState(0);
+  const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
   const [currentMessage, setCurrentMessage] = useState<string>('');
   const [currentItinerary, setCurrentItinerary] = useState<import('../types/tripPlan').TripPlanDay[] | null>(null);
   const [showTripBuilder, setShowTripBuilder] = useState(false);
@@ -1226,16 +1276,17 @@ const Chat = () => {
         }
       }
 
-      // Формируем сообщения для GPT с контекстом о рейсах
+      const conversationSummary = buildConversationSummaryForModel(messages);
+      const compactHistory = compactMessagesForModel(messages);
+
+      // Формируем компактные сообщения для GPT с контекстом о рейсах.
+      // Полную историю храним в БД/UI, но модели отправляем summary + последние сообщения.
       const messagesToSend = [
         {
           role: 'system',
           text: SYSTEM_PROMPT
         },
-        ...messages.map(msg => ({
-          role: msg.role || (msg.isUser ? 'user' : 'assistant'),
-          text: msg.text
-        })),
+        ...compactHistory,
         {
           role: 'user',
           text: messageText + (flightData || '')
@@ -1275,6 +1326,7 @@ const Chat = () => {
         headers: requestHeaders,
         body: JSON.stringify({
           messages: messagesToSend,
+          conversationSummary,
           // Не показываем частичный текст — только готовый финальный ответ.
           stream: false,
           filters: {
@@ -1311,6 +1363,10 @@ const Chat = () => {
           }
         } catch {
           // ignore JSON parse errors
+        }
+
+        if (errData?.aiUsage) {
+          setAiUsage(errData.aiUsage as AiUsage);
         }
 
         const errorMessage =
@@ -1394,11 +1450,14 @@ const Chat = () => {
         return;
       }
 
-      let data: { text?: string; response?: string; hotels?: AssistantHotel[]; itinerary?: import('../types/tripPlan').TripPlanDay[]; error?: string; message?: string };
+      let data: { text?: string; response?: string; hotels?: AssistantHotel[]; itinerary?: import('../types/tripPlan').TripPlanDay[]; aiUsage?: AiUsage; error?: string; message?: string };
       try {
         const responseText = await response.text();
         if (!responseText?.trim()) throw new Error('Empty response from server');
         data = JSON.parse(responseText);
+        if (data.aiUsage) {
+          setAiUsage(data.aiUsage);
+        }
       } catch (parseError) {
         console.error('Error parsing response:', parseError);
         throw new Error('Invalid response format from server');
@@ -1442,7 +1501,9 @@ const Chat = () => {
         id: Date.now() + Math.random(),
         text: error instanceof Error
           ? (
-              error.message.includes('Лимит запросов') || error.message.includes('rate_limit') || error.message.includes('бесплатных запросов')
+              error.message.includes('дневного лимита') || error.message.includes('ai_limit')
+                ? error.message
+                : error.message.includes('Лимит запросов') || error.message.includes('rate_limit') || error.message.includes('бесплатных запросов')
                 ? `${error.message}\n\nЗарегистрируйтесь — это бесплатно и даёт неограниченный доступ к чату.`
                 : error.message.includes('Failed to fetch')
                 ? 'Не удалось подключиться к серверу чата. Проверьте, что backend запущен (порт 3001), и попробуйте снова.'
@@ -3343,6 +3404,12 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
   }, [location.search]);
 
   const currentChatTitle = currentChatId ? (userChats.find(c => c.id === currentChatId)?.title ?? 'Чат') : null;
+  const aiUsageWarning =
+    aiUsage && aiUsage.usedPercent >= 95
+      ? 'Почти исчерпан дневной AI-лимит'
+      : aiUsage && aiUsage.usedPercent >= 80
+      ? 'AI-лимит на сегодня близок к концу'
+      : null;
 
   return (
     <div className={`h-full flex flex-col bg-white transition-all duration-300 w-full ${isSidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[280px]'}`}>
@@ -3416,6 +3483,30 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                   </button>
                 </div>
               </div>
+              {aiUsage && (
+                <div className="mt-3 flex flex-col gap-1 text-xs text-gray-500 md:max-w-sm md:ml-auto">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Осталось {aiUsage.remainingPercent}% дневного AI-лимита</span>
+                    {aiUsageWarning && (
+                      <span className={aiUsage.usedPercent >= 95 ? 'text-red-600' : 'text-amber-600'}>
+                        {aiUsageWarning}
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        aiUsage.usedPercent >= 95
+                          ? 'bg-red-500'
+                          : aiUsage.usedPercent >= 80
+                          ? 'bg-amber-500'
+                          : 'bg-black'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(0, aiUsage.usedPercent))}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
