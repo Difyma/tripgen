@@ -1628,7 +1628,7 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
     if (aiUsageBefore.remainingTokens <= 0) {
       return res.status(429).json({
         error: 'ai_limit_exceeded',
-        message: 'Вы достигли дневного лимита. Попробуйте завтра.',
+        message: `Вы достигли лимита AI. Следующий сброс — ${aiUsageBefore.resetAtLabel}.`,
         aiLimitExceeded: true,
         aiUsage: aiUsageBefore,
       });
@@ -1667,12 +1667,42 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
       );
 
       const stream = response.data as NodeJS.ReadableStream;
+      let upstreamBuffer = '';
+      let streamedAssistantMessage = '';
+      const collectStreamText = (rawChunk: string) => {
+        upstreamBuffer += rawChunk;
+        let lineEnd = upstreamBuffer.indexOf('\n');
+        while (lineEnd !== -1) {
+          const line = upstreamBuffer.slice(0, lineEnd).trim();
+          upstreamBuffer = upstreamBuffer.slice(lineEnd + 1);
+          lineEnd = upstreamBuffer.indexOf('\n');
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (!data || data === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed?.choices?.[0]?.delta?.content;
+            if (typeof content === 'string') streamedAssistantMessage += content;
+          } catch {
+            // Ignore non-JSON stream comments/chunks from upstream.
+          }
+        }
+      };
       stream.on('data', (chunk: Buffer | string) => {
         if (res.writableEnded) return;
+        collectStreamText(Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk));
         res.write(chunk);
         if (typeof (res as any).flush === 'function') (res as any).flush();
       });
-      stream.on('end', () => {
+      stream.on('end', async () => {
+        if (res.writableEnded) return;
+        try {
+          const fallbackTokens = estimateMessagesTokens(fullMessages) + estimateTokensFromText(streamedAssistantMessage);
+          const aiUsageAfter = await addAiUsageTokens(aiUsageKey, fallbackTokens, AI_DAILY_TOKEN_LIMIT);
+          res.write(`data: ${JSON.stringify({ type: 'aiUsage', aiUsage: aiUsageAfter })}\n\n`);
+        } catch (err) {
+          console.error('[GPT Proxy] Failed to persist stream AI usage:', err instanceof Error ? err.message : err);
+        }
         if (!res.writableEnded) res.end();
       });
       stream.on('error', (err: Error) => {

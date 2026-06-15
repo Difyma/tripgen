@@ -13,7 +13,7 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const { user } = useAuth();
-  const { isSidebarCollapsed, setIsSidebarCollapsed, mobileOpen, setMobileOpen } = useSidebar();
+  const { isSidebarCollapsed, setIsSidebarCollapsed, mobileOpen, setMobileOpen, aiUsage } = useSidebar();
   const navigate = useNavigate();
   const [showChatList, setShowChatList] = useState(true);
   const [activeChatTab, setActiveChatTab] = useState<'regular' | 'tours'>('regular');
@@ -90,6 +90,9 @@ export function Sidebar({ className }: SidebarProps) {
   };
 
   const hasTourChats = userChats.some(isTourChat);
+  const resetTime = aiUsage?.resetAt
+    ? new Date(aiUsage.resetAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    : aiUsage?.resetAtLabel;
 
   return (
     <div>
@@ -332,6 +335,22 @@ export function Sidebar({ className }: SidebarProps) {
         {/* Footer */}
         <div className="p-2 border-t border-gray-200">
           <div className="space-y-2">
+            {aiUsage && !isSidebarCollapsed && (
+              <div className="rounded-2xl bg-neutral-950 px-4 py-3 text-white shadow-sm">
+                <div className="text-lg font-semibold leading-tight">
+                  Осталось {aiUsage.remainingPercent}% использования
+                </div>
+                <div className="mt-2 text-sm leading-5 text-neutral-400">
+                  Сброс каждые {aiUsage.resetIntervalHours ?? 5} часов
+                </div>
+                {resetTime && (
+                  <div className="text-sm leading-5 text-neutral-400">
+                    Следующий сброс — {resetTime}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* User Profile / Auth Button */}
             {user ? (
               <Link

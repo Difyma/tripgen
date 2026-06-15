@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { AuthModal } from './AuthModal';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useSidebar } from '../contexts/SidebarContext';
+import { type AiUsage, useSidebar } from '../contexts/SidebarContext';
 const AILogo = '/images/TRIPGEN_logo_white.png';
 const AILogo2 = '/images/TRIPGEN_logo_2.png';
 import TripBuilder from './TripBuilder';
@@ -76,14 +76,6 @@ interface Message {
   hotels?: AssistantHotel[];
   /** Структурированный маршрут по дням из JSON-ответа AI (для TripBuilder) */
   itinerary?: import('../types/tripPlan').TripPlanDay[];
-}
-
-interface AiUsage {
-  dailyTokenLimit: number;
-  tokensUsed: number;
-  remainingTokens: number;
-  usedPercent: number;
-  remainingPercent: number;
 }
 
 type StoredAssistantMeta = {
@@ -724,7 +716,7 @@ function ChatFilters({
 }
 
 const Chat = () => {
-  const { isSidebarCollapsed, setMobileOpen, mobileOpen } = useSidebar();
+  const { isSidebarCollapsed, setMobileOpen, mobileOpen, setAiUsage } = useSidebar();
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -770,7 +762,6 @@ const Chat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null);
   const [aiProgressStep, setAiProgressStep] = useState(0);
-  const [aiUsage, setAiUsage] = useState<AiUsage | null>(null);
   const [currentMessage, setCurrentMessage] = useState<string>('');
   const [currentItinerary, setCurrentItinerary] = useState<import('../types/tripPlan').TripPlanDay[] | null>(null);
   const [showTripBuilder, setShowTripBuilder] = useState(false);
@@ -1414,6 +1405,10 @@ const Chat = () => {
                     hotelsFromStream = parsed.hotels as AssistantHotel[];
                     continue;
                   }
+                  if (parsed.type === 'aiUsage' && parsed.aiUsage) {
+                    setAiUsage(parsed.aiUsage as AiUsage);
+                    continue;
+                  }
                   if (parsed.error) {
                     throw new Error(parsed.error.message || parsed.error);
                   }
@@ -1501,7 +1496,7 @@ const Chat = () => {
         id: Date.now() + Math.random(),
         text: error instanceof Error
           ? (
-              error.message.includes('дневного лимита') || error.message.includes('ai_limit')
+              error.message.includes('лимита AI') || error.message.includes('дневного лимита') || error.message.includes('ai_limit')
                 ? error.message
                 : error.message.includes('Лимит запросов') || error.message.includes('rate_limit') || error.message.includes('бесплатных запросов')
                 ? `${error.message}\n\nЗарегистрируйтесь — это бесплатно и даёт неограниченный доступ к чату.`
@@ -3404,12 +3399,6 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
   }, [location.search]);
 
   const currentChatTitle = currentChatId ? (userChats.find(c => c.id === currentChatId)?.title ?? 'Чат') : null;
-  const aiUsageWarning =
-    aiUsage && aiUsage.usedPercent >= 95
-      ? 'Почти исчерпан дневной AI-лимит'
-      : aiUsage && aiUsage.usedPercent >= 80
-      ? 'AI-лимит на сегодня близок к концу'
-      : null;
 
   return (
     <div className={`h-full flex flex-col bg-white transition-all duration-300 w-full ${isSidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[280px]'}`}>
@@ -3483,30 +3472,6 @@ ${places.restaurants[2] || '🍽️ Ресторан(restaurant) — Проща�
                   </button>
                 </div>
               </div>
-              {aiUsage && (
-                <div className="mt-3 flex flex-col gap-1 text-xs text-gray-500 md:max-w-sm md:ml-auto">
-                  <div className="flex items-center justify-between gap-3">
-                    <span>Осталось {aiUsage.remainingPercent}% дневного AI-лимита</span>
-                    {aiUsageWarning && (
-                      <span className={aiUsage.usedPercent >= 95 ? 'text-red-600' : 'text-amber-600'}>
-                        {aiUsageWarning}
-                      </span>
-                    )}
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        aiUsage.usedPercent >= 95
-                          ? 'bg-red-500'
-                          : aiUsage.usedPercent >= 80
-                          ? 'bg-amber-500'
-                          : 'bg-black'
-                      }`}
-                      style={{ width: `${Math.min(100, Math.max(0, aiUsage.usedPercent))}%` }}
-                    />
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
