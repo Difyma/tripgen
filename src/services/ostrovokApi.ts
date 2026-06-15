@@ -1,8 +1,6 @@
-import axios from 'axios';
 import { buildHotelPageLink, type RoomGuests } from '@/lib/ostrovok';
 
-const API_BASE_URL = 'https://api.ostrovok.ru/v2';
-const API_TOKEN = import.meta.env.VITE_OSTROVOK_API_TOKEN;
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const PARTNER_SLUG = import.meta.env.VITE_OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
 
 interface HotelInfo {
@@ -19,43 +17,16 @@ interface HotelInfo {
 
 interface HotelSearchParams {
   location: string;
-  checkIn: string; // YYYY-MM-DD
-  checkOut: string; // YYYY-MM-DD
+  checkIn: string;
+  checkOut: string;
   guests: number;
   children?: number[];
   currency?: string;
   lang?: string;
 }
 
-interface OstrovokResponse {
-  hotels: Array<{
-    id: string;
-    hid?: number;
-    slug?: string;
-    name: string;
-    stars: number;
-    address: string;
-    min_price: number;
-    currency: string;
-    thumbnail: string;
-    rating: number;
-  }>;
-}
-
 class OstrovokApi {
   private static instance: OstrovokApi;
-  private api;
-
-  private constructor() {
-    this.api = axios.create({
-      baseURL: API_BASE_URL,
-      headers: {
-        'Authorization': `Bearer ${API_TOKEN}`,
-        'Accept': 'application/json',
-        'X-Partner-ID': PARTNER_SLUG
-      },
-    });
-  }
 
   public static getInstance(): OstrovokApi {
     if (!OstrovokApi.instance) {
@@ -64,14 +35,12 @@ class OstrovokApi {
     return OstrovokApi.instance;
   }
 
-  // Формирование партнерской ссылки
   private generatePartnerUrl(hotelSlug: string, params: HotelSearchParams): string {
-    // Используем правильный LinkBuilder с partner_slug и UTM
     const rooms: RoomGuests[] = [{
       adults: params.guests,
-      childrenAges: params.children
+      childrenAges: params.children,
     }];
-    
+
     return buildHotelPageLink(hotelSlug, {
       partnerSlug: PARTNER_SLUG,
       checkIn: params.checkIn,
@@ -82,31 +51,51 @@ class OstrovokApi {
     });
   }
 
-  // Поиск отелей
   async searchHotels(params: HotelSearchParams): Promise<HotelInfo[]> {
     try {
-      const response = await this.api.post('/search', {
-        location: params.location,
-        check_in: params.checkIn,
-        check_out: params.checkOut,
-        guests: params.guests,
-        currency: 'RUB',
-        limit: 5
+      const response = await fetch(`${API_BASE_URL}/api/hotels/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: params.location,
+          checkIn: params.checkIn,
+          checkOut: params.checkOut,
+          guests: params.guests,
+        }),
       });
 
-      const data = response.data as OstrovokResponse;
-      return data.hotels.map(hotel => ({
+      if (!response.ok) {
+        throw new Error(`Hotel search failed: ${response.status}`);
+      }
+
+      const data = await response.json() as {
+        hotels?: Array<{
+          id: string;
+          hid?: number;
+          slug?: string;
+          name: string;
+          stars?: number;
+          address?: string;
+          price?: number;
+          min_price?: number;
+          currency?: string;
+          thumbnail?: string;
+          thumbnail_url?: string;
+          rating?: number;
+        }>;
+      };
+
+      return (data.hotels || []).map((hotel) => ({
         id: hotel.id,
         hid: hotel.hid,
         name: hotel.name,
-        stars: hotel.stars,
-        address: hotel.address,
-        price: hotel.min_price,
-        currency: hotel.currency,
-        thumbnail: hotel.thumbnail,
-        // Используем hotel.slug если доступен, иначе hotel.id (если это slug)
+        stars: hotel.stars || 0,
+        address: hotel.address || '',
+        price: hotel.price ?? hotel.min_price ?? 0,
+        currency: hotel.currency || 'RUB',
+        thumbnail: hotel.thumbnail || hotel.thumbnail_url || '',
         booking_url: this.generatePartnerUrl(hotel.slug || hotel.id, params),
-        rating: hotel.rating
+        rating: hotel.rating || 0,
       }));
     } catch (error) {
       console.error('Error searching hotels:', error);
@@ -117,26 +106,17 @@ class OstrovokApi {
 
 export const ostrovokApi = OstrovokApi.getInstance();
 
-// Форматирование информации об отелях для GPT
 export function formatHotelInfoForGPT(hotels: HotelInfo[]): string {
   if (!hotels.length) {
     return 'К сожалению, отелей по данному запросу не найдено.';
   }
 
-  const formatPrice = (price: number) => {
-    return price.toLocaleString('ru-RU');
-  };
-
-  const formatStars = (stars: number) => {
-    return '⭐'.repeat(stars);
-  };
-
   let response = '# 🏨 Рекомендуемые отели\n\n';
 
-  hotels.forEach(hotel => {
-    response += `### ${hotel.name} ${formatStars(hotel.stars)}\n`;
+  hotels.forEach((hotel) => {
+    response += `### ${hotel.name} ${'⭐'.repeat(hotel.stars)}\n`;
     response += `- 📍 **Адрес:** ${hotel.address}\n`;
-    response += `- 💰 **Цена от:** ${formatPrice(hotel.price)} ${hotel.currency}\n`;
+    response += `- 💰 **Цена от:** ${hotel.price.toLocaleString('ru-RU')} ${hotel.currency}\n`;
     if (hotel.rating) {
       response += `- ⭐ **Рейтинг:** ${hotel.rating.toFixed(1)}/10\n`;
     }

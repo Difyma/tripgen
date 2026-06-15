@@ -73,6 +73,7 @@ echo "📁 Поиск файлов..."
 FILES=$(find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o -name "*.json" -o -name "*.md" \) \
     -not -path "*/node_modules/*" \
     -not -path "*/.git/*" \
+    -not -path "*/.claude/*" \
     -not -path "*/dist/*" \
     -not -path "*/build/*" \
     -not -path "*/.vercel/*" 2>/dev/null)

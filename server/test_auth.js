@@ -1,57 +1,36 @@
+#!/usr/bin/env node
 const axios = require('axios');
 
-const API_KEY = '8be7ae21-6759-4c42-ae09-aa8c958d8c54';
-const API_URL = 'https://partner.ostrovok.ru';
+const KEY_ID = process.env.OSTROVOK_KEY_ID || process.env.OSTROVOK_API_KEY || '';
+const TOKEN = process.env.OSTROVOK_API_TOKEN || process.env.OSTROVOK_API_SECRET || '';
+const API_URL = process.env.OSTROVOK_API_URL || 'https://api.worldota.net';
 
-async function testAuth(method, headers) {
-  console.log(`\n=== Testing ${method} ===`);
-  try {
-    const response = await axios.post(
-      `${API_URL}/api/b2b/v3/search/serp/hotels/`,
-      {
-        hids: [1],  // test_hotel has hid=1
-        checkin: '2026-02-11',
-        checkout: '2026-02-12',
-        guests: [{ adults: 2, children: [] }],
-        language: 'ru',
-        currency: 'RUB',
-        residency: 'ru'
-      },
-      { headers, timeout: 10000 }
-    );
-    console.log('SUCCESS! Status:', response.status);
-    console.log('Hotels found:', response.data.hotels?.length || 0);
-    return true;
-  } catch (error) {
-    console.log('FAILED:', error.response?.status, error.response?.data?.error || error.message);
-    return false;
+if (!KEY_ID || !TOKEN) {
+  console.error('Set OSTROVOK_KEY_ID and OSTROVOK_API_TOKEN before running this script.');
+  process.exit(1);
+}
+
+axios.post(
+  `${API_URL}/api/b2b/v3/search/serp/hotels/`,
+  {
+    ids: ['test_hotel', 'test_hotel_do_not_book'],
+    checkin: process.env.TEST_CHECKIN || '2026-06-20',
+    checkout: process.env.TEST_CHECKOUT || '2026-06-21',
+    guests: [{ adults: 2, children: [] }],
+    language: 'ru',
+    currency: 'RUB',
+    residency: 'ru',
+  },
+  {
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${KEY_ID}:${TOKEN}`).toString('base64')}`,
+      'Content-Type': 'application/json',
+    },
+    timeout: 10000,
   }
-}
-
-async function main() {
-  // Test 1: Basic Auth с пустым паролем
-  await testAuth('Basic Auth (empty password)', {
-    'Authorization': `Basic ${Buffer.from(`${API_KEY}:`).toString('base64')}`,
-    'Content-Type': 'application/json'
-  });
-
-  // Test 2: Bearer token
-  await testAuth('Bearer token', {
-    'Authorization': `Bearer ${API_KEY}`,
-    'Content-Type': 'application/json'
-  });
-
-  // Test 3: X-API-Key header
-  await testAuth('X-API-Key header', {
-    'X-API-Key': API_KEY,
-    'Content-Type': 'application/json'
-  });
-
-  // Test 4: Просто API key как заголовок
-  await testAuth('Plain API key', {
-    'Authorization': API_KEY,
-    'Content-Type': 'application/json'
-  });
-}
-
-main();
+).then((response) => {
+  console.log('SUCCESS:', response.status, 'hotels:', response.data?.hotels?.length || 0);
+}).catch((error) => {
+  console.error('FAILED:', error.response?.status, error.response?.data || error.message);
+  process.exit(1);
+});

@@ -1,51 +1,45 @@
+#!/usr/bin/env node
+/**
+ * Auth smoke test. Requires env vars; never hardcode real credentials here.
+ */
+
 import axios from 'axios';
 
-const API_KEY = '8be7ae21-6759-4c42-ae09-aa8c958d8c54';
-const API_SECRET = '72f3fb15ba5b19b2e469acbe7d28f654654dace2';
-const API_URL = 'https://partner.ostrovok.ru';
+const KEY_ID = process.env.OSTROVOK_KEY_ID || process.env.OSTROVOK_API_KEY || '';
+const TOKEN = process.env.OSTROVOK_API_TOKEN || process.env.OSTROVOK_API_SECRET || '';
+const API_URL = process.env.OSTROVOK_API_URL || 'https://api.worldota.net';
 
-async function testAuth(method, headers) {
-  console.log(`\n=== Testing ${method} ===`);
-  try {
-    const response = await axios.post(
-      `${API_URL}/api/b2b/v3/search/serp/hotels/`,
-      {
-        hids: [1],  // test_hotel has hid=1
-        checkin: '2026-02-11',
-        checkout: '2026-02-12',
-        guests: [{ adults: 2, children: [] }],
-        language: 'ru',
-        currency: 'RUB',
-        residency: 'ru'
-      },
-      { headers, timeout: 10000 }
-    );
-    console.log('SUCCESS! Status:', response.status);
-    console.log('Hotels found:', response.data.hotels?.length || 0);
-    if (response.data.hotels?.[0]) {
-      console.log('First hotel:', response.data.hotels[0].name);
-    }
-    return true;
-  } catch (error) {
-    console.log('FAILED:', error.response?.status, error.response?.data?.error || error.message);
-    return false;
-  }
+if (!KEY_ID || !TOKEN) {
+  console.error('Set OSTROVOK_KEY_ID and OSTROVOK_API_TOKEN before running this script.');
+  process.exit(1);
 }
 
 async function main() {
-  // Test with API_SECRET
-  await testAuth('Basic Auth with API_SECRET', {
-    'Authorization': `Basic ${Buffer.from(`${API_KEY}:${API_SECRET}`).toString('base64')}`,
-    'Content-Type': 'application/json',
-    'User-Agent': 'Test/1.0'
-  });
-  
-  // Test on production endpoint
-  await testAuth('Production API (worldota.net)', {
-    'Authorization': `Basic ${Buffer.from(`${API_KEY}:${API_SECRET}`).toString('base64')}`,
-    'Content-Type': 'application/json',
-    'User-Agent': 'Test/1.0'
-  }, 'https://api.worldota.net');
+  const response = await axios.post(
+    `${API_URL}/api/b2b/v3/search/serp/hotels/`,
+    {
+      ids: ['test_hotel', 'test_hotel_do_not_book'],
+      checkin: process.env.TEST_CHECKIN || '2026-06-20',
+      checkout: process.env.TEST_CHECKOUT || '2026-06-21',
+      guests: [{ adults: 2, children: [] }],
+      language: 'ru',
+      currency: 'RUB',
+      residency: 'ru',
+    },
+    {
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${KEY_ID}:${TOKEN}`).toString('base64')}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Test/1.0',
+      },
+      timeout: 10000,
+    }
+  );
+
+  console.log('SUCCESS:', response.status, 'hotels:', response.data?.hotels?.length || 0);
 }
 
-main();
+main().catch((error) => {
+  console.error('FAILED:', error.response?.status, error.response?.data || error.message);
+  process.exit(1);
+});

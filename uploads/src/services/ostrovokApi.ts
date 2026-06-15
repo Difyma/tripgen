@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = 'https://api.ostrovok.ru/v2';
-const API_TOKEN = import.meta.env.VITE_OSTROVOK_API_TOKEN;
+const API_TOKEN = import.meta.env.OSTROVOK_API_TOKEN;
 const PARTNER_ID = import.meta.env.VITE_OSTROVOK_PARTNER_ID;
 
 interface HotelInfo {

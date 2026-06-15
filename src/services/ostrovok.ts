@@ -1,12 +1,12 @@
-import axios from 'axios';
 import { buildHotelPageLink } from '@/lib/ostrovok';
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const PARTNER_SLUG = import.meta.env.VITE_OSTROVOK_PARTNER_SLUG || '270392.affiliate.a0bd';
 
 interface HotelSearchParams {
   location: string;
-  checkIn: string; // YYYY-MM-DD
-  checkOut: string; // YYYY-MM-DD
+  checkIn: string;
+  checkOut: string;
   adults: number;
   children?: number[];
   currency?: string;
@@ -24,40 +24,43 @@ interface Hotel {
   stars?: number;
 }
 
-interface OstrovokResponse {
-  hotels: Array<{
-    id: string;
-    slug?: string;
-    name: string;
-    price: number;
-    currency: string;
-    rating?: number;
-    imageUrl?: string;
-    stars?: number;
-  }>;
-}
-
 export const searchHotels = async (params: HotelSearchParams): Promise<Hotel[]> => {
   try {
-    const response = await axios.get<OstrovokResponse>('https://api.ostrovok.com/v1/hotels/search', {
-      params: {
-        location: params.location,
+    const response = await fetch(`${API_BASE_URL}/api/hotels/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: params.location,
         checkIn: params.checkIn,
         checkOut: params.checkOut,
-        adults: params.adults,
-        children: params.children || 0,
-      },
-      headers: {
-        'Authorization': `Bearer ${process.env.REACT_APP_OSTROVOK_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+        guests: params.adults,
+      }),
     });
 
-    return response.data.hotels.map((hotel) => ({
+    if (!response.ok) {
+      throw new Error(`Hotel search failed: ${response.status}`);
+    }
+
+    const data = await response.json() as {
+      hotels?: Array<{
+        id: string;
+        slug?: string;
+        name: string;
+        price?: number;
+        min_price?: number;
+        currency?: string;
+        rating?: number;
+        imageUrl?: string;
+        thumbnail?: string;
+        stars?: number;
+      }>;
+    };
+
+    return (data.hotels || []).map((hotel) => ({
       id: hotel.id,
       name: hotel.name,
-      price: hotel.price,
-      currency: hotel.currency,
+      price: hotel.price ?? hotel.min_price ?? 0,
+      currency: hotel.currency || 'RUB',
       url: buildHotelPageLink(hotel.slug || hotel.id, {
         partnerSlug: PARTNER_SLUG,
         checkIn: params.checkIn,
@@ -67,11 +70,11 @@ export const searchHotels = async (params: HotelSearchParams): Promise<Hotel[]> 
         lang: params.lang,
       }),
       rating: hotel.rating,
-      imageUrl: hotel.imageUrl,
+      imageUrl: hotel.imageUrl || hotel.thumbnail,
       stars: hotel.stars,
     }));
   } catch (error) {
     console.error('Error searching hotels:', error);
     return [];
   }
-}; 
+};

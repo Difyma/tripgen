@@ -15,8 +15,8 @@ const port = process.env.PORT || 3000;
 
 // API Configuration
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OSTROVOK_API_URL = process.env.VITE_OSTROVOK_API_URL || 'https://api.ostrovok.com/v1';
-const OSTROVOK_API_KEY = process.env.VITE_OSTROVOK_API_TOKEN;
+const OSTROVOK_API_URL = process.env.OSTROVOK_API_URL || 'https://api.ostrovok.com/v1';
+const OSTROVOK_API_KEY = process.env.OSTROVOK_API_TOKEN;
 
 // Validate required environment variables
 if (!OPENAI_API_KEY) {

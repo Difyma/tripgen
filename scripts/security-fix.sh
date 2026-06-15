@@ -54,10 +54,10 @@ echo "🛠️  Шаг 3: Удаление жестко закодированн�
 GPTPROXY_FILE="server/src/gptProxy.ts"
 if [ -f "$GPTPROXY_FILE" ]; then
     # Проверяем, есть ли жестко закодированный ключ
-    if grep -q "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" "$GPTPROXY_FILE"; then
+    if grep -q "<redacted-openrouter-key>" "$GPTPROXY_FILE"; then
         echo "  ⚠️  Найден жестко закодированный ключ в $GPTPROXY_FILE"
         # Заменяем
-        sed -i.bak "s/const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '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';/const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;\nif (!OPENROUTER_API_KEY) {\n  throw new Error('OPENROUTER_API_KEY is required');\n}/g" "$GPTPROXY_FILE"
+        sed -i.bak "s/const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '<redacted-openrouter-key>';/const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;\nif (!OPENROUTER_API_KEY) {\n  throw new Error('OPENROUTER_API_KEY is required');\n}/g" "$GPTPROXY_FILE"
         echo "  ✅ Ключ удалён, добавлена проверка"
     else
         echo "  ℹ️  Жестко закодированный ключ не найден"

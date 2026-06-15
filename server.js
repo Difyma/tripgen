@@ -17,8 +17,8 @@ const port = process.env.PORT || 3000;
 const YANDEX_GPT_API_URL = process.env.VITE_YANDEX_GPT_API_URL || 'https://llm.api.cloud.yandex.net/foundationModels/v1/completion';
 const YANDEX_API_KEY = process.env.YANDEX_API_KEY;
 const YANDEX_FOLDER_ID = process.env.YANDEX_FOLDER_ID;
-const OSTROVOK_API_URL = process.env.VITE_OSTROVOK_API_URL || 'https://api.ostrovok.com/v1';
-const OSTROVOK_API_KEY = process.env.VITE_OSTROVOK_API_TOKEN;
+const OSTROVOK_API_URL = process.env.OSTROVOK_API_URL || 'https://api.ostrovok.com/v1';
+const OSTROVOK_API_KEY = process.env.OSTROVOK_API_TOKEN;
 
 // Validate required environment variables
 if (!YANDEX_API_KEY) {

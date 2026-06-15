@@ -39,7 +39,7 @@ export const searchHotels = async (params: HotelSearchParams): Promise<Hotel[]> 
         children: params.children || 0,
       },
       headers: {
-        'Authorization': `Bearer ${process.env.REACT_APP_OSTROVOK_API_KEY}`,
+        'Authorization': `Bearer ${process.env.OSTROVOK_API_KEY}`,
         'Content-Type': 'application/json',
       },
     });
