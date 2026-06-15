@@ -89,6 +89,7 @@ interface FilterState {
   travelers?: number;
   children?: number;
   childrenAges?: number[];
+  certificationHotelIds?: string[];
 }
 
 interface Hotel {
@@ -290,6 +291,33 @@ function parseDurationDays(text: string): number | null {
 function isDurationOnlyMessage(text: string): boolean {
   if (!text) return false;
   return /^\s*\d{1,2}\s*(?:дн(?:я|ей)?|дня|дней|д\.?|day|days)\s*$/i.test(text);
+}
+
+const CERT_TEST_HOTEL_IDS = ['test_hotel', 'test_hotel_do_not_book'] as const;
+
+function resolveCertificationHotelIds(input: string): string[] | null {
+  const text = String(input || '').toLowerCase();
+  if (!text) return null;
+
+  const ids = new Set<string>();
+  const hasGenericTestIntent =
+    /test[_\s-]?hotel/.test(text) ||
+    /тестов\w*\s+отел/.test(text) ||
+    /сертификац\w*\s+отел/.test(text) ||
+    /do\s*not\s*book/.test(text);
+
+  if (hasGenericTestIntent) {
+    ids.add('test_hotel');
+    ids.add('test_hotel_do_not_book');
+  }
+  if (/test[_\s-]?hotel[_\s-]?do[_\s-]?not[_\s-]?book/.test(text) || /do\s*not\s*book/.test(text)) {
+    ids.add('test_hotel_do_not_book');
+  }
+  if (/(?:hid|хид|hotel\s*id|id)\s*[:#№-]?\s*1\b/.test(text)) ids.add('test_hotel');
+  if (/(?:hid|хид|hotel\s*id|id)\s*[:#№-]?\s*2\b/.test(text)) ids.add('test_hotel_do_not_book');
+
+  if (ids.size === 0) return null;
+  return CERT_TEST_HOTEL_IDS.filter((id) => ids.has(id));
 }
 
 function parseIsoDate(value?: string): Date | null {
@@ -895,6 +923,10 @@ async function searchOstrovokHotels(filters: FilterState): Promise<Hotel[]> {
   const guests = filters.travelers || 2;
   const traceId = createTraceId();
   const normalized = normalizeDestination(filters.destination || 'Москва');
+  const certificationHotelIds =
+    filters.certificationHotelIds?.length
+      ? filters.certificationHotelIds
+      : resolveCertificationHotelIds(filters.destination || '');
   logSearchStep('info', traceId, 'search_start', {
     destination: filters.destination,
     normalizedDestination: normalized.regionHint,
@@ -902,6 +934,11 @@ async function searchOstrovokHotels(filters: FilterState): Promise<Hotel[]> {
     checkOut,
     guests,
   });
+  if (certificationHotelIds) {
+    logSearchStep('info', traceId, 'certification_test_hotel_requested', {
+      ids: certificationHotelIds,
+    });
+  }
   upsertTrace({ traceId, rawUserQuery: filters.destination, normalizedDestination: normalized.regionHint });
 
   try {
@@ -922,7 +959,38 @@ async function searchOstrovokHotels(filters: FilterState): Promise<Hotel[]> {
     let apiHotels: any[] = [];
     const stepErrors: string[] = [];
 
-    try {
+    if (certificationHotelIds) {
+      try {
+        apiHotels = await searchSerpHotels(certificationHotelIds, {
+          checkIn,
+          checkOut,
+          adults: guests,
+          childrenAges,
+        });
+        if (apiHotels.length === 0) {
+          logSearchStep('warn', traceId, 'certification_test_hotel_empty', { ids: certificationHotelIds });
+        }
+        upsertTrace({
+          traceId,
+          requestPayload: {
+            endpoint: '/api/b2b/v3/search/serp/hotels/',
+            ids: certificationHotelIds,
+            checkin: checkIn,
+            checkout: checkOut,
+            guests: [{ adults: guests, children: childrenAges }],
+          },
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'serp_hotels_failed';
+        stepErrors.push(`certification_hotels:${msg}`);
+        logSearchStep('warn', traceId, 'certification_test_hotel_failed', {
+          ids: certificationHotelIds,
+          error: msg,
+        });
+      }
+    }
+
+    if (apiHotels.length === 0) try {
       apiHotels = await searchSerpRegion(normalized.regionHint || 'Москва', {
         checkIn,
         checkOut,
@@ -1411,6 +1479,9 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
       .find((m: any) => (m?.role || 'user') === 'user' && typeof (m?.text || m?.content) === 'string');
     const lastUserContent = String(lastUserText?.text || lastUserText?.content || '').trim();
     const durationFromLastUser = parseDurationDays(lastUserContent);
+    const certificationHotelIds = resolveCertificationHotelIds(
+      `${lastUserContent}\n${filters?.destination || ''}\n${filters?.location || ''}`
+    );
     const durationFromFilters = Number(filters?.durationDays);
     const requestedDurationDays = Number.isFinite(durationFromFilters) && durationFromFilters > 0
       ? Math.max(1, Math.min(30, Math.round(durationFromFilters)))
@@ -1428,7 +1499,7 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
     }
 
     const defaultFilters: FilterState = {
-      destination: filters?.destination || 'Москва',
+      destination: certificationHotelIds ? 'test_hotel' : (filters?.destination || filters?.location || 'Москва'),
       dates: {
         start: formatIsoDate(parsedStart),
         end: formatIsoDate(parsedEnd)
@@ -1441,7 +1512,8 @@ router.post('/openai', checkEnvVariables, asyncHandler(async (req: Request, res:
       preferences: filters?.preferences || [],
       travelers: filters?.travelers || 2,
       children: filters?.children || 0,
-      childrenAges: Array.isArray(filters?.childrenAges) ? filters.childrenAges : []
+      childrenAges: Array.isArray(filters?.childrenAges) ? filters.childrenAges : [],
+      certificationHotelIds: certificationHotelIds || undefined
     };
 
     console.log('[GPT Proxy] Merged filters:', JSON.stringify(defaultFilters, null, 2));

@@ -112,7 +112,7 @@ const parsedEtgTimeout = Number(process.env.ETG_SEARCH_TIMEOUT_MS || 15000);
 const ETG_SEARCH_TIMEOUT_MS = Number.isFinite(parsedEtgTimeout)
   ? Math.min(Math.max(parsedEtgTimeout, 1000), 30000)
   : 15000;
-const BUILD_VERSION = 'v1.8.2';
+const BUILD_VERSION = 'v1.8.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -300,6 +300,31 @@ function parseDurationDays(text: string): number | null {
 function isDurationOnlyMessage(text: string): boolean {
   if (!text) return false;
   return /^\s*\d{1,2}\s*(?:дн(?:я|ей)?|дня|дней|д\.?|day|days)\s*$/i.test(text);
+}
+
+function resolveCertificationHotelIds(input: string): readonly string[] | null {
+  const text = String(input || '').toLowerCase();
+  if (!text) return null;
+
+  const ids = new Set<string>();
+  const hasGenericTestIntent =
+    /test[_\s-]?hotel/.test(text) ||
+    /тестов\w*\s+отел/.test(text) ||
+    /сертификац\w*\s+отел/.test(text) ||
+    /do\s*not\s*book/.test(text);
+
+  if (hasGenericTestIntent) {
+    ids.add('test_hotel');
+    ids.add('test_hotel_do_not_book');
+  }
+  if (/test[_\s-]?hotel[_\s-]?do[_\s-]?not[_\s-]?book/.test(text) || /do\s*not\s*book/.test(text)) {
+    ids.add('test_hotel_do_not_book');
+  }
+  if (/(?:hid|хид|hotel\s*id|id)\s*[:#№-]?\s*1\b/.test(text)) ids.add('test_hotel');
+  if (/(?:hid|хид|hotel\s*id|id)\s*[:#№-]?\s*2\b/.test(text)) ids.add('test_hotel_do_not_book');
+
+  if (ids.size === 0) return null;
+  return CERT_TEST_HOTEL_IDS.filter((id) => ids.has(id));
 }
 
 function parseIsoDate(value?: string): Date | null {
@@ -962,6 +987,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const budgetMax = filters?.budget?.max ?? 100000;
     const traceId = createTraceId();
     const rawUserQuery = messages?.[messages.length - 1]?.text || '';
+    const certificationHotelIds = resolveCertificationHotelIds(`${rawUserQuery}\n${destination}`);
     upsertTrace({
       traceId,
       rawUserQuery,
@@ -979,6 +1005,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       travelers,
       childrenAgesCount: childrenAges.length
     });
+    if (certificationHotelIds) {
+      logSearchStep('info', traceId, 'certification_test_hotel_requested', {
+        ids: certificationHotelIds,
+      });
+    }
     const normalized = normalizeDestination(destination);
     const regionId = getRegionIdByCity(normalized.regionHint || destination);
     upsertTrace({ traceId, normalizedDestination: normalized.regionHint });
@@ -1011,7 +1042,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       let rawHotels: any[] = [];
       const stepErrors: string[] = [];
-      if (regionId) {
+      if (certificationHotelIds) {
+        try {
+          rawHotels = await searchSerpHotels(certificationHotelIds, {
+            checkIn: start,
+            checkOut: end,
+            adults: travelers,
+            childrenAges,
+          });
+          if (rawHotels.length === 0) {
+            logSearchStep('warn', traceId, 'certification_test_hotel_empty', { ids: certificationHotelIds });
+          }
+          upsertTrace({
+            traceId,
+            selectedEndpoint: '/api/b2b/v3/search/serp/hotels/',
+            etgRequestPayload: {
+              endpoint: '/api/b2b/v3/search/serp/hotels/',
+              ids: certificationHotelIds,
+              checkin: start,
+              checkout: end,
+              guests: [{ adults: travelers, children: childrenAges }],
+            },
+          });
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : 'serp_hotels_failed';
+          stepErrors.push(`certification_hotels:${msg}`);
+          logSearchStep('warn', traceId, 'certification_test_hotel_failed', {
+            ids: certificationHotelIds,
+            error: msg,
+          });
+        }
+      }
+
+      if (rawHotels.length === 0 && regionId) {
         try {
           rawHotels = await searchSerpRegion(regionId, {
             checkIn: start,

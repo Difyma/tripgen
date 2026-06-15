@@ -59,7 +59,7 @@ const basePayload = {
   stream: false,
   filters: {
     destination: 'Москва',
-    dates: { start: '2026-06-10', end: '2026-06-12' },
+    dates: { start: '2026-06-20', end: '2026-06-22' },
     budget: { min: 5000, max: 20000 },
     travelers: 2,
     children: 0,
@@ -68,6 +68,19 @@ const basePayload = {
 };
 
 async function run() {
+  await scenario('certification test hotel by id', {
+    ...basePayload,
+    messages: [{ role: 'user', text: 'Найди test_hotel для сертификации Островка' }],
+    filters: { ...basePayload.filters, destination: 'test_hotel' },
+  }, async ({ status, data }) => {
+    assert(status === 200, 'Expected 200 from /api/openai');
+    assert(Array.isArray(data.hotels), 'Hotels array missing');
+    assert(data.hotels.some((h) => h?.id === 'test_hotel'), 'test_hotel not returned');
+    const testHotel = data.hotels.find((h) => h?.id === 'test_hotel');
+    assert(String(testHotel?.bookingUrl || '').includes('/rooms/test_hotel/'), 'test_hotel bookingUrl must point to hotel page');
+    assert(String(testHotel?.bookingUrl || '').includes('partner_slug='), 'Missing partner_slug for test_hotel');
+  });
+
   await scenario('2 adults city search', basePayload, async ({ status, data }) => {
     assert(status === 200, 'Expected 200 from /api/openai');
     assertRealHotelsPayload(data);
