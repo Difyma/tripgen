@@ -4,6 +4,10 @@ import { createClient, Session, AuthError as SupabaseAuthError, type SupabaseCli
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
+const parsedAuthTimeout = Number(import.meta.env.VITE_SUPABASE_AUTH_TIMEOUT_MS || 2500);
+const SUPABASE_AUTH_TIMEOUT_MS = Number.isFinite(parsedAuthTimeout)
+  ? Math.min(Math.max(parsedAuthTimeout, 500), 10000)
+  : 2500;
 
 // Check if we're in production
 const isProduction = import.meta.env.PROD;
@@ -50,9 +54,54 @@ const createMockSupabase = (): SupabaseClient => {
   } as unknown as SupabaseClient;
 };
 
+const fetchWithTimeout: typeof fetch = async (input, init = {}) => {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), SUPABASE_AUTH_TIMEOUT_MS);
+  const signal = init.signal;
+
+  if (signal) {
+    if (signal.aborted) {
+      controller.abort();
+    } else {
+      signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+  }
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeout);
+  }
+};
+
 export const supabase: SupabaseClient = hasSupabaseConfig
-  ? createClient(supabaseUrl!, supabaseAnonKey!)
+  ? createClient(supabaseUrl!, supabaseAnonKey!, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        // Avoid reusing stale sessions created by older deployments with the default sb-* key.
+        storageKey: 'tripgen-auth',
+      },
+      global: {
+        fetch: fetchWithTimeout,
+      },
+    })
   : createMockSupabase();
+
+export const getSafeAuthSession = async (): Promise<Session | null> => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      console.warn('[Auth] Supabase session unavailable, continuing anonymously:', error.message);
+      return null;
+    }
+    return session;
+  } catch (error) {
+    console.warn('[Auth] Supabase session request failed, continuing anonymously:', error);
+    return null;
+  }
+};
 
 export interface User {
   id: string;
@@ -192,9 +241,7 @@ export const auth = {
   },
 
   getSession: async () => {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    return session;
+    return getSafeAuthSession();
   },
 
   getUser: async () => {

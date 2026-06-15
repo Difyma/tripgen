@@ -33,7 +33,7 @@ import {
 import { HotelCard } from './HotelCard';
 import { 
   getUserChats,
-  supabase,
+  getSafeAuthSession,
   createChat,
   getChatMessages,
   addChatMessage,
@@ -1265,7 +1265,7 @@ const Chat = () => {
       const configuredApiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
       // Когда VITE_API_URL не задан, используем относительный путь и Vite proxy.
       const apiBase = configuredApiBase;
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const currentSession = await getSafeAuthSession();
       const requestHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
       if (currentSession?.access_token) {
         requestHeaders['Authorization'] = `Bearer ${currentSession.access_token}`;

@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { getSafeAuthSession } from '../lib/supabase';
 import { io, Socket } from 'socket.io-client';
 
 const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
@@ -45,7 +45,7 @@ async function getSocket(): Promise<Socket | null> {
   // Один экземпляр на сессию: не создаём второй io(), пока первый жив (в т.ч. до connect)
   if (socket) return socket;
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const session = await getSafeAuthSession();
   if (!session?.access_token) return null;
 
   socket = io(API_URL || undefined, {
@@ -148,7 +148,7 @@ export const creatorChatApi = {
     const s = await getSocket();
     if (!s) throw new Error('Not connected');
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSafeAuthSession();
     const clientId = session?.user?.id;
 
     return new Promise((resolve, reject) => {
