@@ -11,6 +11,8 @@ interface GoogleMapProps {
   className?: string;
 }
 
+const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+
 // Расширяем глобальный объект Window для Google Maps
 declare global {
   interface Window {
@@ -64,9 +66,16 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ places = [], className = '' }) =>
         return;
       }
 
+      if (!googleMapsApiKey) {
+        console.warn('Google Maps API key is not configured; showing fallback map');
+        setHasError(true);
+        setIsLoaded(true);
+        return;
+      }
+
       // Загружаем Google Maps JavaScript API
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyC6EPnNJwqtLYslN4AaUh-0i549yFdLyW8&libraries=places,marker&loading=async&callback=initMap`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(googleMapsApiKey)}&libraries=places,marker&loading=async&callback=initMap`;
       script.async = true;
       script.defer = true;
       
