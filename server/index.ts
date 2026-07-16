@@ -9,6 +9,7 @@ import creatorRouter from './routes/creatorApplication.js';
 import hotelsRouter from './routes/hotels-full.js';
 import creatorChatRouter from './routes/creator-chat.js';
 import authRouter from './routes/auth.js';
+import subscriptionPlansRouter from './routes/subscription-plans.js';
 import { initChatWebSocket } from './lib/chat-ws.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -67,6 +68,7 @@ app.use('/api/creators', creatorRouter);
 app.use('/api/hotels', hotelsRouter);
 app.use('/api/creator-chat', creatorChatRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/subscription-plans', subscriptionPlansRouter);
 
 console.log('Routes configured:', {
   gpt: '/api',
@@ -74,7 +76,8 @@ console.log('Routes configured:', {
   creators: '/api/creators',
   hotels: '/api/hotels',
   creatorChat: '/api/creator-chat',
-  auth: '/api/auth'
+  auth: '/api/auth',
+  subscriptionPlans: '/api/subscription-plans'
 });
 
 // Error handling middleware - MUST be last
@@ -113,6 +116,7 @@ const server = app.listen(PORT, () => {
   console.log('- POST /api/hotels/hotelpage -> Hotel details endpoint');
   console.log('- POST /api/hotels/content -> Hotel static content endpoint');
   console.log('- GET  /api/hotels/suggest -> Hotel/region autocomplete');
+  console.log('- GET  /api/subscription-plans -> Subscription plans endpoint');
   console.log('- WS   /socket.io/chat -> Creator chat WebSocket');
 });
 

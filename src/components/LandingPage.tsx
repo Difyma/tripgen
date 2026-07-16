@@ -1,6 +1,7 @@
 import Hero from './Hero';
 import HowItWorks from './HowItWorks';
 import Services from './Services';
+import PricingSection from './PricingSection';
 import CreatorSection from './CreatorSection';
 import Footer from './Footer';
 import ExampleTour from './ExampleTour';
@@ -19,6 +20,7 @@ export function LandingPage() {
         <HowItWorks />
         <ExampleTour />
         <Services />
+        <PricingSection />
         <ReadyTours />
         <TravelQuiz />
         <CollectiveTour />

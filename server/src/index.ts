@@ -9,6 +9,7 @@ import flightsRouter from './routes/flights.js';
 import creatorRouter from './routes/creatorApplication.js';
 import creatorChatRouter from './routes/creatorChat.js';
 import toursRouter from './routes/tours.js';
+import subscriptionPlansRouter from './routes/subscriptionPlans.js';
 import hotelsRouter from '../routes/hotels-full.js';
 
 const rootDir = path.resolve(__dirname, '../../');
@@ -123,6 +124,7 @@ app.use('/api/flights', flightsRouter);
 app.use('/api/creators', creatorRouter);
 app.use('/api/creator-chat', creatorChatRouter);
 app.use('/api/tours', toursRouter);
+app.use('/api/subscription-plans', subscriptionPlansRouter);
 app.use('/api/hotels', hotelsRouter);
 
 console.log('Routes configured:', {
@@ -131,6 +133,7 @@ console.log('Routes configured:', {
   creators: '/api/creators',
   creatorChat: '/api/creator-chat',
   tours: '/api/tours',
+  subscriptionPlans: '/api/subscription-plans',
   hotels: '/api/hotels'
 });
 
@@ -157,6 +160,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('- POST /api/flights/search -> Flight search endpoint');
   console.log('- POST /api/creators/creator-application -> Creator application endpoint');
   console.log('- GET/POST /api/tours -> Creator tours and booking requests');
+  console.log('- GET  /api/subscription-plans -> Subscription plans endpoint');
   console.log('- POST /api/hotels/search -> Hotel search endpoint');
   console.log('- POST /api/hotels/hotelpage -> Hotel details endpoint');
   console.log('- POST /api/hotels/content -> Hotel static content endpoint');

@@ -21,6 +21,18 @@ export interface TripPlanHotel {
   description?: string;
 }
 
+export interface TripPlanPlace {
+  name: string;
+  type: 'restaurant' | 'cafe' | 'museum' | 'attraction' | 'park' | 'viewpoint' | 'shopping' | 'nightlife' | string;
+  area?: string;
+  whyMatchesUser?: string;
+  bestTimeToVisit?: string;
+  priceLevel?: string;
+  duration?: string;
+  mapUrl?: string;
+  source?: string;
+}
+
 export interface TripPlanDay {
   day: number;
   title?: string;
@@ -34,6 +46,7 @@ export interface TripPlanResponse {
   assumptions?: string[];
   recommendedAreas: TripPlanArea[];
   hotelRecommendations: TripPlanHotel[];
+  placeRecommendations?: TripPlanPlace[];
   itinerary: TripPlanDay[];
   highlights?: string[];
   foodRecommendations?: string[];

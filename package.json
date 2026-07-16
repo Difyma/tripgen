@@ -19,6 +19,7 @@
     "db:migrate:003": "node scripts/pg-apply-migration.mjs db/migrations/003_ai_daily_token_usage.sql",
     "db:migrate:004": "node scripts/pg-apply-migration.mjs db/migrations/004_ai_token_usage_windows.sql",
     "db:migrate:005": "node scripts/pg-apply-migration.mjs db/migrations/005_creator_tours_and_bookings.sql",
+    "db:migrate:006": "node scripts/pg-apply-migration.mjs db/migrations/006_subscription_plans.sql",
     "smoke:etg": "node scripts/etg-cert-smoke.mjs",
     "lint": "eslint .",
     "preview": "vite preview",

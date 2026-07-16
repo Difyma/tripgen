@@ -561,8 +561,9 @@ function rewriteOstrovokHybridHotelPathToSerp(url: string): string | null {
   try {
     pathname = new URL(raw).pathname;
   } catch {
-    return null;
-  }
+  return null;
+}
+
   if (!/^\/hotel\/[^/]+/i.test(pathname)) return null;
   if (!/(?:[?&])q=(\d+)(?:&|#|$)/i.test(raw)) return null;
   try {
@@ -573,6 +574,19 @@ function rewriteOstrovokHybridHotelPathToSerp(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+function stripContextUpdateBlock(text: string): string {
+  return String(text || '').replace(/<context_update>\s*[\s\S]*?\s*<\/context_update>/i, '').trim();
+}
+
+function extractJsonObject(text: string): string | null {
+  const clean = stripContextUpdateBlock(text);
+  if (!clean) return null;
+  const firstBrace = clean.indexOf('{');
+  const lastBrace = clean.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace <= firstBrace) return null;
+  return clean.slice(firstBrace, lastBrace + 1);
 }
 
 function rewriteOstrovokHotelPathToRooms(url: string): string | null {
@@ -768,32 +782,38 @@ async function searchSerpHotels(ids: readonly string[], params: { checkIn: strin
 
 // Inline the JSON-system-prompt to avoid Vercel runtime module resolution issues
 // (ERR_MODULE_NOT_FOUND for ../src/prompts/travelJsonSystemPrompt).
-const TRAVEL_JSON_SYSTEM_PROMPT = `Ты — AI-планировщик путешествий премиального уровня. Твоя задача — составлять персонализированный план поездки в структурированном виде.
+const TRAVEL_JSON_SYSTEM_PROMPT = `Ты — персональный travel-эксперт сервиса TripGen. Составляешь персонализированные маршруты в структурированном JSON для пользователей из России и СНГ.
 
-Как ты работаешь:
-- Учитывай направление, длительность, бюджет, состав путешественников и стиль поездки.
-- Строй реалистичный маршрут, группируй активности логично (утро / день / вечер).
-- Подбирай только подходящие отели из переданного списка — НЕ придумывай отели.
-- bookingUrl, photoUrl, цены и рейтинги бери ТОЛЬКО из контекста (список отелей). Не выдумывай ссылки и данные.
-- Объясняй, почему выбран район и отель. Избегай общих туристических фраз и клише.
-- Не выдавай слишком длинные перечни мест. Не фантазируй факты.
-- Делай ответ практически полезным: конкретные места, конкретные шаги, конкретные советы.
-- В tripSummary дай 2-4 предложения с ориентиром по логистике/ритму поездки.
-- В recommendedAreas дай 2-3 района с понятной причиной выбора.
-- В itinerary по каждому дню указывай 2-4 реальных точки интереса (не абстрактные "музей/парк").
-- В foodRecommendations и highlights указывай конкретные названия заведений/мест, когда это уместно.
+Сначала определи намерение пользователя, но не называй его вслух:
+- SMALL_TALK: приветствие или вопрос о возможностях.
+- DREAM: размытое желание без деталей.
+- INFO_REQUEST: вопрос о месте, стране, визах, погоде.
+- TRIP_PLANNING: запрос на маршрут, отели или план поездки.
+- OFF_TOPIC: не про путешествия.
 
-Если каких-то данных не хватает, сделай разумное предположение и укажи его в массиве assumptions.
+Правила поведения:
+- Если данных не хватает, не выдумывай финальный маршрут. Дай полезное краткое резюме в tripSummary, оставь itinerary пустым и задай один вопрос в followUpQuestion.
+- Для финального маршрута желательно знать направление, даты или длительность, бюджет и состав группы. Если часть данных уже есть в контексте, не спрашивай повторно.
+- В tripSummary для финального маршрута начни с: "Исходя из того, что вы рассказали: ...".
+- Маршрут должен быть реалистичным: реальные места, адреса/районы, сезонность, логистика и время в дороге.
+- Для зарубежных поездок учитывай визы и особенности перелетов из России; если данные о рейсах могут быть устаревшими, честно скажи об этом в practicalTips.
+- В itinerary каждый день должен отличаться по содержанию. Не повторяй одинаковые блоки утро/день/вечер.
+- В itinerary указывай конкретные места, рестораны, музеи, районы и практические советы, а не абстрактные "музей" или "парк".
+- Каждый пункт в morning/daytime/evening должен начинаться с времени или диапазона времени в формате "09:00-10:30 — ...".
+- Для мест и заведений пиши название так, чтобы система могла сделать ссылку Google Maps.
+- Если в контексте есть блок "Проверенные места и заведения", используй его как основной источник для placeRecommendations и itinerary.
+- В placeRecommendations объясняй, почему место подходит именно этому пользователю: интересы, бюджет, состав группы, темп поездки, район отеля.
+
+Правила отелей Ostrovok:
+- Используй ТОЛЬКО отели из переданного списка.
+- bookingUrl, photoUrl, цены, рейтинг, адрес, налоги, питание, отмену и комнаты бери только из API-контекста.
+- Не генерируй ссылки на отели самостоятельно.
+- Если отелей в контексте нет, hotelRecommendations должен быть пустым массивом.
 
 КРИТИЧНО — формат ответа:
-Твой ответ должен быть ТОЛЬКО одним валидным JSON-объектом. Запрещено:
-- писать markdown;
-- добавлять пояснительный текст до или после JSON;
-- обрамлять JSON в \`\`\`json ... \`\`\` или кавычки;
-- добавлять комментарии вне JSON.
+Верни ТОЛЬКО один валидный JSON-объект. Нельзя markdown, текст до/после JSON, code fence или комментарии.
 
-Обязательная структура JSON (все поля должны присутствовать; если данных нет — пустая строка или пустой массив):
-
+Обязательная структура JSON:
 {
   "tripSummary": "string",
   "assumptions": ["string"],
@@ -814,6 +834,19 @@ const TRAVEL_JSON_SYSTEM_PROMPT = `Ты — AI-планировщик путеш
       "description": "string"
     }
   ],
+  "placeRecommendations": [
+    {
+      "name": "string",
+      "type": "restaurant | cafe | museum | attraction | park | viewpoint | shopping | nightlife",
+      "area": "string",
+      "whyMatchesUser": "string",
+      "bestTimeToVisit": "string",
+      "priceLevel": "string",
+      "duration": "string",
+      "mapUrl": "string",
+      "source": "context | model_knowledge"
+    }
+  ],
   "itinerary": [
     {
       "day": 1,
@@ -826,25 +859,89 @@ const TRAVEL_JSON_SYSTEM_PROMPT = `Ты — AI-планировщик путеш
   "highlights": ["string"],
   "foodRecommendations": ["string"],
   "practicalTips": ["string"],
-  "followUpQuestion": "string"
+  "followUpQuestion": "string",
+  "context_update": {
+    "intent": "SMALL_TALK | DREAM | INFO_REQUEST | TRIP_PLANNING | OFF_TOPIC",
+    "destination": "string",
+    "dates": "string",
+    "budget": "string",
+    "group": "string",
+    "interests": ["string"],
+    "restrictions": ["string"],
+    "citizenship": "string",
+    "missing": ["string"]
+  }
+}` as const;
+
+const SYSTEM_PROMPT = `Ты — персональный travel-эксперт сервиса TripGen. Помогаешь планировать путешествия по всему миру для пользователей из России и СНГ.
+
+РАСПОЗНАВАНИЕ НАМЕРЕНИЙ:
+Перед ответом определи тип сообщения пользователя:
+
+SMALL_TALK — приветствие, вопрос "что умеешь", "как дела"
+→ Отвечай тепло и коротко, в конце мягко предложи помочь с поездкой.
+
+DREAM — размытое желание без деталей: "хочу на море", "устал, хочу уехать"
+→ Подхвати эмоцию, предложи 2-3 направления, задай один вопрос.
+
+INFO_REQUEST — вопрос о месте, стране, визах, погоде
+→ Ответь на вопрос, потом мягко верни к планированию поездки.
+
+TRIP_PLANNING — явный запрос на маршрут с деталями или без
+→ Собирай недостающие данные по одному вопросу за раз.
+
+OFF_TOPIC — вопросы не про путешествия вообще
+→ Вежливо объясни свою специализацию и предложи вернуться к теме.
+
+НИКОГДА не называй тип намерения вслух — просто реагируй соответственно.
+
+СТИЛЬ ОБЩЕНИЯ:
+- Веди диалог как опытный друг-путешественник, а не как справочник.
+- Если данных не хватает — предложи 2-3 варианта на выбор и задай один уточняющий вопрос в конце сообщения.
+- Задавай ТОЛЬКО ОДИН вопрос за раз.
+- После получения ответа — подтверди выбор и двигайся дальше.
+- Не составляй финальный маршрут, пока не знаешь минимум: направление, даты или длительность, бюджет, состав группы.
+
+ПАМЯТЬ КОНТЕКСТА:
+- Учитывай всё, что пользователь сказал в этом чате.
+- Если он уже называл город, даты, бюджет или состав группы — не спрашивай повторно.
+- Если он сменил предпочтение — обнови понимание и учти это.
+- В начале финального маршрута напиши: "Исходя из того, что вы рассказали: ..."
+
+ПРАВИЛА МАРШРУТОВ:
+- Только реально существующие места с конкретными адресами или районами.
+- Учитывай сезонность и реалистичную логистику между точками.
+- Для зарубежных поездок предупреждай о визах и особенностях перелётов из России; если данные о рейсах могут быть устаревшими — честно скажи и предложи проверить на Aviasales.
+- Бюджет расписывай с разбивкой по категориям, если пользователь просит финальный маршрут.
+
+ПРАВИЛА ОТЕЛЕЙ OSTROVOK:
+- Используй ТОЛЬКО отели из переданного списка.
+- bookingUrl, фото, цены, рейтинг, налоги, питание, отмену и комнаты бери только из API-контекста.
+- Не генерируй ссылки на отели самостоятельно.
+- Если bookingUrl отсутствует — не показывай кнопку бронирования.
+
+ПРАВИЛА ССЫЛОК НА МЕСТА:
+- Для ключевых достопримечательностей, музеев, парков и ресторанов можно давать ссылку Google Maps.
+- Формат: [Название места](https://www.google.com/maps/search/?api=1&query=НАЗВАНИЕ+МЕСТА+ГОРОД).
+- Не перегружай ответ: 2-4 ссылки на день достаточно.
+- Если в контексте есть блок "Проверенные места и заведения", в первую очередь используй эти места и объясняй, почему они подходят под интересы, бюджет и состав группы.
+
+В конце КАЖДОГО текстового ответа добавляй скрытый блок, который система вырежет перед показом пользователю:
+<context_update>
+{
+  "intent": "SMALL_TALK | DREAM | INFO_REQUEST | TRIP_PLANNING | OFF_TOPIC",
+  "destination": "",
+  "dates": "",
+  "budget": "",
+  "group": "",
+  "interests": [],
+  "restrictions": [],
+  "citizenship": "RU",
+  "missing": []
 }
+</context_update>
 
-В hotelRecommendations используй ТОЛЬКО отели из предоставленного списка. Все URL и фото бери из контекста.` as const;
-
-const SYSTEM_PROMPT = `Ты — опытный туристический ассистент и профессиональный travel-блогер.
-Твоя задача — помогать пользователям планировать путешествия, предоставляя персонализированные рекомендации.
-
-ВАЖНО: В твоём распоряжении есть актуальные данные об отелях из Ostrovok.ru с реальными ценами, фото и ссылками на бронирование.
-Используй ТОЛЬКО эти данные при составлении рекомендаций по размещению. НЕ ПРИДУМЫВАЙ отели — используй только те, что в списке ниже.
-
-ПРАВИЛА ОТВЕТОВ:
-1. Используй ТОЛЬКО отели из предоставленного списка "Рекомендуемые отели"
-2. Для каждого отеля ОБЯЗАТЕЛЬНО включи фото используя markdown: ![название отеля](URL_фото)
-3. Добавь кнопку бронирования ТОЧНО в формате: [🛎️ Забронировать отель](URL_бронирования)
-4. Укажи цену, звёздность, рейтинг и расстояние до центра
-5. Добавь краткое описание отеля
-
-⚠️ ВАЖНО: Используй ТОЛЬКО bookingUrl из предоставленных данных. Не придумывай ссылки.`;
+ЯЗЫК: всегда русский.`
 
 interface OpenRouterChoice {
   message?: { content?: string };
@@ -1102,6 +1199,139 @@ function formatHotelsForPrompt(hotels: HotelForApi[]): string {
   return text;
 }
 
+type PlaceType = 'restaurant' | 'cafe' | 'museum' | 'attraction' | 'park' | 'viewpoint' | 'shopping' | 'nightlife';
+type PromptPlace = {
+  name: string;
+  type: PlaceType;
+  area: string;
+  why: string;
+  bestTimeToVisit: string;
+  priceLevel: string;
+  duration: string;
+  interests: string[];
+};
+
+const PROMPT_PLACES: Record<string, PromptPlace[]> = {
+  'москва': [
+    { name: 'ГЭС-2', type: 'museum', area: 'Болотная набережная', why: 'современное искусство, архитектура и культурная программа в центре', bestTimeToVisit: 'днем или ранним вечером', priceLevel: 'средний', duration: '1.5-2 часа', interests: ['art', 'architecture', 'culture', 'museum'] },
+    { name: 'Патриаршие пруды', type: 'attraction', area: 'Пресня', why: 'короткая прогулка, кафе и вечерняя атмосфера старой Москвы', bestTimeToVisit: 'вечером', priceLevel: 'бесплатно', duration: '45-90 минут', interests: ['walks', 'food', 'local', 'romantic'] },
+    { name: 'Северяне', type: 'restaurant', area: 'Большая Никитская', why: 'русская кухня в современной подаче для ужина без туристического ощущения', bestTimeToVisit: 'ужин', priceLevel: 'выше среднего', duration: '1.5-2 часа', interests: ['food', 'local', 'restaurant'] },
+    { name: 'Аптекарский огород', type: 'park', area: 'Проспект Мира', why: 'спокойная зеленая локация для разгрузки плотного маршрута', bestTimeToVisit: 'утро или день', priceLevel: 'низкий', duration: '1-1.5 часа', interests: ['nature', 'walks', 'family'] },
+  ],
+  'санкт-петербург': [
+    { name: 'Новая Голландия', type: 'park', area: 'Адмиралтейский район', why: 'еда, прогулка и культурные события в одной компактной локации', bestTimeToVisit: 'днем или вечером', priceLevel: 'средний', duration: '1.5-3 часа', interests: ['walks', 'food', 'culture', 'family'] },
+    { name: 'Эрарта', type: 'museum', area: 'Васильевский остров', why: 'современное искусство без перегруза классикой', bestTimeToVisit: 'днем', priceLevel: 'средний', duration: '2-3 часа', interests: ['art', 'museum', 'culture'] },
+    { name: 'Севкабель Порт', type: 'viewpoint', area: 'Васильевский остров', why: 'вид на залив, кафе и расслабленный вечерний сценарий', bestTimeToVisit: 'закат', priceLevel: 'средний', duration: '1.5-2 часа', interests: ['view', 'walks', 'food', 'nightlife'] },
+    { name: 'Бекицер', type: 'restaurant', area: 'Рубинштейна', why: 'неформальная еда и оживленная улица для вечернего маршрута', bestTimeToVisit: 'ужин', priceLevel: 'средний', duration: '1-1.5 часа', interests: ['food', 'casual', 'nightlife'] },
+  ],
+  'париж': [
+    { name: 'Musée d’Orsay', type: 'museum', area: '7-й округ', why: 'импрессионисты и сильная коллекция в красивом здании бывшего вокзала', bestTimeToVisit: 'утро', priceLevel: 'средний', duration: '2-3 часа', interests: ['art', 'museum', 'culture'] },
+    { name: 'Le Marais', type: 'attraction', area: '3-4-й округа', why: 'бутики, галереи, еда и исторические улицы без длинных переездов', bestTimeToVisit: 'день', priceLevel: 'бесплатно', duration: '2-3 часа', interests: ['walks', 'shopping', 'food', 'architecture'] },
+    { name: 'Bouillon République', type: 'restaurant', area: 'République', why: 'классическая французская еда по умеренной цене и быстрый формат', bestTimeToVisit: 'обед или ужин', priceLevel: 'средний', duration: '1-1.5 часа', interests: ['food', 'budget', 'local'] },
+    { name: 'Parc des Buttes-Chaumont', type: 'park', area: '19-й округ', why: 'менее очевидный парк с видами и паузой от музеев', bestTimeToVisit: 'день', priceLevel: 'бесплатно', duration: '1-2 часа', interests: ['nature', 'walks', 'view'] },
+  ],
+  'стамбул': [
+    { name: 'Айя-София', type: 'attraction', area: 'Султанахмет', why: 'главная историческая точка рядом с Голубой мечетью и цистерной', bestTimeToVisit: 'утро', priceLevel: 'средний', duration: '1-1.5 часа', interests: ['history', 'architecture', 'culture'] },
+    { name: 'Цистерна Базилика', type: 'museum', area: 'Султанахмет', why: 'атмосферная короткая остановка рядом с главными достопримечательностями', bestTimeToVisit: 'день', priceLevel: 'средний', duration: '45-60 минут', interests: ['history', 'architecture'] },
+    { name: 'Karaköy Lokantası', type: 'restaurant', area: 'Каракёй', why: 'турецкая кухня в удобном районе между Галатой и набережной', bestTimeToVisit: 'обед или ужин', priceLevel: 'выше среднего', duration: '1.5 часа', interests: ['food', 'local', 'restaurant'] },
+    { name: 'Kadıköy Çarşı', type: 'shopping', area: 'Кадыкёй', why: 'рынок, уличная еда и более локальная азиатская сторона города', bestTimeToVisit: 'день или вечер', priceLevel: 'средний', duration: '2-3 часа', interests: ['food', 'local', 'shopping', 'walks'] },
+  ],
+  'дубай': [
+    { name: 'Alserkal Avenue', type: 'museum', area: 'Al Quoz', why: 'галереи, дизайн-пространства и кафе за пределами моллового Дубая', bestTimeToVisit: 'днем', priceLevel: 'средний', duration: '2-3 часа', interests: ['art', 'culture', 'coffee'] },
+    { name: 'Dubai Creek Harbour', type: 'viewpoint', area: 'Creek Harbour', why: 'виды на skyline и спокойная прогулка у воды', bestTimeToVisit: 'закат', priceLevel: 'бесплатно', duration: '1-1.5 часа', interests: ['view', 'walks', 'romantic'] },
+    { name: 'Arabian Tea House', type: 'restaurant', area: 'Al Fahidi', why: 'знакомство с эмиратской кухней рядом с историческим кварталом', bestTimeToVisit: 'завтрак или обед', priceLevel: 'средний', duration: '1-1.5 часа', interests: ['food', 'local', 'history'] },
+    { name: 'Museum of the Future', type: 'museum', area: 'Trade Centre', why: 'зрелищная архитектура и интерактивный формат для первого визита', bestTimeToVisit: 'утро', priceLevel: 'выше среднего', duration: '2 часа', interests: ['architecture', 'family', 'museum'] },
+  ],
+};
+
+const PLACE_ALIASES: Record<string, string> = {
+  moscow: 'москва',
+  'питер': 'санкт-петербург',
+  'петербург': 'санкт-петербург',
+  'saint petersburg': 'санкт-петербург',
+  paris: 'париж',
+  istanbul: 'стамбул',
+  dubai: 'дубай',
+};
+
+function normalizePlaceText(value: string): string {
+  return value.toLowerCase().replace(/ё/g, 'е').trim();
+}
+
+function getPromptPlaces(destination: string, preferences: string[] = [], budgetMax?: number): PromptPlace[] {
+  const normalized = normalizePlaceText(destination);
+  const key =
+    Object.entries(PLACE_ALIASES).find(([alias]) => normalized.includes(normalizePlaceText(alias)))?.[1] ||
+    Object.keys(PROMPT_PLACES).find((candidate) => normalized.includes(normalizePlaceText(candidate)));
+  const places = key ? PROMPT_PLACES[key] || [] : [];
+  const interestText = preferences.map(normalizePlaceText).join(' ');
+  return [...places]
+    .sort((a, b) => {
+      const score = (p: PromptPlace) =>
+        p.interests.reduce((sum, tag) => sum + (interestText.includes(tag) ? 3 : 0), 0) -
+        (budgetMax && budgetMax < 70000 && p.priceLevel === 'выше среднего' ? 2 : 0);
+      return score(b) - score(a);
+    })
+    .slice(0, 10);
+}
+
+function formatPlacesForPrompt(places: PromptPlace[], destination: string): string {
+  if (places.length === 0) {
+    return '\n\n# 📍 Места и заведения\n\nНет проверенного списка мест для этого направления. Можно рекомендовать общеизвестные реальные места, но не выдумывать адреса, рейтинги и часы работы.\n';
+  }
+  let text = '\n\n# 📍 Проверенные места и заведения для маршрута\n\n';
+  places.forEach((place, index) => {
+    const query = encodeURIComponent(`${place.name} ${destination}`);
+    text += `### ${index + 1}. ${place.name}\n`;
+    text += `- **Тип:** ${place.type}\n`;
+    text += `- **Район:** ${place.area}\n`;
+    text += `- **Почему подходит:** ${place.why}\n`;
+    text += `- **Лучшее время:** ${place.bestTimeToVisit}\n`;
+    text += `- **Бюджет:** ${place.priceLevel}\n`;
+    text += `- **Время на месте:** ${place.duration}\n`;
+    text += `- **Google Maps:** https://www.google.com/maps/search/?api=1&query=${query}\n\n`;
+  });
+  text += '⚠️ Для placeRecommendations и маршрута в первую очередь используй эти места. Если добавляешь другое место, оно должно быть общеизвестным и реально существующим.\n';
+  return text;
+}
+
+function formatStructuredTripPlanForApi(plan: Record<string, unknown>): string {
+  const out: string[] = [];
+  const summary = typeof plan.tripSummary === 'string' ? plan.tripSummary.trim() : '';
+  if (summary) out.push(summary);
+
+  const placeRecommendations = Array.isArray(plan.placeRecommendations) ? plan.placeRecommendations : [];
+  const placeLines = placeRecommendations
+    .map((raw) => {
+      const p = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+      const name = typeof p.name === 'string' ? p.name.trim() : '';
+      if (!name) return '';
+      const mapUrl = typeof p.mapUrl === 'string' && p.mapUrl.trim() ? p.mapUrl.trim() : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}`)}`;
+      const details = [p.type, p.area, p.bestTimeToVisit, p.priceLevel, p.duration]
+        .map((x) => typeof x === 'string' ? x.trim() : '')
+        .filter(Boolean)
+        .join(', ');
+      const reason = typeof p.whyMatchesUser === 'string' ? p.whyMatchesUser.trim() : '';
+      return `- [${name}](${mapUrl})${details ? ` — ${details}` : ''}${reason ? `. ${reason}` : ''}`;
+    })
+    .filter(Boolean);
+  if (placeLines.length > 0) out.push(`## 📍 Места и заведения\n\n${placeLines.join('\n')}`);
+
+  const foodRecommendations = Array.isArray(plan.foodRecommendations)
+    ? plan.foodRecommendations.map((x) => typeof x === 'string' ? x.trim() : '').filter(Boolean)
+    : [];
+  if (foodRecommendations.length > 0) out.push(`## 🍽 Еда и рестораны\n\n${foodRecommendations.map((x) => `- ${x}`).join('\n')}`);
+
+  const practicalTips = Array.isArray(plan.practicalTips)
+    ? plan.practicalTips.map((x) => typeof x === 'string' ? x.trim() : '').filter(Boolean)
+    : [];
+  if (practicalTips.length > 0) out.push(`## 💡 Практические советы\n\n${practicalTips.map((x) => `- ${x}`).join('\n')}`);
+
+  const followUp = typeof plan.followUpQuestion === 'string' ? plan.followUpQuestion.trim() : '';
+  if (followUp) out.push(followUp);
+  return out.join('\n\n').trim();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') {
     Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
@@ -1167,6 +1397,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       dates?: { start?: string; end?: string };
       durationDays?: number;
       budget?: { min?: number; max?: number };
+      preferences?: string[];
       travelers?: number;
     } | undefined;
     // IMPORTANT:
@@ -1446,6 +1677,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       logSearchStep('info', traceId, 'etg_failed_continuing_gpt', { hotelsCount: 0 });
     }
     const hotelsText = formatHotelsForPrompt(hotels);
+    const places = getPromptPlaces(
+      destination,
+      Array.isArray(filters?.preferences) ? filters.preferences : [],
+      budgetMax
+    );
+    const placesText = formatPlacesForPrompt(places, destination);
 
     const conversationMessages = messages
       .map((msg) => ({
@@ -1463,16 +1700,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (durationFromMessage && isDurationOnlyMessage(String(lastUserText?.text || ''))) {
       conversationMessages.push({
         role: 'user',
-        content: `Составь детальный маршрут по ${destination} на ${durationFromMessage} дня по дням (утро/день/вечер), с практическими советами и логичной последовательностью.`,
+        content: `Составь детальный маршрут по ${destination} на ${durationFromMessage} дня по дням (утро/день/вечер), с практическими советами, логичной последовательностью и временем для каждого пункта.`,
       });
     }
 
     const effectiveDurationDays = requestedDurationDays || diffDaysUtc(startDate, endDate);
-    const contextBlock = `Контекст путешествия:\n- Направление: ${destination}\n- Даты: с ${start} по ${end}\n- Длительность: ${effectiveDurationDays} дней\n- Бюджет: от ${budgetMin} до ${budgetMax} ₽\n- Путешественников: ${travelers}${hotelsText}`;
+    const contextBlock = `Контекст путешествия:\n- Направление: ${destination}\n- Даты: с ${start} по ${end}\n- Длительность: ${effectiveDurationDays} дней\n- Бюджет: от ${budgetMin} до ${budgetMax} ₽\n- Путешественников: ${travelers}${hotelsText}${placesText}`;
     const systemPromptForRequest = useStream ? SYSTEM_PROMPT : TRAVEL_JSON_SYSTEM_PROMPT;
     const durationInstruction =
       effectiveDurationDays > 0
-        ? `\n\nКРИТИЧНО: В поле itinerary верни РОВНО ${effectiveDurationDays} дней (day: 1..${effectiveDurationDays}), без пропусков и пустых дней.`
+        ? `\n\nКРИТИЧНО: В поле itinerary верни РОВНО ${effectiveDurationDays} дней (day: 1..${effectiveDurationDays}), без пропусков и пустых дней. Каждый пункт внутри morning/daytime/evening начинай с времени: "09:00-10:30 — ...".`
         : '';
     const systemContent = `${systemPromptForRequest}${durationInstruction}\n\n${contextBlock}`;
     const summaryMessages = conversationSummary
@@ -1614,13 +1851,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(502).json({ error: 'Empty response from OpenRouter API' });
     }
 
-    let textToSend = assistantMessage;
+    let textToSend = stripContextUpdateBlock(assistantMessage);
     let itineraryFromGpt: unknown[] | undefined;
     try {
-      const gptJson = JSON.parse(assistantMessage) as Record<string, unknown>;
-      if (typeof gptJson.tripSummary === 'string' && gptJson.tripSummary) {
-        textToSend = gptJson.tripSummary;
-      }
+      const gptJson = JSON.parse(extractJsonObject(assistantMessage) || assistantMessage) as Record<string, unknown>;
+      const formatted = formatStructuredTripPlanForApi(gptJson);
+      if (formatted) textToSend = formatted;
       if (Array.isArray(gptJson.itinerary) && gptJson.itinerary.length > 0) {
         itineraryFromGpt = gptJson.itinerary as unknown[];
       }

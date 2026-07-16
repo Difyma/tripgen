@@ -4,7 +4,7 @@
  * Не бросает исключений; при неудаче возвращает null.
  */
 
-import type { TripPlanResponse, TripPlanArea, TripPlanHotel, TripPlanDay } from '../types/tripPlan';
+import type { TripPlanResponse, TripPlanArea, TripPlanHotel, TripPlanPlace, TripPlanDay } from '../types/tripPlan';
 
 const JSON_START = /^\s*(\{[\s\S]*\})\s*$/;
 const CODE_FENCE = /```(?:json)?\s*([\s\S]*?)```/;
@@ -117,6 +117,25 @@ export function normalizeTripPlanResponse(parsed: unknown): TripPlanResponse | n
     });
   }
 
+  const placeRecsRaw = o.placeRecommendations;
+  let placeRecommendations: TripPlanPlace[] = [];
+  if (Array.isArray(placeRecsRaw)) {
+    placeRecommendations = (placeRecsRaw as unknown[]).map((p) => {
+      const item = p && typeof p === 'object' && !Array.isArray(p) ? (p as Record<string, unknown>) : {};
+      return {
+        name: strOrEmpty(item.name),
+        type: strOrEmpty(item.type),
+        area: strOpt(item.area),
+        whyMatchesUser: strOpt(item.whyMatchesUser),
+        bestTimeToVisit: strOpt(item.bestTimeToVisit),
+        priceLevel: strOpt(item.priceLevel),
+        duration: strOpt(item.duration),
+        mapUrl: strOpt(item.mapUrl),
+        source: strOpt(item.source),
+      };
+    }).filter((p) => p.name.trim() !== '');
+  }
+
   const itineraryRaw = o.itinerary;
   let itinerary: TripPlanDay[] = [];
   if (Array.isArray(itineraryRaw)) {
@@ -152,6 +171,7 @@ export function normalizeTripPlanResponse(parsed: unknown): TripPlanResponse | n
     assumptions,
     recommendedAreas,
     hotelRecommendations,
+    placeRecommendations,
     itinerary,
     highlights,
     foodRecommendations,

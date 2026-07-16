@@ -20,6 +20,7 @@ const footerLinks: Record<string, FooterLink[]> = {
   ],
   Поддержка: [
     { name: 'Связаться с нами', href: '#' },
+    { name: 'Оферта', href: '/docs/oferta_890510882013.docx' },
     { name: 'Условия использования', href: '#' },
     { name: 'Политика конфиденциальности', href: '#' },
     { name: 'Помощь', href: '#' }

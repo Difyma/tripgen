@@ -5,12 +5,9 @@
 
 import type { TripPlanResponse } from '../types/tripPlan';
 
-/** Экранирует символы, которые могут сломать markdown: \ ` * _ [ ] ( ) # */
 function escapeMarkdownText(s: string | null | undefined): string {
   if (s == null || typeof s !== 'string') return '';
-  return s
-    .replace(/\\/g, '\\\\')
-    .replace(/[`*_[\]()#]/g, '\\$&');
+  return s.replace(/\\/g, '\\\\').replace(/[`*_[\]()#]/g, '\\$&');
 }
 
 function block(lines: string[], prefix = '-'): string {
@@ -25,14 +22,40 @@ function mapsUrl(query: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
+function stripMarkdownLinks(line: string): string {
+  return String(line || '')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/gi, '$1')
+    .replace(/\((https?:\/\/[^)]+)\)/gi, '')
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hasTimePrefix(line: string): boolean {
+  return /^\s*(?:\d{1,2}[:.]\d{2}|\d{1,2}\s*[—–-]\s*\d{1,2}|\d{1,2}[:.]\d{2}\s*[—–-]\s*\d{1,2}[:.]\d{2})/.test(line);
+}
+
+function withDefaultTime(line: string, slot: 'morning' | 'daytime' | 'evening', index: number): string {
+  const clean = stripMarkdownLinks(line);
+  if (!clean || hasTimePrefix(clean)) return clean;
+  const slots: Record<typeof slot, string[]> = {
+    morning: ['09:00-10:30', '10:45-12:00', '08:00-09:00'],
+    daytime: ['12:30-14:00', '14:30-16:30', '16:30-17:30'],
+    evening: ['18:00-19:30', '20:00-21:30', '21:30-22:30'],
+  };
+  const time = slots[slot][index] || slots[slot][slots[slot].length - 1];
+  return `${time} — ${clean}`;
+}
+
 function normalizeMapsQuery(line: string): string {
-  return line
-    .replace(/\[[^\]]+\]\((https?:\/\/[^)]+)\)/gi, '')
+  return stripMarkdownLinks(line)
+    .replace(/^\s*\d{1,2}[:.]\d{2}\s*[—–-]\s*\d{1,2}[:.]\d{2}\s*[—–-]\s*/g, '')
+    .replace(/^\s*\d{1,2}[:.]\d{2}\s*[—–-]\s*/g, '')
     .replace(/^[\s\-•●\d.:()]+/g, '')
     .replace(/\s*[—–-]\s.*$/g, '')
     .replace(/\s*\([^)]*\)\s*$/g, '')
     .replace(
-      /\b(посещение|экскурсия|прогулка|поездка|обед|ужин|завтрак|кофе-брейк|осмотр|визит)\b\s+/i,
+      /\b(посещение|экскурсия|прогулка|поездка|обед|ужин|завтрак|кофе-брейк|осмотр|визит|трансфер|прибытие|заселение)\b\s+/i,
       ''
     )
     .replace(/\s+/g, ' ')
@@ -40,13 +63,12 @@ function normalizeMapsQuery(line: string): string {
 }
 
 function withMapsLink(line: string): string {
-  const value = safeStr(line);
+  const value = stripMarkdownLinks(safeStr(line));
   if (!value) return '';
   if (/^\s*#{1,6}\s*/.test(value)) return escapeMarkdownText(value);
-  if (value.length > 80) return escapeMarkdownText(value);
-  if (/\[[^\]]+\]\(https?:\/\/[^)]+\)/i.test(value)) return value;
+  if (value.length > 110) return escapeMarkdownText(value);
   const query = normalizeMapsQuery(value);
-  const weak = /^(адрес|рейтинг|цена|до центра|налоги|питание|отмена|дедлайн|номер|практические советы?)$/i;
+  const weak = /^(адрес|рейтинг|цена|до центра|налоги|питание|отмена|дедлайн|номер|практические советы?|трансфер в отель|заселение в отель)$/i;
   if (!query || query.length < 3 || query.length > 90 || weak.test(query) || !/[A-Za-zА-Яа-яЁё]/.test(query)) {
     return escapeMarkdownText(value);
   }
@@ -66,6 +88,23 @@ function safeStr(s: string | null | undefined): string {
   return s.trim();
 }
 
+function formatPlaceRecommendation(place: NonNullable<TripPlanResponse['placeRecommendations']>[number]): string {
+  const name = safeStr(place.name);
+  if (!name) return '';
+  const details = [
+    safeStr(place.type),
+    safeStr(place.area),
+    safeStr(place.bestTimeToVisit) ? `лучше: ${safeStr(place.bestTimeToVisit)}` : '',
+    safeStr(place.priceLevel),
+    safeStr(place.duration),
+  ].filter(Boolean);
+  const title = place.mapUrl
+    ? `[${escapeMarkdownText(name)}](${place.mapUrl})`
+    : withMapsLink(name);
+  const reason = safeStr(place.whyMatchesUser);
+  return `${title}${details.length ? ` — ${escapeMarkdownText(details.join(', '))}` : ''}${reason ? `. ${escapeMarkdownText(reason)}` : ''}`;
+}
+
 export function formatTripPlanToMarkdown(plan: TripPlanResponse): string {
   const out: string[] = [];
 
@@ -76,9 +115,7 @@ export function formatTripPlanToMarkdown(plan: TripPlanResponse): string {
 
   if (Array.isArray(plan.assumptions) && plan.assumptions.length > 0) {
     const lines = plan.assumptions.map((a) => safeStr(a)).filter(Boolean);
-    if (lines.length > 0) {
-      out.push('**Предположения:**\n\n', block(lines), '\n');
-    }
+    if (lines.length > 0) out.push('**Предположения:**\n\n', block(lines), '\n');
   }
 
   if (Array.isArray(plan.recommendedAreas) && plan.recommendedAreas.length > 0) {
@@ -108,9 +145,12 @@ export function formatTripPlanToMarkdown(plan: TripPlanResponse): string {
 
   if (Array.isArray(plan.highlights) && plan.highlights.length > 0) {
     const lines = plan.highlights.map((s) => safeStr(s)).filter(Boolean);
-    if (lines.length > 0) {
-      out.push('# 🎯 Что посмотреть\n\n', blockWithMaps(lines), '\n');
-    }
+    if (lines.length > 0) out.push('# 🎯 Что посмотреть\n\n', blockWithMaps(lines), '\n');
+  }
+
+  if (Array.isArray(plan.placeRecommendations) && plan.placeRecommendations.length > 0) {
+    const lines = plan.placeRecommendations.map(formatPlaceRecommendation).filter(Boolean);
+    if (lines.length > 0) out.push('# 📍 Места и заведения\n\n', lines.map((line) => `- ${line}`).join('\n'), '\n\n');
   }
 
   if (Array.isArray(plan.itinerary) && plan.itinerary.length > 0) {
@@ -127,13 +167,13 @@ export function formatTripPlanToMarkdown(plan: TripPlanResponse): string {
         const title = escapeMarkdownText(safeStr(day.title) || `День ${dayNum}`);
         out.push(`## ${title}\n\n`);
         if (Array.isArray(day.morning) && day.morning.length > 0) {
-          out.push('### ⏰ Утро\n\n', blockWithMaps(day.morning), '\n');
+          out.push('### ⏰ Утро\n\n', blockWithMaps(day.morning.map((line, idx) => withDefaultTime(line, 'morning', idx))), '\n');
         }
         if (Array.isArray(day.daytime) && day.daytime.length > 0) {
-          out.push('### 🌞 День\n\n', blockWithMaps(day.daytime), '\n');
+          out.push('### 🌞 День\n\n', blockWithMaps(day.daytime.map((line, idx) => withDefaultTime(line, 'daytime', idx))), '\n');
         }
         if (Array.isArray(day.evening) && day.evening.length > 0) {
-          out.push('### 🌅 Вечер\n\n', blockWithMaps(day.evening), '\n');
+          out.push('### 🌅 Вечер\n\n', blockWithMaps(day.evening.map((line, idx) => withDefaultTime(line, 'evening', idx))), '\n');
         }
       });
     }
@@ -141,22 +181,16 @@ export function formatTripPlanToMarkdown(plan: TripPlanResponse): string {
 
   if (Array.isArray(plan.foodRecommendations) && plan.foodRecommendations.length > 0) {
     const lines = plan.foodRecommendations.map((s) => safeStr(s)).filter(Boolean);
-    if (lines.length > 0) {
-      out.push('# 🍽 Еда и рестораны\n\n', blockWithMaps(lines), '\n');
-    }
+    if (lines.length > 0) out.push('# 🍽 Еда и рестораны\n\n', blockWithMaps(lines), '\n');
   }
 
   if (Array.isArray(plan.practicalTips) && plan.practicalTips.length > 0) {
     const lines = plan.practicalTips.map((s) => safeStr(s)).filter(Boolean);
-    if (lines.length > 0) {
-      out.push('# 💡 Практические советы\n\n', block(lines), '\n');
-    }
+    if (lines.length > 0) out.push('# 💡 Практические советы\n\n', block(lines), '\n');
   }
 
   const followUp = safeStr(plan.followUpQuestion);
-  if (followUp) {
-    out.push('\n---\n\n', escapeMarkdownText(followUp));
-  }
+  if (followUp) out.push('\n---\n\n', escapeMarkdownText(followUp));
 
   const result = out.join('').trim();
   return result || '';

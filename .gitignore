@@ -36,3 +36,4 @@ dist-ssr
 *.sw?
 .vercel
 .claude/
+supabase/.temp/
