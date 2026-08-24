@@ -452,7 +452,6 @@ function upsertTrace(trace: Partial<SearchTrace> & { traceId: string }): void {
   const idx = inMemoryTraces.findIndex((t) => t.traceId === trace.traceId);
   if (idx === -1) {
     inMemoryTraces.push({
-      traceId: trace.traceId,
       timestamp: new Date().toISOString(),
       ...trace,
     });
