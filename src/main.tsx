@@ -5,7 +5,14 @@ import { App } from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
-console.info('TRIPGEN app build: asset-delivery-refresh-20260828');
+console.info('TRIPGEN app build: asset-delivery-refresh-20260828b');
+
+// Recover when a preloaded chunk fails (e.g. ERR_CONNECTION_RESET / ERR_HTTP2_PING_FAILED).
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault();
+  console.warn('Chunk preload failed, reloading…');
+  window.location.reload();
+});
 
 // Ensure the root element exists
 const rootElement = document.getElementById('root');

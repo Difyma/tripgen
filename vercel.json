@@ -14,7 +14,7 @@
       "destination": "/api/openai"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!assets|images|icons|favicon\\.ico|api).*)",
       "destination": "/index.html"
     }
   ],
