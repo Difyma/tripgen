@@ -5,7 +5,7 @@ import { App } from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
-console.log('Starting application...');
+console.info('TRIPGEN app build: asset-delivery-refresh-20260828');
 
 // Ensure the root element exists
 const rootElement = document.getElementById('root');
