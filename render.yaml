@@ -1,0 +1,78 @@
+# Render Blueprint — деплой TRIPGEN из git.
+# Два сервиса: статический фронтенд (Vite SPA) и Express API (server/).
+# Секреты помечены sync: false — их значения задаются один раз в Render Dashboard.
+
+services:
+  # ---------- Frontend: Vite SPA -> dist/ ----------
+  - type: web
+    name: tripgen-web
+    runtime: static
+    buildCommand: npm ci --include=dev && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: false
+    # SPA-rewrite: существующие файлы (/assets, /images, /icons) отдаются как есть,
+    # остальные пути уходят в index.html (аналог vercel.json).
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /images/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /icons/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    envVars:
+      # URL бэкенда, подставляется в сборку фронта (например https://tripgen-api.onrender.com)
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: VITE_OSTROVOK_PARTNER_SLUG
+        sync: false
+      - key: VITE_OSTROVOK_PARTNER_ID
+        sync: false
+
+  # ---------- Backend: Express API (server/) ----------
+  - type: web
+    name: tripgen-api
+    runtime: node
+    # server/ имеет собственный package.json (socket.io и др.), поэтому ставим оба набора зависимостей
+    buildCommand: npm ci --include=dev && npm --prefix server ci && npm run server:build
+    startCommand: node server/dist/index.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: OSTROVOK_API_URL
+        sync: false
+      - key: OSTROVOK_KEY_ID
+        sync: false
+      - key: OSTROVOK_API_TOKEN
+        sync: false
+      - key: ETG_SEARCH_TIMEOUT_MS
+        sync: false
+      - key: PGHOST
+        sync: false
+      - key: PGPORT
+        sync: false
+      - key: PGUSER
+        sync: false
+      - key: PGPASSWORD
+        sync: false
+      - key: PGDATABASE
+        sync: false
