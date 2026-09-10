@@ -32,14 +32,16 @@
 
 5. **Настройка переменных окружения**
 
+   **ВАЖНО:** Переменные с префиксом `VITE_` должны быть установлены ДО сборки проекта, чтобы Vite мог встроить их в клиентский код.
+
    Добавьте следующие переменные в панели TatNet.ru:
 
-   **Обязательные:**
+   **Обязательные (для сборки и работы):**
    - `NODE_ENV=production`
    - `PORT=3001` (или другой доступный порт)
+   - `VITE_SUPABASE_URL=ваш_url_supabase` (ВАЖНО: с префиксом VITE_)
+   - `VITE_SUPABASE_ANON_KEY=ваш_ключ_supabase` (ВАЖНО: с префиксом VITE_)
    - `OPENAI_API_KEY=ваш_ключ`
-   - `VITE_SUPABASE_URL=ваш_url_supabase`
-   - `VITE_SUPABASE_ANON_KEY=ваш_ключ_supabase`
    - `OSTROVOK_KEY_ID=ваш_key_id`
    - `OSTROVOK_API_TOKEN=ваш_api_token`
    - `OSTROVOK_API_URL=https://api.worldota.net`
@@ -77,6 +79,17 @@
 - Мониторьте работоспособность API эндпоинтов
 
 ### Решение проблем
+
+**Белый экран и ошибка Supabase:**
+```
+[Error] Error: Supabase configuration is missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.
+```
+
+**Решение:**
+1. Убедитесь, что переменные `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` установлены в панели TatNet.ru
+2. **ВАЖНО:** Переменные с префиксом `VITE_` должны быть установлены ДО начала сборки
+3. Сделайте redeploy проекта после добавления переменных окружения
+4. Проверьте логи сборки - Vite должен показать, что переменные были прочитаны
 
 **Сборка не проходит:**
 - Проверьте версию Node.js

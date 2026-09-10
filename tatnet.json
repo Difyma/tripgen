@@ -35,5 +35,10 @@
   "healthCheck": {
     "path": "/api/health",
     "interval": 30
+  },
+  "notes": {
+    "envVariables": "ВАЖНО: Переменные с префиксом VITE_ должны быть установлены ДО сборки проекта",
+    "supabase": "Без VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY фронтенд не будет работать (белый экран)",
+    "redeploy": "После добавления переменных окружения необходимо сделать redeploy проекта"
   }
 }

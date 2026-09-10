@@ -70,8 +70,10 @@ npm run build
    - `server:start` - запуск бэкенда
 
 3. **Настройте переменные окружения на TatNet.ru**
-   - Все переменные из `.env.example` должны быть добавлены в панели управления TatNet.ru
+   - Все переменные из `.env.example` должны быть добавлены в панель управления TatNet.ru
+   - **ВАЖНО:** Переменные с префиксом `VITE_` должны быть установлены ДО сборки проекта
    - Особенно важны: `OPENAI_API_KEY`, `OSTROVOK_KEY_ID`, `OSTROVOK_API_TOKEN`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+   - После добавления переменных необходимо сделать redeploy проекта
 
 ### Варианты деплоя на TatNet.ru
 
@@ -152,6 +154,17 @@ npm run db:migrate:003
 ```
 
 ## 🐛 Решение проблем
+
+### Белый экран на TatNet.ru с ошибкой Supabase
+```
+[Error] Error: Supabase configuration is missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.
+```
+
+**Решение:**
+1. Убедитесь, что переменные `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` установлены в панели TatNet.ru
+2. **ВАЖНО:** Переменные с префиксом `VITE_` должны быть установлены ДО начала сборки
+3. Сделайте redeploy проекта после добавления переменных окружения
+4. Проверьте логи сборки - Vite должен показать, что переменные были прочитаны
 
 ### Ошибка сборки на TatNet.ru
 - Проверьте версию Node.js в настройках
