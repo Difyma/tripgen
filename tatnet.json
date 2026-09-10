@@ -1,0 +1,39 @@
+{
+  "name": "ai-travel-tripgen",
+  "type": "nodejs",
+  "build": {
+    "command": "npm install && npm run build",
+    "outputDirectory": "dist"
+  },
+  "start": {
+    "command": "node server/dist/index.js"
+  },
+  "nodeVersion": "18",
+  "envVariables": {
+    "NODE_ENV": "production",
+    "PORT": "3001"
+  },
+  "requiredEnvVariables": [
+    "OPENAI_API_KEY",
+    "VITE_SUPABASE_URL",
+    "VITE_SUPABASE_ANON_KEY",
+    "OSTROVOK_KEY_ID",
+    "OSTROVOK_API_TOKEN"
+  ],
+  "optionalEnvVariables": [
+    "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_CHAT_ID",
+    "VITE_GOOGLE_MAPS_API_KEY",
+    "YANDEX_API_KEY",
+    "YANDEX_FOLDER_ID",
+    "PGHOST",
+    "PGPORT",
+    "PGUSER",
+    "PGPASSWORD",
+    "PGDATABASE"
+  ],
+  "healthCheck": {
+    "path": "/api/health",
+    "interval": 30
+  }
+}

@@ -37,3 +37,6 @@ dist-ssr
 .vercel
 .claude/
 supabase/.temp/
+.MGXTools/
+.MGXEnv.json
+.timeline.json
